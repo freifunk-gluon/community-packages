@@ -1,0 +1,6 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+uci:delete('gluon-node-info', uci:get_first('gluon-node-info', 'owner'), 'contact')
+uci:commit('gluon-node-info')
