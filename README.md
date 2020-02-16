@@ -15,6 +15,13 @@ PACKAGES_COMMUNITY_REPO=https://github.com/freifunk-gluon/community-packages.git
 PACKAGES_COMMUNITY_COMMIT=<COMMIT-HASH>
 ```
 
+## Commit guidelines
+
+* The master branch is protected against the use of `git push --force`.
+* Use Pull Requests if you are uncertain about your patches.
+* Merge commits are disabled in the master branch. If you accept single-commit pull-requests, do a "rebase"- or "squash"-merge instead.
+  This will prevent the commit-history to be cluttered with superfluous "merge" logmessages.
+
 ## Commit-message guidelines
 
 Every commit message should prefixed with the package-name, followed by a colon.
@@ -70,4 +77,3 @@ $(eval $(call BuildPackageGluon,ffXX-hello-world))
 ```
 
 After creating the package, open a pull-request to the community-repository.
-
