@@ -71,3 +71,11 @@ $(eval $(call BuildPackageGluon,ffXX-hello-world))
 
 After creating the package, open a pull-request to the community-repository.
 
+
+## Addition to the [Contributing Guidelines](https://github.com/freifunk-gluon/gluon/blob/master/CONTRIBUTING.md)
+
+for those, who have commit access:
+
+* The master branch is protected against the use of `git push --force`.
+* Use Pull Requests if you are unsure and to suggest changes to other developers.
+* Merge commits are disabled in the master branch if you accept a single-commit PR, do a "rebase"- or "squash"-merge instead. This will prevent the commit-history to be cluttered with superfluous "merge" logmessages.
