@@ -1,0 +1,81 @@
+#!/usr/bin/lua
+
+local ubus = require 'ubus'
+local dirent = require "posix.dirent"
+
+BRIDGE_NAME = "wan"
+WAN_IF_PATH = "/tmp/usb-wan-hotplug-wan-interfaces"
+
+ACTION = arg[1]
+DEVPATH = arg[2]
+
+if DEVPATH == nil then return 0 end
+NETPATH="/sys" .. DEVPATH .. "/net"
+
+function get_bridge_interfaces(bridge_name)
+	uconn = ubus.connect()
+	if not uconn then
+		error("failed to connect to ubus")
+	end
+	local status = uconn:call("network.device", "status", {})
+	local ifnames = {}
+	if status["br-" .. bridge_name] ~= nil and status["br-" .. bridge_name]["bridge-members"] ~= nil then
+		for _, ifname in ipairs(status["br-" .. bridge_name]["bridge-members"]) do
+			table.insert(ifnames, ifname)
+		end
+	end
+	ubus.close(uconn)
+	return ifnames
+end
+
+function get_usb_ifname(path)
+	local d = dirent.dir(path)
+	if not d then return nil end
+	for k, v in ipairs(d) do
+		if v ~= "." and v ~= ".." then
+			return v
+		end
+	end
+	return nil
+end
+
+function add_interface_to_bridge(bridge_name, ifname)
+	uconn = ubus.connect()
+	if not uconn then
+		error("failed to connect to ubus")
+	end
+	local status = uconn:call("network.interface." .. bridge_name, "add_device", {name = ifname})
+	ubus.close(uconn)
+	os.execute("ip link set dev " .. ifname .. " up")
+end
+
+function remove_interface_from_bridge(bridge_name, ifname)
+	uconn = ubus.connect()
+	if not uconn then
+		error("failed to connect to ubus")
+	end
+	local status = uconn:call("network.interface." .. bridge_name, "remove_device", {name = ifname})
+	ubus.close(uconn)
+end
+
+if ACTION == "add" then
+	-- Get USB ifname
+	local usb_ifname = get_usb_ifname(NETPATH)
+	if not usb_ifname then return 1 end
+
+	-- Empty WAN bridge
+	local wan_ifnames = get_bridge_interfaces(BRIDGE_NAME)
+	file = io.open(WAN_IF_PATH, "w")
+	for k, v in ipairs(wan_ifnames) do
+		file:write(v, "\n")
+		remove_interface_from_bridge(BRIDGE_NAME, v)
+	end
+	file:close()
+
+	-- Add USB ifname
+	add_interface_to_bridge(BRIDGE_NAME, usb_ifname)
+elseif ACTION == "remove" then
+	for ifname in io.lines(WAN_IF_PATH) do
+		add_interface_to_bridge(BRIDGE_NAME, ifname)
+	end
+end

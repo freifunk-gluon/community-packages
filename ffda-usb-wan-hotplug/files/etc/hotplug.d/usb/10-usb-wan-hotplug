@@ -1,0 +1,24 @@
+NETPATH="/sys${DEVPATH}/net"
+LOCKPATH="/tmp/usb-wan-hotplug-devpath"
+
+ENABLED=$(uci get usb-wan-hotplug.settings.enabled)
+MESH_WAN=$(uci get network.mesh_wan.disabled)
+
+if [ "${ACTION}" = "add" ]; then
+	[ "${ENABLED}" != "1" ] && exit 0
+	[ "${MESH_WAN}" != "1" ] && exit 0
+	test -e "${LOCKPATH}" && exit 0
+	if test -e  "${NETPATH}"; then
+		logger -t hotplug "Network USB device was plugged in"
+		echo "${DEVPATH}" > "${LOCKPATH}"
+		usb-wan-hotplug add "${DEVPATH}"
+	fi
+fi
+
+if [ "${ACTION}" = "remove" ]; then
+	if [ "x${DEVPATH}" = "x$(cat ${LOCKPATH})" ]; then
+		logger -t hotplug "Network USB device was removed"
+		usb-wan-hotplug remove "${DEVPATH}"
+		rm "${LOCKPATH}"
+	fi
+fi
