@@ -11,7 +11,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffda-usb-wan-hotplug
   TITLE:=Automatically adds USB ethernet devices to the WAN bridge
-  DEPENDS:=+gluon-core +luaposix +libubus-lua +kmod-usb-net-rndis
+  DEPENDS:=+gluon-core +luaposix +libubus-lua +kmod-usb-net-rndis +kmod-usb-net-ipheth +usbmuxd
 endef
 
 define Package/ffda-usb-wan-hotplug/description
