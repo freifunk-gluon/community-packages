@@ -1,0 +1,41 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+local dns = site.dns({})
+local dnsmasq = uci:get_first('dhcp', 'dnsmasq')
+
+-- Remove unbound default config
+local unbound_section = uci:get_first('unbound', 'unbound')
+if unbound_section ~= nil then
+	uci:delete('unbound', unbound_section)
+end
+
+uci:foreach('unbound', 'zone', function(zone)
+	uci:delete(zone['.name'])
+end)
+
+-- Disable the dnsmasq resolver
+os.execute('/etc/init.d/dnsmasq disable')
+
+-- Create unbound configuration
+uci:section('unbound', 'unbound', 'unbound', {
+	add_extra_dns = '1',
+	add_local_fqdn = '0',
+	add_wan_fqdn = '0',
+	interface_auto = '1',
+	listen_port = '53',
+	rebind_protection = '0'
+})
+
+-- Create forwarding zone
+uci:section('unbound', 'zone', 'forward_zone', {
+	enabled = '1',
+	fallback = '0',
+	zone_name = {'.'},
+	zone_type = 'forward_zone',
+	server = dns.servers
+})
+
+uci:commit('unbound')
