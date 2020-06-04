@@ -26,6 +26,7 @@ uci:section('unbound', 'unbound', 'unbound', {
 	add_wan_fqdn = '0',
 	interface_auto = '1',
 	listen_port = '53',
+	localservice = '0',
 	rebind_protection = '0'
 })
 
