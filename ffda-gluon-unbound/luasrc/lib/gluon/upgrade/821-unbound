@@ -22,7 +22,7 @@ if unbound_section ~= nil then
 end
 
 uci:foreach('unbound', 'zone', function(zone)
-	uci:delete(zone['.name'])
+	uci:delete('unbound', zone['.name'])
 end)
 
 -- Disable the dnsmasq resolver
