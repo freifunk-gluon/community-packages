@@ -6,6 +6,15 @@ local uci = require('simple-uci').cursor()
 local dns = site.dns({})
 local dnsmasq = uci:get_first('dhcp', 'dnsmasq')
 
+local function get_mem_total()
+	for line in io.lines('/proc/meminfo') do
+		local match = line:match('^MemTotal:%s+(%d+)')
+		if match then
+			return tonumber(match)
+		end
+	end
+end
+
 -- Remove unbound default config
 local unbound_section = uci:get_first('unbound', 'unbound')
 if unbound_section ~= nil then
@@ -27,7 +36,8 @@ uci:section('unbound', 'unbound', 'unbound', {
 	interface_auto = '1',
 	listen_port = '53',
 	localservice = '0',
-	rebind_protection = '0'
+	rebind_protection = '0',
+	resource = 'tiny',
 })
 
 -- Create forwarding zone
@@ -38,5 +48,9 @@ uci:section('unbound', 'zone', 'forward_zone', {
 	zone_type = 'forward_zone',
 	server = dns.servers
 })
+
+if get_mem_total() > 64*1024 then
+	uci:set('unbound', 'unbound', 'resource', 'small')
+end
 
 uci:commit('unbound')
