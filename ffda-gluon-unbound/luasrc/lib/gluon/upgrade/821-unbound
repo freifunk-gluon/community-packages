@@ -4,7 +4,6 @@ local site = require 'gluon.site'
 local uci = require('simple-uci').cursor()
 
 local dns = site.dns({})
-local dnsmasq = uci:get_first('dhcp', 'dnsmasq')
 
 local function get_mem_total()
 	for line in io.lines('/proc/meminfo') do
