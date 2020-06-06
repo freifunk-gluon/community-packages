@@ -3,17 +3,17 @@
 local ubus = require 'ubus'
 local dirent = require "posix.dirent"
 
-BRIDGE_NAME = "wan"
-WAN_IF_PATH = "/tmp/usb-wan-hotplug-wan-interfaces"
+local BRIDGE_NAME = "wan"
+local WAN_IF_PATH = "/tmp/usb-wan-hotplug-wan-interfaces"
 
-ACTION = arg[1]
-DEVPATH = arg[2]
+local ACTION = arg[1]
+local DEVPATH = arg[2]
 
 if DEVPATH == nil then return 0 end
-NETPATH="/sys" .. DEVPATH .. "/net"
+local NETPATH="/sys" .. DEVPATH .. "/net"
 
-function get_bridge_interfaces(bridge_name)
-	uconn = ubus.connect()
+local function get_bridge_interfaces(bridge_name)
+	local uconn = ubus.connect()
 	if not uconn then
 		error("failed to connect to ubus")
 	end
@@ -28,10 +28,10 @@ function get_bridge_interfaces(bridge_name)
 	return ifnames
 end
 
-function get_usb_ifname(path)
+local function get_usb_ifname(path)
 	local d = dirent.dir(path)
 	if not d then return nil end
-	for k, v in ipairs(d) do
+	for _, v in ipairs(d) do
 		if v ~= "." and v ~= ".." then
 			return v
 		end
@@ -39,22 +39,22 @@ function get_usb_ifname(path)
 	return nil
 end
 
-function add_interface_to_bridge(bridge_name, ifname)
-	uconn = ubus.connect()
+local function add_interface_to_bridge(bridge_name, ifname)
+	local uconn = ubus.connect()
 	if not uconn then
 		error("failed to connect to ubus")
 	end
-	local status = uconn:call("network.interface." .. bridge_name, "add_device", {name = ifname})
+	uconn:call("network.interface." .. bridge_name, "add_device", {name = ifname})
 	ubus.close(uconn)
 	os.execute("ip link set dev " .. ifname .. " up")
 end
 
-function remove_interface_from_bridge(bridge_name, ifname)
-	uconn = ubus.connect()
+local function remove_interface_from_bridge(bridge_name, ifname)
+	local uconn = ubus.connect()
 	if not uconn then
 		error("failed to connect to ubus")
 	end
-	local status = uconn:call("network.interface." .. bridge_name, "remove_device", {name = ifname})
+	uconn:call("network.interface." .. bridge_name, "remove_device", {name = ifname})
 	ubus.close(uconn)
 end
 
@@ -65,8 +65,8 @@ if ACTION == "add" then
 
 	-- Empty WAN bridge
 	local wan_ifnames = get_bridge_interfaces(BRIDGE_NAME)
-	file = io.open(WAN_IF_PATH, "w")
-	for k, v in ipairs(wan_ifnames) do
+	local file = io.open(WAN_IF_PATH, "w")
+	for _, v in ipairs(wan_ifnames) do
 		file:write(v, "\n")
 		remove_interface_from_bridge(BRIDGE_NAME, v)
 	end
