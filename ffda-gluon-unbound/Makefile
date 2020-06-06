@@ -11,7 +11,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffda-gluon-unbound
   TITLE:=Drop-in replacement for the local node resolver
-  DEPENDS:=+gluon-core +unbound-daemon
+  DEPENDS:=+gluon-core +unbound-daemon +ca-bundle
 endef
 
 define Package/ffda-gluon-unbound/description

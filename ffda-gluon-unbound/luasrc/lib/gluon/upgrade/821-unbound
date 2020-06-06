@@ -48,6 +48,39 @@ uci:section('unbound', 'zone', 'forward_zone', {
 	server = dns.servers
 })
 
+-- Configure operation with DoT upstream
+local dot_servers = site.unbound.dot.servers()
+if dot_servers ~= nil then
+	-- Remove existing server list
+	uci:delete('unbound', 'forward_zone', 'server')
+
+	-- Add DoT servers
+	for _, v in pairs(dot_servers) do
+		local hostname = v['hostname']
+		local addresses = v['addresses']
+		local port = v['port'] or 853
+
+		for _, address in ipairs(addresses) do
+			local entry = address .. '@' .. port .. '#' .. hostname
+			uci:set('unbound', 'forward_zone', 'server', {entry})
+		end
+		uci:set('unbound', 'forward_zone', 'tls_upstream', 1)
+	end
+
+	-- DoT needs a valid NTP time in order to verify the certificates
+	-- Add zones for NTP servers which will be resolved using plain DNS
+	local ntp_servers = site.ntp_servers()
+	if ntp_servers ~= nil then
+		uci:section('unbound', 'zone', 'ntp_zone', {
+			enabled = '1',
+			fallback = '0',
+			zone_name = ntp_servers,
+			zone_type = 'forward_zone',
+			server = dns.servers
+		})
+	end
+end
+
 if get_mem_total() > 64*1024 then
 	uci:set('unbound', 'unbound', 'resource', 'small')
 end
