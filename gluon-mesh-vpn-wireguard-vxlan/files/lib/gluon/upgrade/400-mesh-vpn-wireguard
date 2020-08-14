@@ -1,0 +1,37 @@
+#!/bin/sh
+
+rm /etc/config/wireguard
+touch /etc/config/wireguard
+
+uci set wireguard.wireguard=wireguard
+
+
+#Ist multidomainsupport aktiviert?
+domain=$(uci get gluon.core.domain)
+if [ -z "$domain" ]; then {                     #falls nein
+        datei="/lib/gluon/site.json";
+} else {                                        #falls ja
+        datei="/lib/gluon/domains/$domain.json";
+}
+fi 
+
+uci set wireguard.wireguard.enabled=$(jsonfilter -i $datei -e "$.mesh_vpn.wireguard.enabled")
+uci set wireguard.wireguard.iface=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.iface")   
+uci set wireguard.wireguard.limit=$(jsonfilter -i $datei -e "$.mesh_vpn.wireguard.limit")     
+uci set wireguard.wireguard.privkey=$(jsonfilter -i $datei -e "$.mesh_vpn.wireguard.privkey")
+                                                                                                
+#Wieviele peers haben wir denn?                                                                 
+anzahl=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers.*" | wc -l)                       
+anzahl=`expr $anzahl - 1`                                                                       
+                                                                                                
+i=0                                                                      
+while [ $i -le $anzahl ]                                                 
+do                                                                       
+        uci set wireguard.peer_$(expr $i + 1)=peer
+        uci set wireguard.peer_$(expr $i + 1).endpoint=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].endpoint")
+        uci set wireguard.peer_$(expr $i + 1).publickey=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].publickey")
+        uci set wireguard.peer_$(expr $i + 1).link_address=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].link_address")
+        i=`expr $i + 1`                                                                                                       
+done                                                                                                                          
+                                                                                                                              
+uci commit wireguard          
