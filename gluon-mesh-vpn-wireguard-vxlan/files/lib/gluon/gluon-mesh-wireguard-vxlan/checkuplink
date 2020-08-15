@@ -41,9 +41,9 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
 
 		# Delete Interfaces
-		ip link set nomaster bat0 dev vx_mesh_vpn
-		ip link delete dev vx_mesh_vpn
-		ip link del $MESH_VPN_IFACE
+		ip link set nomaster bat0 dev vx_mesh_vpn &> /dev/null
+		ip link delete dev vx_mesh_vpn &> /dev/null
+		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
 		echo $(uci get wireguard.wireguard.privatekey) > /tmp/wgpriv
 
