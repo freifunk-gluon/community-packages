@@ -37,7 +37,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	if [ $CONNECTED != 1 ]; then                                    
 
 		# Get the number of configured peers and randomly select one
-		NUMBER_OF_PEERS=$(uci show wireguard | egrep -ce peer_[0-9]+.endpoint)
+		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
 		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
 
 		# Delete Interfaces
