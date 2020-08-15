@@ -1,0 +1,68 @@
+#!/bin/sh
+
+xor2() {
+	echo -n "${1:0:1}"
+	echo -n "${1:1:1}" | tr '0123456789abcdef' '23016745ab89efcd'
+}
+
+interface_linklocal() {
+	# We generate a predictable v6 address
+	local macaddr="$(echo $(uci get wireguard.wireguard.privatekey | wg pubkey) |md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')"
+	local oldIFS="$IFS"; IFS=':'; set -- $macaddr; IFS="$oldIFS"
+	echo "fe80::$(xor2 "$1")$2:$3ff:fe$4:$5$6"
+}
+
+# Do we already have a private-key? If not generate one
+temp=$(uci get wireguard.wireguard.privatekey);
+if [ "$?" -ne "0" ]; then
+	uci set wireguard.wireguard.privatekey=$(wg genkey);
+	uci commit wireguard
+fi
+
+# Is wireguard enabled?
+if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wireguard.wireguard.enabled)" == "1" ]; then
+
+	#We assume we are not connected by default
+	CONNECTED=0
+
+	INTERFACE=$(uci get wireguard.wireguard.iface)
+
+	# Check connectivity to supernode
+	ping -c1 -w2  $(wg  | grep fe80 | cut -d'/' -f1 | awk '{print $3}')%$MESH_VPN_IFACE
+	if [ $? == 0 ]; then
+			CONNECTED=1
+	fi
+
+	# If we don't have a connection we try to connect
+	if [ $CONNECTED != 1 ]; then                                    
+
+		# Get the number of configured peers and randomly select one
+		NUMBER_OF_PEERS=$(uci show wireguard | egrep -ce peer_[0-9]+.endpoint)
+		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
+
+		# Delete Interfaces
+		ip link set nomaster bat0 dev vx_mesh_vpn
+		ip link delete dev vx_mesh_vpn
+		ip link del $MESH_VPN_IFACE
+		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
+		echo $(uci get wireguard.wireguard.privatekey) > /tmp/wgpriv
+
+		# For future use
+		#curl -s -k --data-urlencode "pubkey=$PUBLICKEY" https://$URL/wireguard.php
+
+		# Bring up the wireguard interface
+		ip link add dev $MESH_VPN_IFACE type wireguard
+		wg set $MESH_VPN_IFACE private-key /tmp/wgpriv
+		ip link set up dev $MESH_VPN_IFACE
+
+		# Add link-address and Peer
+		ip address add "$(interface_linklocal "$MESH_VPN_IFACE")"/64 dev $MESH_VPN_IFACE
+		gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get uci get wireguard.peer_$PEER.link_address)/128 endpoint $(uci get wireguard.peer_$PEER.endpoint)
+
+		# Bring up VXLAN
+		ip link add vx_mesh_vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vxlan", 3), 16))')" remote $(uci get uci get wireguard.peer_$PEER.link_address) dstport 4789 dev $MESH_VPN_IFACE
+		ip link set up dev vx_mesh_vpn
+
+		ip link set master bat0 dev vx_mesh_vpn
+	fi
+fi

@@ -9,7 +9,7 @@ You should use something like the following in the site.conf:
  mesh_vpn = {
         mtu = 1400,
         wireguard = {
-                enabled = 'true',
+                enabled = '1',
                 iface = 'mesh-vpn',
                 limit = '1', -- actually unused
                 peers = {
