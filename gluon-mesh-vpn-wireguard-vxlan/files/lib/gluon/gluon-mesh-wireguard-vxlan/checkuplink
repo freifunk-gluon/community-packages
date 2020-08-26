@@ -25,7 +25,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	#We assume we are not connected by default
 	CONNECTED=0
 
-	INTERFACE=$(uci get wireguard.wireguard.iface)
+	MESH_VPN_IFACE=$(uci get wireguard.wireguard.iface)
 
 	# Check connectivity to supernode
 	ping -c1 -w2  $(wg  | grep fe80 | cut -d'/' -f1 | awk '{print $3}')%$MESH_VPN_IFACE
@@ -57,10 +57,10 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 
 		# Add link-address and Peer
 		ip address add "$(interface_linklocal "$MESH_VPN_IFACE")"/64 dev $MESH_VPN_IFACE
-		gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get uci get wireguard.peer_$PEER.link_address)/128 endpoint $(uci get wireguard.peer_$PEER.endpoint)
+		gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $(uci get wireguard.peer_$PEER.endpoint)
 
 		# Bring up VXLAN
-		ip link add vx_mesh_vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vxlan", 3), 16))')" remote $(uci get uci get wireguard.peer_$PEER.link_address) dstport 4789 dev $MESH_VPN_IFACE
+		ip link add vx_mesh_vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 4789 dev $MESH_VPN_IFACE
 		ip link set up dev vx_mesh_vpn
 
 		ip link set master bat0 dev vx_mesh_vpn
