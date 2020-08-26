@@ -1,5 +1,8 @@
 #!/bin/sh
-privkey=$(wireguard.wireguard.privatekey)
+
+# Make sure we store the private key
+privkey=$(uci getwireguard.wireguard.privatekey)
+
 echo > /etc/config/wireguard
 
 uci set wireguard.wireguard=wireguard
