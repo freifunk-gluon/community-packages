@@ -1,5 +1,5 @@
 #!/bin/sh
-
+privkey=$(wireguard.wireguard.privatekey)
 echo > /etc/config/wireguard
 
 uci set wireguard.wireguard=wireguard
