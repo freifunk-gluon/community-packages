@@ -48,7 +48,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		echo $(uci get wireguard.wireguard.privatekey) > /tmp/wgpriv
 
 		# For future use
-		#curl -s -k --data-urlencode "pubkey=$PUBLICKEY" https://$URL/wireguard.php
+		curl -s http://gw03.ext.ffmuc.net:5000/wg-public-key/$PUBLICKEY
 
 		# Bring up the wireguard interface
 		ip link add dev $MESH_VPN_IFACE type wireguard
@@ -64,7 +64,8 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		ip link set up dev vx_mesh_vpn
 
 		ip link set master bat0 dev vx_mesh_vpn
-        # We need to allow incoming vxlan traffic on mesh iface
-        ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 4789 -j ACCEPT 
+        	# We need to allow incoming vxlan traffic on mesh iface
+		sleep 10
+        	ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 4789 -j ACCEPT 
 	fi
 fi
