@@ -48,7 +48,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		echo $(uci get wireguard.wireguard.privatekey) > /tmp/wgpriv
 
 		# For future use
-		curl -s http://gw03.ext.ffmuc.net:5000/wg-public-key/$PUBLICKEY
+		wget -q http://gw03.ext.ffmuc.net:5000/wg-public-key/$PUBLICKEY
 
 		# Bring up the wireguard interface
 		ip link add dev $MESH_VPN_IFACE type wireguard
