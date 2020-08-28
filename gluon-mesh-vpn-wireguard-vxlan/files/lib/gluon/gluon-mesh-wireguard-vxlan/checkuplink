@@ -45,14 +45,13 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		ip link delete dev vx_mesh_vpn &> /dev/null
 		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
-		echo $(uci get wireguard.wireguard.privatekey) > /tmp/wgpriv
 
 		# For future use
 		gluon-wan wget -q http://gw03.ext.ffmuc.net:5000/wg-public-key/$PUBLICKEY
 
 		# Bring up the wireguard interface
 		ip link add dev $MESH_VPN_IFACE type wireguard
-		wg set $MESH_VPN_IFACE private-key /tmp/wgpriv
+		uci get wireguard.wireguard.privatekey | wg set $MESH_VPN_IFACE private-key /proc/self/fd/0
 		ip link set up dev $MESH_VPN_IFACE
 
 		# Add link-address and Peer
