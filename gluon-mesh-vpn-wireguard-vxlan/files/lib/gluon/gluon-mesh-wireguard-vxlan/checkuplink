@@ -68,6 +68,8 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		ip link set up dev vx_mesh_vpn
 
 		ip link set master bat0 dev vx_mesh_vpn
-
+		
+		# If we have a BATMAN_V env we need to correct the throughput value now
+		if [ -f /sys/devices/virtual/net/vx_mesh_vpn/batman_adv/throughput_override ]; then echo 1000000 > /sys/devices/virtual/net/vx_mesh_vpn/batman_adv/throughput_override; fi
 	fi
 fi
