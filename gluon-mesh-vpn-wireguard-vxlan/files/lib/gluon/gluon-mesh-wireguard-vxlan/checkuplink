@@ -12,6 +12,25 @@ interface_linklocal() {
 	echo "fe80::$(xor2 "$1")$2:$3ff:fe$4:$5$6"
 }
 
+clean_port(){
+	echo "$(echo $1 | sed -r 's/:[0-9]+$|\[|\]//g')"
+}
+
+check_handshake() {
+	wg | grep -q handshake
+	if [ $? == 1 ]; then
+		local gateway="$(clean_port $1)"
+		local peer="$(clean_port "$(wg | grep endpoint | awk '{print $2}')")"
+		local other_ip="$(gluon-wan nslookup $gateway | grep -v $peer | grep 'Address [0-9]')"
+		if [ "$other_ip" == "" ]; then
+			exit 1
+		fi
+		echo "$(echo $other_ip | sed -r s/Address\ [0-9]://)$(echo $1 | egrep -oe :[0-9]+$)"
+		exit 0
+	fi
+	exit 1
+}
+
 # Do we already have a private-key? If not generate one
 temp=$(uci get wireguard.wireguard.privatekey);
 if [ "$?" -ne "0" ]; then
@@ -40,9 +59,11 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
 		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
 
+		endpoint="$(check_handshake "$(uci get wireguard.peer_$PEER.endpoint)")"
+
 		# Delete Interfaces
-		ip link set nomaster bat0 dev vx_mesh_vpn &> /dev/null
-		ip link delete dev vx_mesh_vpn &> /dev/null
+		ip link set nomaster bat0 dev mesh-vpn &> /dev/null
+		ip link delete dev mesh-vpn &> /dev/null
 		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
 
@@ -56,19 +77,20 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 
 		# Add link-address and Peer
 		ip address add "$(interface_linklocal "$MESH_VPN_IFACE")"/64 dev $MESH_VPN_IFACE
-		gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $(uci get wireguard.peer_$PEER.endpoint)
-		
+		if [ "$endpoint" == "" ]; then
+			gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $(uci get wireguard.peer_$PEER.endpoint)
+		else
+			gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $endpoint
+		fi
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
         	ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 4789 -j ACCEPT
 		
 		# Bring up VXLAN
-		ip link add vx_mesh_vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 4789 dev $MESH_VPN_IFACE
-		ip link set up dev vx_mesh_vpn
+		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 4789 dev $MESH_VPN_IFACE
+		ip link set up dev mesh-vpn
 
-		ip link set master bat0 dev vx_mesh_vpn
-		
 		# If we have a BATMAN_V env we need to correct the throughput value now
-		if [ -f /sys/devices/virtual/net/vx_mesh_vpn/batman_adv/throughput_override ]; then echo 1000000 > /sys/devices/virtual/net/vx_mesh_vpn/batman_adv/throughput_override; fi
+		if [ -f /sys/devices/virtual/net/mesh-vpn/batman_adv/throughput_override ]; then echo 1000000 > /sys/devices/virtual/net/mesh-vpn/batman_adv/throughput_override; fi
 	fi
 fi
