@@ -54,14 +54,14 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	fi
 
 	# If we don't have a connection we try to connect
-	if [ $CONNECTED != 1 ]; then                                    
+	if [ $CONNECTED != 1 ]; then
+		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ntp.ext.ffmuc.net -q
 
 		# Get the number of configured peers and randomly select one
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
 		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
 
 		endpoint="$(check_handshake "$(uci get wireguard.peer_$PEER.endpoint)")"
-		wg_listen_port="$( wg | grep "listening port" | awk '{print $3}' )"
 
 		# Delete Interfaces
 		ip link set nomaster bat0 dev mesh-vpn &> /dev/null
@@ -70,13 +70,6 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
 		SEGMENT=$(uci get gluon.core.domain)
                 LISTENPORT=$(uci get wireguard.wireguard.listen_port||echo 0)
-                if [ -z $wg_listen_port ] ; then
-                        wg_listen_port=0
-                fi
-                if [ "$LISTENPORT" = "0" -a $wg_listen_port -gt 0 ]; then
-                        LISTENPORT="$wg_listen_port"
-                        uci set wireguard.wireguard.listen_port=$LISTENPORT ; uci commit
-                fi
 
                 # For future use
                 gluon-wan wget -q  -O- --post-data='{"segment": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://gw03.ext.ffmuc.net:5000/api/v1/wg/key/exchange
