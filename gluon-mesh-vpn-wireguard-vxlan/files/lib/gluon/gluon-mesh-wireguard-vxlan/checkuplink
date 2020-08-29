@@ -86,7 +86,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		fi
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
-        	ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 4789 -j ACCEPT
+        	ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT
 		
 		# Bring up VXLAN
 		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 8472 dev $MESH_VPN_IFACE
