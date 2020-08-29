@@ -17,10 +17,11 @@ clean_port(){
 }
 
 check_handshake() {
-	wg | grep -q handshake
+	local MESH_VPN_IFACE=$(uci get wireguard.wireguard.iface)
+	wg show $MESH_VPN_IFACE | grep -q handshake
 	if [ $? == 1 ]; then
 		local gateway="$(clean_port $1)"
-		local peer="$(clean_port "$(wg | grep endpoint | awk '{print $2}')")"
+		local peer="$(clean_port "$(wg show $MESH_VPN_IFACE | grep endpoint | awk '{print $2}')")"
 		local other_ip="$(gluon-wan nslookup $gateway | grep -v $peer | grep 'Address [0-9]')"
 		if [ "$other_ip" == "" ]; then
 			exit 1
