@@ -17,20 +17,31 @@ clean_port() {
 }
 
 check_handshake() {
+	local peer_publickey="$1"
+	local peer_endpoint="$2"
 	local MESH_VPN_IFACE=$(uci get wireguard.wireguard.iface)
-	wg show $MESH_VPN_IFACE | grep -q handshake
-	if [ $? == 1 ]; then
-		local gateway="$(clean_port $1)"
-		local peer="$(clean_port "$(wg show $MESH_VPN_IFACE | grep endpoint | awk '{print $2}')")"
-		local other_ip="$(gluon-wan nslookup $gateway | grep -v $peer | grep 'Address [0-9]')"
-		if [ "$other_ip" == "" ]; then
+	local peer_handshakes="$(wg show $MESH_VPN_IFACE latest-handshakes|grep "$peer_publickey"|awk '{print $2}'||0)"
+	if [ "$peer_handshakes" = "0" ] ; then
+		local gateway="$(clean_port $peer_endpoint)"
+		local peer="$(clean_port "$(wg show $MESH_VPN_IFACE endpoints|grep "$peer_publickey"|awk '{print $2}')")"
+		local other_ip="$(gluon-wan nslookup $gateway | grep -v "$peer" | grep 'Address [0-9]')"
+		if [ "$other_ip" == "" ] ; then
 			exit 1
 		fi
-		echo "$(echo $other_ip | sed -r s/Address\ [0-9]://)$(echo $1 | egrep -oe :[0-9]+$)"
+		echo "$(echo $other_ip | sed -r s/Address\ [0-9]://)$(echo $peer_endpoint | egrep -oe :[0-9]+$)"
 		exit 0
 	fi
 	exit 1
 }
+
+#Set Debug SSID
+if [ $(uci get gluon.debug_ssid_enabled||echo false) = 'true' ] ; then
+        suffix="$(uci get network.bat0.macaddr | sed "s/://g; s/^........//g")"
+        if ! grep -q "muenchen.freifunk.net/$suffix" /etc/config/wireless ; then
+                sed "s|muenchen.freifunk.net/.*|muenchen.freifunk.net/test_$suffix'|g" /etc/config/wireless -i
+                wifi
+        fi
+fi
 
 # Do we already have a private-key? If not generate one
 temp=$(uci get wireguard.wireguard.privatekey)
@@ -48,20 +59,22 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	MESH_VPN_IFACE=$(uci get wireguard.wireguard.iface)
 
 	# Check connectivity to supernode
-	ping -c1 -w2  $(wg  | grep fe80 | cut -d'/' -f1 | awk '{print $3}')%$MESH_VPN_IFACE
+ 	ping -c1 -w2  $(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE
 	if [ $? == 0 ]; then
 			CONNECTED=1
 	fi
 
 	# If we don't have a connection we try to connect
 	if [ $CONNECTED != 1 ]; then
-		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ntp.ext.ffmuc.net -q
+		NTP_SERVER=$(uci get system.ntp.server)
+		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p $NTP_SERVER -q
 
 		# Get the number of configured peers and randomly select one
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
-		PEER=$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')
+		PEER="$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')"
+		PEER_PUBLICKEY="$(uci get wireguard.peer_$PEER.publickey)"
 
-		endpoint="$(check_handshake "$(uci get wireguard.peer_$PEER.endpoint)")"
+		endpoint="$(check_handshake "$PEER_PUBLICKEY" "$(uci get wireguard.peer_$PEER.endpoint)")"
 
 		# Delete Interfaces
 		ip link set nomaster bat0 dev mesh-vpn &> /dev/null
