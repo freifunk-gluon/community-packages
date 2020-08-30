@@ -32,6 +32,15 @@ check_handshake() {
 	exit 1
 }
 
+#Set Debug SSID
+if [ $(uci get gluon.debug_ssid_enabled||echo false) = 'true' ] ; then
+        suffix="$(uci get network.bat0.macaddr | sed "s/://g; s/^........//g")"
+        if ! grep -q "muenchen.freifunk.net/$suffix" /etc/config/wireless ; then
+                sed "s|muenchen.freifunk.net/.*|muenchen.freifunk.net/test_$suffix'|g" /etc/config/wireless -i
+                wifi
+        fi
+fi
+
 # Do we already have a private-key? If not generate one
 temp=$(uci get wireguard.wireguard.privatekey)
 if [ "$?" -ne "0" ]; then
