@@ -12,7 +12,7 @@ interface_linklocal() {
 	echo "fe80::$(xor2 "$1")$2:$3ff:fe$4:$5$6"
 }
 
-clean_port(){
+clean_port() {
 	echo "$(echo $1 | sed -r 's/:[0-9]+$|\[|\]//g')"
 }
 
@@ -33,9 +33,9 @@ check_handshake() {
 }
 
 # Do we already have a private-key? If not generate one
-temp=$(uci get wireguard.wireguard.privatekey);
+temp=$(uci get wireguard.wireguard.privatekey)
 if [ "$?" -ne "0" ]; then
-	uci set wireguard.wireguard.privatekey=$(wg genkey);
+	uci set wireguard.wireguard.privatekey=$(wg genkey)
 	uci commit wireguard
 fi
 
@@ -69,8 +69,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.wireguard.privatekey | wg pubkey)
 		SEGMENT=$(uci get gluon.core.domain)
-                LISTENPORT=$(uci get wireguard.wireguard.listen_port||echo 0)
-
+		
                 # For future use
                 gluon-wan wget -q  -O- --post-data='{"segment": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://gw03.ext.ffmuc.net:5000/api/v1/wg/key/exchange
 
@@ -84,7 +83,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		if [ "$endpoint" == "" ]; then
 			endpoint=$(uci get wireguard.peer_$PEER.endpoint)
 		fi
-		gluon-wan wg set $MESH_VPN_IFACE listen-port $LISTENPORT peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $endpoint
+		gluon-wan wg set $MESH_VPN_IFACE peer $(uci get wireguard.peer_$PEER.publickey) persistent-keepalive 25 allowed-ips $(uci get wireguard.peer_$PEER.link_address)/128 endpoint $endpoint
 		
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
