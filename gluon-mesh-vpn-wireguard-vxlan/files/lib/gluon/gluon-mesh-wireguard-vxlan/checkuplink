@@ -36,9 +36,11 @@ check_handshake() {
 
 #Set Debug SSID
 if [ $(uci get gluon.debug_ssid_enabled||echo false) = 'true' ] ; then
-        suffix="$(uci get network.bat0.macaddr | sed "s/://g; s/^........//g")"
-        if ! grep -q "muenchen.freifunk.net/$suffix" /etc/config/wireless ; then
-                sed "s|muenchen.freifunk.net/.*|muenchen.freifunk.net/test_$suffix'|g" /etc/config/wireless -i
+        suffix="$(uci get network.bat0.macaddr)"
+        if ! grep -q "dev.ffmuc.net/$suffix" /etc/config/wireless ; then
+                sed "s|muenchen.freifunk.net/.*|dev.ffmuc.net/$suffix'|g" /etc/config/wireless -i
+		uci -q set wireless.radio0.txpower="$(uci -q get gluon.debug_tx_power|| echo 0)"
+		uci -q set wireless.radio1.txpower="$(uci -q get gluon.debug_tx_power|| echo 0)"
                 wifi
         fi
 fi
