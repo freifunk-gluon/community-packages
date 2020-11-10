@@ -1,15 +1,10 @@
 #!/bin/sh
 
-xor2() {
-	echo -n "${1:0:1}"
-	echo -n "${1:1:1}" | tr '0123456789abcdef' '23016745ab89efcd'
-}
-
 interface_linklocal() {
 	# We generate a predictable v6 address
 	local macaddr="$(echo $(uci get wireguard.wireguard.privatekey | wg pubkey) |md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')"
 	local oldIFS="$IFS"; IFS=':'; set -- $macaddr; IFS="$oldIFS"
-	echo "fe80::$(xor2 "$1")$2:$3ff:fe$4:$5$6"
+	echo "fe80::$1$2:$3ff:fe$4:$5$6"
 }
 
 clean_port() {
