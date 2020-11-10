@@ -81,7 +81,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		SEGMENT=$(uci get gluon.core.domain)
 		
                 # For future use
-                gluon-wan wget -q  -O- --post-data='{"segment": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://gw03.ext.ffmuc.net:5000/api/v1/wg/key/exchange
+                gluon-wan wget -q  -O- --post-data='{"segment": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://broker.ffmuc.net/api/v1/wg/key/exchange
 
 		# Bring up the wireguard interface
 		ip link add dev $MESH_VPN_IFACE type wireguard
