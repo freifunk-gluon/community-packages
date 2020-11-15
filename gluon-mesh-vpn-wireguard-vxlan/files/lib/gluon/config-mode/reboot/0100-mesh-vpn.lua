@@ -38,9 +38,9 @@ elseif has_fastd then
 		msg = site_i18n._translate('gluon-config-mode:novpn')
 	end
 elseif has_wireguard then
-	local wireguard_enabled = uci:get_bool("wireguard", "wireguard", "enabled")
+	local wireguard_enabled = uci:get_bool("wireguard", "mesh_vpn", "enabled")
 	if wireguard_enabled then
-		pubkey = util.trim(util.exec("uci get wireguard.wireguard.privatekey | wg pubkey"))
+		pubkey = util.trim(util.exec("uci get wireguard.mesh_vpn.privatekey | wg pubkey"))
 		msg = site_i18n._translate('gluon-config-mode:pubkey')
         else
                 msg = site_i18n._translate('gluon-config-mode:novpn')
