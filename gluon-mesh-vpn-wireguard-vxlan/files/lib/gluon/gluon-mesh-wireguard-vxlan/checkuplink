@@ -56,7 +56,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	MESH_VPN_IFACE=$(uci get wireguard.wireguard.iface)
 
 	# Check connectivity to supernode
- 	ping -c1 -w2  $(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE
+ 	ping -c5 -W2 -w5 $(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE
 	if [ $? == 0 ]; then
 			CONNECTED=1
 	fi
