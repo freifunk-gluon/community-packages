@@ -64,7 +64,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	logger -t checkuplink "CONNECTED is $CONNECTED"
 	
 	# If we don't have a connection we try to connect
-	if [ $CONNECTED != 1 ]; then
+	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
 		NTP_SERVER=$(uci get system.ntp.server)
 		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p $NTP_SERVER -q
