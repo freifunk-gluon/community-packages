@@ -13,11 +13,11 @@ return function(form, uci)
 
 	local msg = pkg_i18n.translate(
 		'Your internet connection can be used to establish a ' ..
-	        'VPN connection with other nodes. ' ..
-	        'Enable this option if there are no other nodes reachable ' ..
-	        'over WLAN in your vicinity or you want to make a part of ' ..
-	        'your connection\'s bandwidth available for the network. You can limit how ' ..
-	        'much bandwidth the node will use at most.'
+		'VPN connection with other nodes. ' ..
+		'Enable this option if there are no other nodes reachable ' ..
+		'over WLAN in your vicinity or you want to make a part of ' ..
+		'your connection\'s bandwidth available for the network. You can limit how ' ..
+		'much bandwidth the node will use at most.'
 	)
 
 	local s = form:section(Section, nil, msg)
@@ -25,7 +25,7 @@ return function(form, uci)
 	local o
 
 	local meshvpn = s:option(Flag, "meshvpn", pkg_i18n.translate("Use internet connection (mesh VPN)"))
-	meshvpn.default = uci:get_bool("fastd", "mesh_vpn", "enabled") or uci:get_bool("tunneldigger", "mesh_vpn", "enabled") or uci:get_bool("wireguard","wireguard","enabled")
+	meshvpn.default = uci:get_bool("fastd", "mesh_vpn", "enabled") or uci:get_bool("tunneldigger", "mesh_vpn", "enabled") or uci:get_bool("wireguard","mesh_vpn","enabled")
 	function meshvpn:write(data)
 		if has_fastd then
 			uci:set("fastd", "mesh_vpn", "enabled", data)
@@ -34,7 +34,7 @@ return function(form, uci)
 			uci:set("tunneldigger", "mesh_vpn", "enabled", data)
 		end
 		if has_wireguard then
-			uci:set("wireguard","wireguard","enabled",data)
+			uci:set("wireguard","mesh_vpn","enabled",data)
 		end
 	end
 

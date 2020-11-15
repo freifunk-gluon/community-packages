@@ -1,39 +1,42 @@
-#!/bin/sh
+#!/usr/bin/lua
 
-# Make sure we store the private key
-privkey=$(uci get wireguard.wireguard.privatekey)
+local site = require 'gluon.site'
+local uci = require("simple-uci").cursor()
+local util = require "gluon.util"
 
-echo > /etc/config/wireguard
+local privkey = uci:get("wireguard", "mesh_vpn", "privatekey") or
+        util.trim(util.exec("wg genkey"))
 
-uci set wireguard.wireguard=wireguard
+-- Clean up previous configuration
+uci:delete_all('wireguard', 'peer', function(peer)
+	return peer.preserve ~= '1'
+end)
+-- Clean up previous configuration
+uci:delete_all('wireguard', 'wireguard', function(peer)
+	return peer.preserve ~= '1'
+end)
 
+local mesh_enabled = false
+if uci:get("gluon", "mesh_vpn", "enabled") then
+  if site.mesh_vpn.wireguard.enabled() then
+    mesh_enabled = true
+  end
+end
 
-#Are we running in multidomain mode?
-domain=$(uci get gluon.core.domain)
-if [ -z "$domain" ]; then {                     #nope
-        datei="/lib/gluon/site.json";
-} else {                                        #yep
-        datei="/lib/gluon/domains/$domain.json";
-}
-fi 
+uci:section("wireguard", "wireguard", "mesh_vpn", {
+        iface = site.mesh_vpn.wireguard.iface(),
+        limit = site.mesh_vpn.wireguard.limit(),
+        enabled = mesh_enabled,
+        privatekey = privkey,
+})
 
-uci set wireguard.wireguard.enabled=$(jsonfilter -i $datei -e "$.mesh_vpn.wireguard.enabled")
-uci set wireguard.wireguard.iface=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.iface")   
-uci set wireguard.wireguard.limit=$(jsonfilter -i $datei -e "$.mesh_vpn.wireguard.limit")     
-echo "set wireguard.wireguard.privatekey=$privkey" | uci batch
-                                                                                                
-#How many peers do we have                                                               
-anzahl=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers.*" | wc -l)                       
-anzahl=`expr $anzahl - 1`                                                                       
-                                                                                                
-i=0                                                                      
-while [ $i -le $anzahl ]                                                 
-do                                                                       
-        uci set wireguard.peer_$(expr $i + 1)=peer
-        uci set wireguard.peer_$(expr $i + 1).endpoint=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].endpoint")
-        uci set wireguard.peer_$(expr $i + 1).publickey=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].publickey")
-        uci set wireguard.peer_$(expr $i + 1).link_address=$(jsonfilter -i $datei  -e "$.mesh_vpn.wireguard.peers[$i].link_address")
-        i=`expr $i + 1`                                                                                                       
-done                                                                                                                          
-                                                                                                                              
-uci commit wireguard          
+for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
+        uci:section("wireguard", "peer", "peer_" .. name, {
+                enabled = true,
+                endpoint = peer.endpoint,
+                publickey = peer.publickey,
+                link_address = peer.link_address,
+        })
+end
+
+uci:save('wireguard')
