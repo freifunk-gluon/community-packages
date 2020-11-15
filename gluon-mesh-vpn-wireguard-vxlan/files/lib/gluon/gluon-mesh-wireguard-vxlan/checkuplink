@@ -2,7 +2,7 @@
 
 interface_linklocal() {
 	# We generate a predictable v6 address
-	local macaddr="$(echo $(uci get wireguard.wireguard.privatekey | wg pubkey) |md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')"
+	local macaddr="$(echo $(uci get wireguard.mesh_vpn.privatekey | wg pubkey) |md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')"
 	local oldIFS="$IFS"; IFS=':'; set -- $macaddr; IFS="$oldIFS"
 	echo "fe80::$1$2:$3ff:fe$4:$5$6"
 }
