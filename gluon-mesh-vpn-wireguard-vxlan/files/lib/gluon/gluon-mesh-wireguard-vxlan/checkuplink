@@ -60,9 +60,12 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 	if [ $? == 0 ]; then
 			CONNECTED=1
 	fi
-
+	
+	logger -t checkuplink "CONNECTED is $CONNECTED"
+	
 	# If we don't have a connection we try to connect
 	if [ $CONNECTED != 1 ]; then
+		logger -t checkuplink "Reconnecting ..."
 		NTP_SERVER=$(uci get system.ntp.server)
 		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p $NTP_SERVER -q
 
@@ -70,8 +73,12 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
 		PEER="$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')"
 		PEER_PUBLICKEY="$(uci get wireguard.peer_$PEER.publickey)"
+		
+		logger -t checkuplink "Selected peer $PEER"
 
 		endpoint="$(check_handshake "$PEER_PUBLICKEY" "$(uci get wireguard.peer_$PEER.endpoint)")"
+		
+		logger -t checkuplink "Connecting to $endpoint"
 
 		# Delete Interfaces
 		ip link set nomaster bat0 dev mesh-vpn &> /dev/null
