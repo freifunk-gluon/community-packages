@@ -31,13 +31,13 @@ check_handshake() {
 
 #Set Debug SSID
 if [ $(uci get gluon.debug_ssid_enabled||echo false) = 'true' ] ; then
-        suffix="$(uci get network.bat0.macaddr)"
-        if ! grep -q "dev.ffmuc.net/$suffix" /etc/config/wireless ; then
-                sed "s|muenchen.freifunk.net/.*|dev.ffmuc.net/$suffix'|g" /etc/config/wireless -i
+	suffix="$(uci get network.bat0.macaddr)"
+	if ! grep -q "dev.ffmuc.net/$suffix" /etc/config/wireless ; then
+		sed "s|muenchen.freifunk.net/.*|dev.ffmuc.net/$suffix'|g" /etc/config/wireless -i
 		uci -q set wireless.radio0.txpower="$(uci -q get gluon.debug_tx_power|| echo 0)"
 		uci -q set wireless.radio1.txpower="$(uci -q get gluon.debug_tx_power|| echo 0)"
-                wifi
-        fi
+		wifi
+	fi
 fi
 
 # Do we already have a private-key? If not generate one
@@ -57,13 +57,13 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 
 	# Check connectivity to supernode
 	logger -t checkuplink "$(wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null; echo "Ping returned $?")"
- 	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null 
+	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null 
 	if [ "$?" -eq "0" ]; then
 			CONNECTED=1
 	fi
-	
+
 	logger -t checkuplink "CONNECTED is $CONNECTED"
-	
+
 	# If we don't have a connection we try to connect
 	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
@@ -74,11 +74,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
 		PEER="$(awk -v min=1 -v max=$NUMBER_OF_PEERS 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
 		PEER_PUBLICKEY="$(uci get wireguard.peer_$PEER.publickey)"
-		
+
 		logger -t checkuplink "Selected peer $PEER"
 
 		endpoint="$(check_handshake "$PEER_PUBLICKEY" "$(uci get wireguard.peer_$PEER.endpoint)")"
-		
+
 		logger -t checkuplink "Connecting to $endpoint"
 
 		# Delete Interfaces
@@ -87,7 +87,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
 		SEGMENT=$(uci get gluon.core.domain)
-		
+
 		# Push public key to broker
 		gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://broker.ffmuc.net/api/v1/wg/key/exchange
 
@@ -105,7 +105,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
-        	ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT
+		ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT
 		
 		# Bring up VXLAN
 		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 8472 dev $MESH_VPN_IFACE
