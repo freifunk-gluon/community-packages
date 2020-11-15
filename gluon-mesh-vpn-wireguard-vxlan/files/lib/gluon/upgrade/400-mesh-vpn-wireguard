@@ -16,12 +16,7 @@ uci:delete_all('wireguard', 'wireguard', function(peer)
 	return peer.preserve ~= '1'
 end)
 
-local mesh_enabled = false
-if uci:get("gluon", "mesh_vpn", "enabled") then
-  if site.mesh_vpn.wireguard.enabled() then
-    mesh_enabled = true
-  end
-end
+local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled')
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
         iface = site.mesh_vpn.wireguard.iface(),
