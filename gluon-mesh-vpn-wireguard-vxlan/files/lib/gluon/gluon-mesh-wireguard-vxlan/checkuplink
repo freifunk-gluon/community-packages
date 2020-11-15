@@ -71,7 +71,7 @@ if [ "$(uci get wireguard.wireguard.enabled)" == "true" ] || [ "$(uci get wiregu
 
 		# Get the number of configured peers and randomly select one
 		NUMBER_OF_PEERS=$(uci -q show wireguard | egrep -ce peer_[0-9]+.endpoint)
-		PEER="$(awk 'BEGIN{srand();print int(rand()*($NUMBER_OF_PEERS)+1) }')"
+		PEER="$(awk -v min=1 -v max=$NUMBER_OF_PEERS 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
 		PEER_PUBLICKEY="$(uci get wireguard.peer_$PEER.publickey)"
 		
 		logger -t checkuplink "Selected peer $PEER"
