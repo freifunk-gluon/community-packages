@@ -17,7 +17,7 @@ You should use something like the following in the site.conf:
 					publickey ='N9uF5Gg1B5AqWrE9IuvDgzmQePhqhb8Em/HrRpAdnlY=',
 					endpoint ='ffkwsn01.freifunk-koenigswinter.de:30020',
 					link_address = 'fe80::f000:22ff:fe12:01',
-				},                
+				},
 				{
 					publickey ='liatbdT62FbPiDPHKBqXVzrEo6hc5oO5tmEKDMhMTlU=',
 					endpoint ='ffkwsn02.freifunk-koenigswinter.de:30020',
@@ -32,7 +32,7 @@ You should use something like the following in the site.conf:
 			},
 	},
 	
-```    
+```
 
 
 And you should include the package in the site.mk of course!
