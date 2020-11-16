@@ -42,9 +42,9 @@ elseif has_wireguard then
 	if wireguard_enabled then
 		pubkey = util.trim(util.exec("uci get wireguard.mesh_vpn.privatekey | wg pubkey"))
 		msg = site_i18n._translate('gluon-config-mode:pubkey')
-        else
-                msg = site_i18n._translate('gluon-config-mode:novpn')
-        end
+		else
+				msg = site_i18n._translate('gluon-config-mode:novpn')
+		end
 end
 
 if not msg then return end

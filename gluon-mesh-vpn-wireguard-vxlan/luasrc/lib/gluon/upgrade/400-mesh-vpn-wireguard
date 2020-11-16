@@ -5,7 +5,7 @@ local uci = require("simple-uci").cursor()
 local util = require "gluon.util"
 
 local privkey = uci:get("wireguard", "mesh_vpn", "privatekey") or
-        util.trim(util.exec("wg genkey"))
+	util.trim(util.exec("wg genkey"))
 
 -- Clean up previous configuration
 uci:delete_all('wireguard', 'peer', function(peer)
@@ -19,19 +19,19 @@ end)
 local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled')
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
-        iface = site.mesh_vpn.wireguard.iface(),
-        limit = site.mesh_vpn.wireguard.limit(),
-        enabled = mesh_enabled,
-        privatekey = privkey,
+	iface = site.mesh_vpn.wireguard.iface(),
+	limit = site.mesh_vpn.wireguard.limit(),
+	enabled = mesh_enabled,
+	privatekey = privkey,
 })
 
 for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
-        uci:section("wireguard", "peer", "peer_" .. name, {
-                enabled = true,
-                endpoint = peer.endpoint,
-                publickey = peer.publickey,
-                link_address = peer.link_address,
-        })
+	uci:section("wireguard", "peer", "peer_" .. name, {
+		enabled = true,
+		endpoint = peer.endpoint,
+		publickey = peer.publickey,
+		link_address = peer.link_address,
+	})
 end
 
 uci:save('wireguard')
