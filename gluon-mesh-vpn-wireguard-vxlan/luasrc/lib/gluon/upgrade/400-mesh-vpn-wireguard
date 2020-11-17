@@ -4,6 +4,7 @@ local site = require 'gluon.site'
 local uci = require("simple-uci").cursor()
 local util = require "gluon.util"
 
+local wg_enabled = uci:get_bool('wireguard', 'mesh_vpn', 'enabled') or false
 local privkey = uci:get("wireguard", "mesh_vpn", "privatekey") or
 	util.trim(util.exec("wg genkey"))
 
@@ -16,7 +17,9 @@ uci:delete_all('wireguard', 'wireguard', function(peer)
 	return peer.preserve ~= '1'
 end)
 
-local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled')
+local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
+	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
+	or wg_enabled -- specific config
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
 	iface = site.mesh_vpn.wireguard.iface(),
