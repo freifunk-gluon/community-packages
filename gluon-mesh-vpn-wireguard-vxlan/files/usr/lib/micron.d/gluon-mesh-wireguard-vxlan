@@ -1,1 +1,1 @@
-* * * * * /lib/gluon/gluon-mesh-wireguard-vxlan/checkuplink
+* * * * * sleep $(awk 'BEGIN{srand();print int(rand()*9)}') && /lib/gluon/gluon-mesh-wireguard-vxlan/checkuplink
