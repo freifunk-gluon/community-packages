@@ -62,8 +62,6 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 			CONNECTED=1
 	fi
 
-	logger -t checkuplink "CONNECTED is $CONNECTED"
-
 	# If we don't have a connection we try to connect
 	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
