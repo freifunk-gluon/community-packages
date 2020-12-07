@@ -56,7 +56,6 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 	MESH_VPN_IFACE=$(uci get wireguard.mesh_vpn.iface)
 
 	# Check connectivity to supernode
-	logger -t checkuplink "$(wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null; echo "Ping returned $?")"
 	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null 
 	if [ "$?" -eq "0" ]; then
 			CONNECTED=1
