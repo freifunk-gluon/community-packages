@@ -79,7 +79,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		logger -t checkuplink "Connecting to $endpoint"
 
 		# Delete Interfaces
-		ip link set nomaster bat0 dev mesh-vpn &> /dev/null
+		ip link set nomaster dev mesh-vpn &> /dev/null
 		ip link delete dev mesh-vpn &> /dev/null
 		ip link del $MESH_VPN_IFACE &> /dev/null
 		PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
