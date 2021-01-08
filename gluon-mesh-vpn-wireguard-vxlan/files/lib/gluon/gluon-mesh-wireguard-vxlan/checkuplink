@@ -30,7 +30,7 @@ check_handshake() {
 }
 
 #Set Debug SSID
-if [ $(uci get gluon.debug_ssid_enabled||echo false) = 'true' ] ; then
+if [ $(uci get gluon.debug_ssid_enabled 2>/dev/null||echo false) = 'true' ] ; then
 	suffix="$(uci get network.bat0.macaddr)"
 	if ! grep -q "dev.ffmuc.net/$suffix" /etc/config/wireless ; then
 		sed "s|muenchen.freifunk.net/.*|dev.ffmuc.net/$suffix'|g" /etc/config/wireless -i
@@ -56,7 +56,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 	MESH_VPN_IFACE=$(uci get wireguard.mesh_vpn.iface)
 
 	# Check connectivity to supernode
-	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null 
+	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null -q
 	if [ "$?" -eq "0" ]; then
 			CONNECTED=1
 	fi
