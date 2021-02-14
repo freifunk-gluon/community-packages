@@ -1,0 +1,22 @@
+#!/bin/sh
+
+gwl=$(batctl gwl | grep \* | awk '{print $2}')
+
+ebtables=$(ebtables-tiny -L IPV6_RA_FILTER)
+if [ "$?" -ne "0" ]; then
+	logger -t ipv6_ra_filter "ebtables chain IPV6_RA_FILTER does not exist"
+	ebtables-tiny -N IPV6_RA_FILTER
+	ebtables-tiny -P IPV6_RA_FILTER DROP
+	ebtables-tiny -A FORWARD -p IPv6 -i bat0 --ip6-proto ipv6-icmp --ip6-icmp-type router-advertisement -j IPV6_RA_FILTER
+fi
+ebtables=$(ebtables-tiny -L IPV6_RA_FILTER | grep -q $gwl)
+if [ "$?" -ne "0" ]; then
+	logger -t ipv6_ra_filter "Setting IPv6 Gateway to $gwl"
+	ebtables-tiny -F IPV6_RA_FILTER
+	ebtables-tiny -A IPV6_RA_FILTER -s $gwl -j ACCEPT
+fi
+if [ "$?" -ne "0" ]; then
+	logger -t ipv6_ra_filter "Setting gateway failed failling back to accept all"
+	ebtables-tiny -F IPV6_RA_FILTER
+	ebtables-tiny -A IPV6_RA_FILTER -j ACCEPT
+fi
