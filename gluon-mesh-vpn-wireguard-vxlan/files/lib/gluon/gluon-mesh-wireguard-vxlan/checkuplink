@@ -1,5 +1,12 @@
 #!/bin/sh
 
+if { set -C; 2>/dev/null >/var/lock/checkuplink.lock; }; then
+         trap "rm -f /var/lock/checkuplink.lock" EXIT
+else
+         echo "Lock file exists... exiting"
+         exit
+fi
+
 interface_linklocal() {
 	# We generate a predictable v6 address
 	local macaddr="$(echo $(uci get wireguard.mesh_vpn.privatekey | wg pubkey) |md5sum|sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')"
