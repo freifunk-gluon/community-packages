@@ -117,6 +117,6 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		ip link set up dev mesh-vpn
 
 		# If we have a BATMAN_V env we need to correct the throughput value now
-		if [ -f /sys/devices/virtual/net/mesh-vpn/batman_adv/throughput_override ]; then echo 1000000 > /sys/devices/virtual/net/mesh-vpn/batman_adv/throughput_override; fi
+		batctl hardif mesh-vpn throughput_override 1000mbit;
 	fi
 fi
