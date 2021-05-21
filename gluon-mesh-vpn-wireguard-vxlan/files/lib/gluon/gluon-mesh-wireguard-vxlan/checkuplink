@@ -92,12 +92,15 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
 		SEGMENT=$(uci get gluon.core.domain)
 
-		# Push public key to broker, try https first, fall back to http in case of error
-		gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' https://broker.ffmuc.net/api/v1/wg/key/exchange
-		if [ $? -ne 0 ]; then
-			gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' http://broker.ffmuc.net/api/v1/wg/key/exchange
+		# Push public key to broker, test for https and use if supported
+		wget -q https://[::1]
+		if [ $? -eq 1 ]; then
+			PROTO=http
+		else
+			PROTO=https
 		fi
-
+		gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' $PROTO://broker.ffmuc.net/api/v1/wg/key/exchange
+		
 		# Bring up the wireguard interface
 		ip link add dev $MESH_VPN_IFACE type wireguard
 		wg set $MESH_VPN_IFACE fwmark 1
