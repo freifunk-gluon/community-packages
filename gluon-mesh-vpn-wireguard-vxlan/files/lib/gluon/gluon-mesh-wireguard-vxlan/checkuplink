@@ -65,7 +65,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 	# Check connectivity to supernode
 	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null -q
 	if [ "$?" -eq "0" ]; then
+		GWMAC=$(batctl gwl | grep \* | awk '{print $2}')
+		batctl ping -c 5 $GWMAC
+		if [ "$?" -eq "0" ]; then
 			CONNECTED=1
+		fi
 	fi
 
 	# If we don't have a connection we try to connect
