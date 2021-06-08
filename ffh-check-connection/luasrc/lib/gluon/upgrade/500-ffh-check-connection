@@ -1,0 +1,13 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+local site = require 'gluon.site'
+
+for group, hosts in pairs(site.ffh_check_connection.targets()) do
+	uci:delete('ffh-check-connection', 'target', group)
+	uci:section('ffh-check-connection', 'target', group, {
+		hosts = hosts
+	})
+end
+
+uci:save('ffh-check-connection')
