@@ -18,22 +18,19 @@ clean_port() {
 	echo "$(echo $1 | sed -r 's/:[0-9]+$|\[|\]//g')"
 }
 
-check_handshake() {
+check_address_family() {
 	local peer_publickey="$1"
 	local peer_endpoint="$2"
-	local MESH_VPN_IFACE=$(uci get wireguard.mesh_vpn.iface)
-	local peer_handshakes="$(wg show $MESH_VPN_IFACE latest-handshakes|grep "$peer_publickey"|awk '{print $2}'||0)"
-	if [ "$peer_handshakes" = "0" ] ; then
-		local gateway="$(clean_port $peer_endpoint)"
-		local peer="$(clean_port "$(wg show $MESH_VPN_IFACE endpoints|grep "$peer_publickey"|awk '{print $2}')")"
-		local other_ip="$(gluon-wan nslookup $gateway | grep -v "$peer" | grep 'Address [0-9]')"
-		if [ "$other_ip" == "" ] ; then
-			exit 1
-		fi
-		echo "$(echo $other_ip | sed -r s/Address\ [0-9]://)$(echo $peer_endpoint | egrep -oe :[0-9]+$)"
-		exit 0
+	local gateway="$(clean_port $peer_endpoint)"
+	# Check if we have a default route for v6 if not fallback to v4
+	if ip -6 route show table 1 | grep 'default via'; then
+		local ipv6="$(gluon-wan nslookup gw04.ext.ffmuc.net | grep 'Address [0-9]' | egrep -o '([a-f0-9:]+:+)+[a-f0-9]+')"
+		echo $ipv6
+	else
+		local ipv4="$(gluon-wan nslookup gw04.ext.ffmuc.net | grep 'Address [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
+		echo $ipv4
 	fi
-	exit 1
+
 }
 
 #Set Debug SSID
@@ -85,7 +82,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 
 		logger -t checkuplink "Selected peer $PEER"
 
-		endpoint="$(check_handshake "$PEER_PUBLICKEY" "$(uci get wireguard.peer_$PEER.endpoint)")"
+		endpoint="$(check_address_family "$PEER_PUBLICKEY" "$(uci get wireguard.peer_$PEER.endpoint)")"
 
 		logger -t checkuplink "Connecting to $endpoint"
 
