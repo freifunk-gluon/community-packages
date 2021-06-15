@@ -10,7 +10,7 @@ PKG_LICENSE:=GPL-2.0-or-later
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffda-purge-contact-info
-  TITLE:=Purge contect-info on a Gluon node
+  TITLE:=Purge contact-info on a Gluon node
   DEPENDS:=+gluon-core
 endef
 
