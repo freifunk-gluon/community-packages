@@ -2,7 +2,6 @@
 
 local site = require 'gluon.site'
 local uci = require("simple-uci").cursor()
-local util = require "gluon.util"
 
 local wg_enabled = uci:get_bool('wireguard', 'mesh_vpn', 'enabled') or false
 local privkey = uci:get("wireguard", "mesh_vpn", "privatekey") or ""
@@ -39,3 +38,4 @@ for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
 end
 
 uci:save('wireguard')
+uci:save('gluon')
