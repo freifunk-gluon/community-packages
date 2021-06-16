@@ -20,6 +20,8 @@ local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
 	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
 	or wg_enabled -- specific config
 
+uci:set('gluon', 'mesh_vpn', 'enabled', mesh_enabled)
+
 uci:section("wireguard", "wireguard", "mesh_vpn", {
 	iface = site.mesh_vpn.wireguard.iface(),
 	limit = site.mesh_vpn.wireguard.limit(),
