@@ -8,7 +8,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/gluon-mesh-vpn-wireguard-vxlan
   TITLE:=Support for connecting meshes via wireguard
-  DEPENDS:=+gluon-mesh-vpn-core +gluon-config-mode-core +micrond +kmod-wireguard +wireguard-tools +ip-full
+  DEPENDS:=+gluon-mesh-vpn-core +micrond +kmod-wireguard +wireguard-tools +ip-full
 endef
 
 $(eval $(call BuildPackageGluon,gluon-mesh-vpn-wireguard-vxlan))
