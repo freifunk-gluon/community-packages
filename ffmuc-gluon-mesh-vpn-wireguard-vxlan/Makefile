@@ -4,6 +4,9 @@ PKG_NAME:=ffmuc-gluon-mesh-vpn-wireguard-vxlan
 PKG_VERSION:=1
 PKG_RELEASE:=1
 
+PKG_MAINTAINER:=Annika Wickert <aw@awlnx.space>
+PKG_LICENSE:=GPL-2.0-or-later
+
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffmuc-gluon-mesh-vpn-wireguard-vxlan
