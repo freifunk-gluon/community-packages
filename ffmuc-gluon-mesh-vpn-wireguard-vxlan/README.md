@@ -53,3 +53,7 @@ If one of the checks above bails out with an error the reconnect cycle is starte
 - [FFMUC: Half a year with WireGuard](https://www.slideshare.net/AnnikaWickert/ffmuc-half-a-year-with-wireguard)
 - [FFMUC: WireGuard Firmware (German)](https://ffmuc.net/freifunkmuc/2020/12/03/wireguard-firmware/)
 - [FFMUC: Statistics](https://stats.ffmuc.net)
+
+### Contact
+
+Feel free to ask questions in the [FFMUC chat](https://chat.ffmuc.net).
