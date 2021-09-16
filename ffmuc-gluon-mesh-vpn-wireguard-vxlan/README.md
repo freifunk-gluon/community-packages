@@ -44,5 +44,12 @@ For the health-checks a webserver of some kind needs to listen to `HTTP GET` req
 
 ### How it works
 
-When `checkuplink` gets called (which happens every minute via cronjob), it checks if the gateway connection is still alive by calling `wget` and connecting to `wireguard.broker.link_address`. If this address replies we also start a `batctl ping` to the same address. If both checks succeed the connection just stays alive.
+When `checkuplink` gets called (which happens every minute via cronjob), it checks if the gateway connection is still alive by calling `wget` and connecting to `wireguard.peer.peer_[number].link_address`. If this address replies we also start a `batctl ping` to the same address. If both checks succeed the connection just stays alive.
 
+If one of the checks above bails out with an error the reconnect cycle is started. Which means `checkuplink` registers itself with `wireguard.broker` by sending the WireGuard public_key over either http or https (depending on the device support). After the key was sent the script tries to randomely connect to one of the `wireguard.peer`. This script prefers to establish connections over IPv6 and falls back to IPv4 only if there is no IPv6 default route.
+
+### Interesting Links
+
+- [FFMUC: Half a year with WireGuard](https://www.slideshare.net/AnnikaWickert/ffmuc-half-a-year-with-wireguard)
+- [FFMUC: WireGuard Firmware (German)](https://ffmuc.net/freifunkmuc/2020/12/03/wireguard-firmware/)
+- [FFMUC: Statistics](https://stats.ffmuc.net)
