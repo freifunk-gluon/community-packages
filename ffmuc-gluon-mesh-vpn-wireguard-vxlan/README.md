@@ -34,6 +34,15 @@ You should use something like the following in the site.conf:
 	},
 	
 ```
-
-
 And you should include the package in the site.mk of course!
+
+### Dependencies
+
+This relies on [wgkex](https://github.com/freifunkMUC/wgkex) the FFMUC wireguard broker running on the configured broker address. The broker programms the gateway to accept the WireGuard key which is transmitted during connection.
+
+For the health-checks a webserver of some kind needs to listen to `HTTP GET` requests on the gateways.
+
+### How it works
+
+When `checkuplink` gets called (which happens every minute via cronjob), it checks if the gateway connection is still alive by calling `wget` and connecting to `wireguard.broker.link_address`. If this address replies we also start a `batctl ping` to the same address. If both checks succeed the connection just stays alive.
+
