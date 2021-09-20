@@ -1,0 +1,1 @@
+* * * * * sleep $(awk 'BEGIN{srand();print int(rand()*40)}') && /lib/gluon/gluon-mesh-wireguard-vxlan/checkuplink
