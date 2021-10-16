@@ -1,4 +1,4 @@
-# gluon-mesh-vpn-wireguard-vxlan
+# ffmuc-mesh-vpn-wireguard-vxlan
 
 You can use this package for connecting with wireguard to the Freifunk Munich network.
 
