@@ -14,4 +14,4 @@ define Package/ffmuc-gluon-mesh-vpn-wireguard-vxlan
   DEPENDS:=+gluon-mesh-vpn-core +micrond +kmod-wireguard +wireguard-tools +ip-full
 endef
 
-$(eval $(call BuildPackageGluon,gluon-mesh-vpn-wireguard-vxlan))
+$(eval $(call BuildPackageGluon,ffmuc-gluon-mesh-vpn-wireguard-vxlan))
