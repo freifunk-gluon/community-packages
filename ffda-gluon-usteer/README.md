@@ -33,7 +33,7 @@ Enabled networking with remote nodes using wired mesh-interfaces.
 
 ### network.update_interval
 
-Default: 5
+Default: 5000
 
 Interval (milliseconds) between node-updates sent.
 
@@ -61,7 +61,7 @@ Clients require to maintain a SNR / signal better than `band_steering.min_snr` t
 
 ### band_steering.interval
 
-Default: 40
+Default: 40000
 
 Clients require to maintain `band_steering.min_snr` for `band_steering.interval` milliseconds in order to be steered to 5GHz.
 
