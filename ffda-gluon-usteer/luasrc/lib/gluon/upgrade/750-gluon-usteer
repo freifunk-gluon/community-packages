@@ -87,8 +87,8 @@ if get_config('network', 'wired') then
 	if site.mesh.vxlan(true) then
 		prefix = 'vx_'
 	end
-	table.insert(networks, prefix .. 'mesh_lan')
-	table.insert(networks, prefix .. 'mesh_wan')
+	table.insert(networks, prefix .. 'mesh_other')
+	table.insert(networks, prefix .. 'mesh_uplink')
 end
 
 uci:set('usteer', 'usteer', 'network', networks)
