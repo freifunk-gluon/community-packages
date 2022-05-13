@@ -46,6 +46,14 @@ local function set_config(config, section, option)
 	uci:set('usteer', 'usteer', config, conf_val)
 end
 
+local function table_contains(table, element)
+	for _, value in pairs(table) do
+		if value == element then
+			return true
+		end
+	end
+	return false
+end
 
 uci:delete_all('usteer', 'usteer')
 
@@ -92,6 +100,23 @@ if get_config('network', 'wired') then
 end
 
 uci:set('usteer', 'usteer', 'network', networks)
+
+
+-- Enabled SSIDs
+local client_ssids = {}
+wireless.foreach_radio(uci, function(_, _, config)
+	local ssid = config.ap.ssid()
+	local owe_ssid = config.ap.owe_ssid()
+
+	if ssid and not table_contains(client_ssids, ssid) then
+		table.insert(client_ssids, ssid)
+	end
+
+	if owe_ssid and not table_contains(client_ssids, owe_ssid) then
+		table.insert(client_ssids, owe_ssid)
+	end
+end)
+uci:set('usteer', 'usteer', 'ssid_list', client_ssids)
 uci:save('usteer')
 
 
