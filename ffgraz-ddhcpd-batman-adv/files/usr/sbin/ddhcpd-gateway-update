@@ -1,0 +1,88 @@
+#!/bin/sh
+
+CACHE_TTL=600
+CACHE_FILE=/tmp/ddhcp_gw_cache
+
+GW_UPDATE_TRIES=5
+
+
+verbose() {
+	[ -n "$VERBOSE" ] && ( >&2 echo $@ )
+}
+
+mac_to_ipv6_ll() {
+	IFS=':'; set $1; unset IFS
+	echo "fe80::$(printf %02x $((0x$1 ^ 2)))$2:${3}ff:fe$4:$5$6"
+}
+
+get_gw_ipv4_address() {
+	local gwmac="$1"
+	local gwid="`echo "$gwmac" | tr -d ':'`"
+	gluon-neighbour-info -p 1001 -d "`mac_to_ipv6_ll "$gwmac"`" -i br-client -r gateway | \
+		while read resp; do
+			local node_id="`echo "$resp" | jsonfilter -e '$.node_id'`"
+			if [ "$node_id" = "$gwid" ]; then
+				echo "$resp" | jsonfilter -e '$.address.ipv4'
+			fi
+		done
+}
+
+gateway_lost() {
+	verbose Gateway lost, removing dhcp options
+	rm -f "$CACHE_FILE"
+	/usr/sbin/ddhcpdctl -r 3
+	/usr/sbin/ddhcpdctl -r 6
+}
+
+update_gateway() {
+	verbose Updating dhcp options
+	/usr/sbin/ddhcpdctl -o "3:4:$1"
+	/usr/sbin/ddhcpdctl -o "6:4:$1"
+}
+
+gwmac="`batctl gwl | sed 's/([[:space:]]*[0-9]\+)//g' | sed 's/[[:space:]]\+/ /g' | egrep '(^\*)|(=>)' | cut -d' ' -f2`"
+[ -z "$gwmac" ] && {
+	verbose Failed to determine mac address of current gateway
+	gateway_lost
+	exit 1
+}
+
+verbose Got gateway mac address: "$gwmac"
+
+[ -f "$CACHE_FILE" ] && {
+	verbose Retrieving cache
+	source "$CACHE_FILE"
+	now="`date +'%s'`"
+	if echo "$last_update_time" | egrep -q '^[0-9]+$' && \
+	    echo "$last_gwaddr" | egrep -q '^(([0-9]){1,3}\.){3}[0-9]{1,3}$'; then
+		verbose Gateway mac address cache found, age $(($now - $last_update_time))
+		if [ "$gwmac" = "$last_gwmac" ] && \
+		    [ $(($now - $last_update_time)) -lt "$CACHE_TTL" ]; then
+			verbose Cache is up to date
+			update_gateway "$last_gwaddr"
+			exit 0
+		fi
+	fi
+	verbose Updating cache
+}
+
+for _ in `seq "$GW_UPDATE_TRIES"`; do
+	gwaddr="`get_gw_ipv4_address "$gwmac"`"
+	[ -n "$gwaddr" ] && break
+done
+[ -z "$gwaddr" ] && [ ! "$gwmac" == "$last_gwmac" ] && {
+	verbose Failed to retrieve new gateway IPv4 address
+	gateway_lost
+	exit 2
+}
+[ ! -z "$gwaddr" ] && {
+verbose Got gateway IPv4 address: "$gwaddr"
+
+echo "last_gwmac=\"$gwmac\"" > "$CACHE_FILE"
+echo "last_gwaddr=\"$gwaddr\"" >> "$CACHE_FILE"
+echo "last_update_time=`date +'%s'`" >> "$CACHE_FILE"
+
+update_gateway "$gwaddr"
+} || {
+  verbose Information gathering failed, done nothing
+}
