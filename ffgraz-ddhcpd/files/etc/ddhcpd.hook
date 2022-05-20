@@ -1,0 +1,8 @@
+#!/bin/sh
+
+for i in /etc/ddhcpd.d/*
+do
+  if [ -e "$i" ] ; then
+    "$i" "$@"
+  fi
+done
