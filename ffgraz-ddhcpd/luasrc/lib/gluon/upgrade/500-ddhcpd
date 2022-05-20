@@ -1,35 +1,39 @@
 #!/usr/bin/lua
 local site = require('gluon.site')
 local uci = require('simple-uci').cursor()
+
 if site.ddhcpd then
-  local enabled = site.ddhcpd.enabled()
-  enabled = enabled == '0' and '0' or enabled and '1' or '0'
+  local enabled = site.ddhcpd.enabled(true)
+
   uci:section('ddhcpd', 'settings', 'settings', {
     enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
-    block_network = site.ddhcpd.range() or 'range missing',
-    block_size_pow = site.ddhcpd.block_size() or 2,
-    block_timeout = site.ddhcpd.block_timeout() or 300,
-    dhcp_lease_time = site.ddhcpd.dhcp_lease_time() or 300,
-    spare_leases = site.ddhcpd.spare_leases() or 2,
-    tentative_timeout = site.ddhcpd.tentative_timeout() or 15,
+    block_network = site.ddhcpd.range(),
+    block_size_pow = site.ddhcpd.block_size(2),
+    block_timeout = site.ddhcpd.block_timeout(300),
+    dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
+    spare_leases = site.ddhcpd.spare_leases(2),
+    tentative_timeout = site.ddhcpd.tentative_timeout(15),
   })
+
   uci:section('ddhcpd','dhcp_option','server_identify',{
-    code=54,
-    len=4,
-    payload=site.next_node.ip4()
+    code = 54,
+    len = 4,
+    payload = site.next_node.ip4()
   })
+
   uci:delete('ddhcpd','broadcast')
-  local cidr=tonumber(string.gsub(site:prefix4(),"[%w.]+/(%d+)","%1"),10)
-  local netmask={}
-  for _=1,4 do
+
+  local cidr = tonumber(string.gsub(site:prefix4(),"[%w.]+/(%d+)","%1"),10)
+  local netmask = {}
+  for _ = 1, 4 do
     table.insert(netmask, 256-2^math.max(0,8-cidr))
-    cidr=math.max(0,cidr-8)
+    cidr = math.max(0,cidr-8)
   end
-  netmask=table.concat(netmask,".")
+  netmask = table.concat(netmask,".")
   uci:section('ddhcpd','dhcp_option','netmask',{
-    code=1,
-    len=4,
-    payload=netmask,
+    code = 1,
+    len = 4,
+    payload = netmask,
   })
   uci:save('ddhcpd')
 end

@@ -2,8 +2,8 @@
 
 ## Integration of DDHCPD in gluon
 
-Add the feed https://github.com/sargon/gluon-sargon to your `modules` config,
-add the package `ddhcpd` (or `ddhcpd-batman-adv`) to your `site.mk` and add a
+Add the feed https://github.com/ffgraz/community-packages to your `modules` config, if not already added,
+then add the package `ffgraz-ddhcpd` (or `ffgraz-ddhcpd-nextnode`, `ffgraz-ddhcpd-batman-adv`, depending on your use case) to your `site.mk` and add a
 section in your `site.conf`:
 
     ddhcpd = {
@@ -23,8 +23,8 @@ nodes.
 Choose a free IP-range that is not used by the DHCP-servers of your gateways
 that the DDHCPD can use to assign to clients.
 
-If you use B.A.T.M.A.N., continue reading the _Configuration_ section in 
-[ddhcpd-batman-adv README](../ddhcpd-batman-adv/README.md#Configuration)
+If you use B.A.T.M.A.N., continue reading the _Configuration_ section in
+[ddhcpd-batman-adv README](../ffgraz-ddhcpd-batman-adv/README.md#Configuration)
 
 
 #### disable DDHCPD with one shell call:
