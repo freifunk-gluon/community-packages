@@ -1,8 +1,11 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=ddhcpd
+PKG_NAME:=ffgraz-ddhcpd
 PKG_VERSION:=2019-11-02
 PKG_RELEASE:=1
+
+PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
+PKG_LICENSE:=MIT
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/sargon/ddhcpd
@@ -16,13 +19,13 @@ TARGET_CFLAGS += -DLOG_LEVEL_LIMIT=5
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ddhcpd
+define Package/ffgraz-ddhcpd
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=ddhcpd
 endef
 
-define Package/ddhcpd/description
+define Package/ffgraz-ddhcpd/description
 	distributed dhcp server
 endef
 
@@ -31,11 +34,11 @@ define Build/Compile
 	CFLAGS="$(TARGET_CFLAGS)" BUILD_DIR="$(BUILD_DIR)" $(MAKE) -C $(PKG_BUILD_DIR) $(TARGET_CONFIGURE_OPTS)
 endef
 
-define Package/ddhcpd/install
+define Package/ffgraz-ddhcpd/install
 	$(call Gluon/Build/Install,$(1))
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ddhcpd  $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ddhcpdctl $(1)/usr/sbin/
 endef
 
-$(eval $(call BuildPackage,ddhcpd))
+$(eval $(call BuildPackage,ffgraz-ddhcpd))
