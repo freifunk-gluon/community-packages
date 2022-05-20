@@ -1,19 +1,22 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=ddhcpd-nextnode
+PKG_NAME:=ffgraz-ddhcpd-nextnode
 PKG_RELEASE:=1
 
-include ../gluon.mk
+PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
+PKG_LICENSE:=MIT
 
-define Package/ddhcpd-nextnode
+include $(TOPDIR)/../package/gluon.mk
+
+define Package/ffgraz-ddhcpd-nextnode
 	SECTION:=net
 	CATEGORY:=Network
-	DEPENDS:=+ddhcpd
+	DEPENDS:=+ffgraz-ddhcpd
 	TITLE:=ddhcpd nextnode integration
 endef
 
-define Package/ddhcpd-nextnode/description
+define Package/ffgraz-ddhcpd-nextnode/description
   nextnode integration for ddhcpd
 endef
 
-$(eval $(call BuildPackage,ddhcpd-nextnode))
+$(eval $(call BuildPackage,ffgraz-ddhcpd-nextnode))
