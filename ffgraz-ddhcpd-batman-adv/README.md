@@ -14,4 +14,4 @@ You need to install [mesh-announce](https://github.com/ffnord/mesh-announce) on
 your gateways, so DDHCPD can query the gateway address that should be announced
 over DHCP via `respondd` from the chosen gateway.
 
-Further reading, see [ddhcpd README](../ddhcpd/README.md).
+Further reading, see [ddhcpd README](../ffgraz-ddhcpd/README.md).
