@@ -50,6 +50,7 @@ auth-user-pass-verify /bin/true via-env
 status /var/log/olsr12-openvpn-status.log
 log-append /var/log/olsr12-openvpn.log
 
+data-ciphers none
 data-ciphers-fallback none
 dh none
 
