@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffgraz-web-static-ip
 
-include ../gluon.mk
+include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-web-static-ip
   DEPENDS:=+gluon-web-admin +ffgraz-static-ip
