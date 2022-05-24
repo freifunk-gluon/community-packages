@@ -1,13 +1,16 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=gluon-static-ip
+PKG_NAME:=ffgraz-static-ip
 PKG_VERSION:=1
+
+PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
+PKG_LICENSE:=MIT
 
 include ../gluon.mk
 
-define Package/gluon-static-ip
+define Package/ffgraz-static-ip
   TITLE:=Static IP assignment and configuration for gluon
   DEPENDS:=+gluon-core +luci-lib-ip
 endef
 
-$(eval $(call BuildPackageGluon,gluon-static-ip))
+$(eval $(call BuildPackageGluon,ffgraz-static-ip))
