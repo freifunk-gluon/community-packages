@@ -6,7 +6,7 @@ PKG_VERSION:=1
 PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
 PKG_LICENSE:=MIT
 
-include ../gluon.mk
+include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-static-ip
   TITLE:=Static IP assignment and configuration for gluon
