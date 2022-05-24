@@ -29,7 +29,7 @@ local s6 = site.prefix6() and f:section(Section, nil, translate(
 ))
 
 local function translate_format(str, ...)
-  return string.format(translate(str), ...)
+	return string.format(translate(str), ...)
 end
 
 local function intf_setting(intf, desc, enabled)
@@ -45,17 +45,24 @@ local function intf_setting(intf, desc, enabled)
 			if isTmp then
 				local w = Warning()
 				if enabled then
-					w:setcontent(translate_format('The address %s for "%s" is an address in the temporary address range %s.<br />It should be replaced by a properly assigned address as soon as possible.',
+					w:setcontent(translate_format(
+						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
+						'It should be replaced by a properly assigned address as soon as possible.',
 						v4addr, desc, tmp:string()))
 				else
-					w:setcontent(translate_format('The address %s for "%s" is an address in the temporary address range %s.<br />If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
+					w:setcontent(translate_format(
+						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
+						'If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
 						v4addr, desc, tmp:string()))
 				end
 				s4:append(w)
 			end
 		end
 
-		local v4 = s4:option(Value, intf .. '_ip4', translate_format("IPv4 for %s (%s)", desc, status), translate("IPv4 CIDR (e.g. 1.2.3.4/12)"))
+		local v4 = s4:option(Value, intf .. '_ip4',
+			translate_format("IPv4 for %s (%s)", desc, status),
+			translate("IPv4 CIDR (e.g. 1.2.3.4/12)")
+		)
 		-- TODO: datatype = "ip4cidr"
 		v4.datatype = "maxlength(32)"
 		v4.default = v4addr
@@ -64,7 +71,7 @@ local function intf_setting(intf, desc, enabled)
 		function v4:write(data)
 			-- TODO: validate via datatype
 			if data == '' and not site.node_prefix4() then
-				data = null
+				data = nil
 			end
 
 			if data and (not ip.new(data) or not ip.new(data):is4()) then
@@ -85,17 +92,23 @@ local function intf_setting(intf, desc, enabled)
 			if isTmp then
 				local w = Warning()
 				if enabled then
-					w:setcontent(translate_format('The address %s for "%s" is an address in the temporary address range %s.<br />It should be replaced by a properly assigned address as soon as possible.',
+					w:setcontent(translate_format(
+						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
+						'It should be replaced by a properly assigned address as soon as possible.',
 						v6addr, desc, tmp:string()))
 				else
-					w:setcontent(translate_format('The address %s for "%s" is an address in the temporary address range %s.<br />If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
+					w:setcontent(translate_format(
+						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
+						'If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
 						v6addr, desc, tmp:string()))
 				end
 				s6:append(w)
 			end
 		end
 
-		local v6 = s6:option(Value, intf .. '_ip6', translate_format("IPv6 for %s (%s)", desc, status), translate("IPv6 CIDR (e.g. aa:bb:cc:dd:ee::ff/64)"))
+		local v6 = s6:option(Value, intf .. '_ip6',
+			translate_format("IPv6 for %s (%s)", desc, status),
+			translate("IPv6 CIDR (e.g. aa:bb:cc:dd:ee::ff/64)"))
 		-- TODO: datatype = "ip6cidr"
 		v6.datatype = "maxlength(132)"
 		v6.default = v6addr
@@ -103,7 +116,7 @@ local function intf_setting(intf, desc, enabled)
 		function v6:write(data)
 			-- TODO: validate via datatype
 			if data == '' and (not site.node_prefix6() or (not site.tmpIp6Everywhere(false) or intf ~= 'loopback')) then
-				data = null
+				data = nil
 			end
 
 			if data and (not ip.new(data) or not ip.new(data):is6()) then
@@ -117,7 +130,7 @@ end
 
 intf_setting('loopback', translate('this node'), true)
 
-wireless.foreach_radio(uci, function(radio, index, config)
+wireless.foreach_radio(uci, function(radio, _, _)
 	local function do_conf(type, desc)
 		local net = type .. radio['.name']
 		intf_setting(net, desc, not uci:get_bool('wireless', net, 'disabled'))
@@ -132,14 +145,13 @@ end)
 if pcall(function() require 'gluon.mesh-vpn' end) then
 	local vpn_core = require 'gluon.mesh-vpn'
 
-  intf_setting('mesh_vpn', 'Mesh VPN', vpn_core.enabled())
+	intf_setting('mesh_vpn', 'Mesh VPN', vpn_core.enabled())
 end
 
-local wan_mesh = not uci:get_bool('network', 'mesh_wan', 'disabled')
 intf_setting('mesh_uplink', 'Mesh on WAN', #mesh_interfaces_uplink)
 
 if sysconfig.lan_ifname then
-  intf_setting('mesh_other', 'Mesh on LAN', #mesh_interfaces_other)
+	intf_setting('mesh_other', 'Mesh on LAN', #mesh_interfaces_other)
 end
 
 function f:write()
