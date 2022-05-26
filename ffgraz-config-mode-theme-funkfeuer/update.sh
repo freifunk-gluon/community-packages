@@ -41,3 +41,6 @@ THEME_REPLACED=${THEME/"$freifunk"/"$funkfeuer"}
 echo "$THEME_REPLACED" > sass/gluon.scss
 
 sass --sourcemap=none -C -t compressed sass/gluon.scss files/lib/gluon/config-mode/www/static/gluon.css
+
+git add .
+git commit -m "ffgraz-config-mode-theme-funkfeuer: update"
