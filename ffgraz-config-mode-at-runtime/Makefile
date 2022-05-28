@@ -18,4 +18,4 @@ define Package/ffgraz-config-mode-at-runtime/description
 	Enable config mode server on port 81 during runtime
 endef
 
-$(eval $(call BuildGluonPackage,ffgraz-config-mode-at-runtime))
+$(eval $(call BuildPackageGluon,ffgraz-config-mode-at-runtime))
