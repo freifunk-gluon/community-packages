@@ -42,20 +42,19 @@ local function intf_setting(intf, desc, enabled)
 			local tmp = ip.new(site.node_prefix4(), site.node_prefix4_range())
 			local isTmp = tmp:contains(ip.new(v4addr):host())
 
+			local w = s4:element('model/warning', {}, intf .. '_w4')
 			if isTmp then
-				local w = Warning()
 				if enabled then
-					w:setcontent(translate_format(
+					w.content = translate_format(
 						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
 						'It should be replaced by a properly assigned address as soon as possible.',
-						v4addr, desc, tmp:string()))
+						v4addr, desc, tmp:string())
 				else
-					w:setcontent(translate_format(
+					w.content = translate_format(
 						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
 						'If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
-						v4addr, desc, tmp:string()))
+						v4addr, desc, tmp:string())
 				end
-				s4:append(w)
 			end
 		end
 
@@ -89,20 +88,19 @@ local function intf_setting(intf, desc, enabled)
 			local tmp = ip.new(site.node_prefix6(), site.node_prefix6_range(64))
 			local isTmp = tmp:contains(ip.new(v6addr):host())
 
+			local w = s6:element('model/warning', {}, intf .. '_w6')
 			if isTmp then
-				local w = Warning()
 				if enabled then
-					w:setcontent(translate_format(
+					w.content = translate_format(
 						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
 						'It should be replaced by a properly assigned address as soon as possible.',
-						v6addr, desc, tmp:string()))
+						v6addr, desc, tmp:string())
 				else
-					w:setcontent(translate_format(
+					w.content = translate_format(
 						'The address %s for "%s" is an address in the temporary address range %s.<br />' ..
 						'If you are planning to use this interface, you will need to replace this address with a properly assigned one.',
-						v6addr, desc, tmp:string()))
+						v6addr, desc, tmp:string())
 				end
-				s6:append(w)
 			end
 		end
 
