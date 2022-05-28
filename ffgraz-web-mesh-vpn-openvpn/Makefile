@@ -1,12 +1,15 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=gluon-web-mesh-vpn-openvpn
+PKG_NAME:=ffgraz-web-mesh-vpn-openvpn
 
-include ../gluon.mk
+PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
+PKG_LICENSE:=MIT
 
-define Package/gluon-web-mesh-vpn-openvpn
+include $(TOPDIR)/../package/gluon.mk
+
+define Package/ffgraz-web-mesh-vpn-openvpn
   TITLE:=gluon-web module to upload keys for openvpn mesh-vpn
   DEPENDS:=+gluon-web-admin +gluon-mesh-vpn-openvpn +lua-openssl
 endef
 
-$(eval $(call BuildPackageGluon,gluon-web-mesh-vpn-openvpn))
+$(eval $(call BuildPackageGluon,ffgraz-web-mesh-vpn-openvpn))
