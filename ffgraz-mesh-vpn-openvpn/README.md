@@ -11,7 +11,8 @@ site.conf
   mesh_vpn = {
     openvpn = {
       enabled = true,
-      mtu = 1312,
+      -- Custom mtu if necesarry (needs to be set on server side aswell)
+      -- mtu = 1312,
       -- Whether to auto-generate self-signed certificate if none found (default: true)
       self_signed = true,
       ca = [[

@@ -34,7 +34,7 @@ function M.set_limit(ingress_limit, egress_limit)
 end
 
 function M.mtu()
-	return site.mesh_vpn.openvpn.mtu()
+	return site.mesh_vpn.openvpn.mtu(1500)
 end
 
 return M
