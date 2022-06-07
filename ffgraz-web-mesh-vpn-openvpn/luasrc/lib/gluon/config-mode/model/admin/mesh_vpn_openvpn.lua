@@ -212,8 +212,6 @@ if cfg.key then
 	file_info(cfg.key, translate('Mesh Key'))
 end
 
-local c = s:element('model/file', {}, 'upload')
-c.title = translate('Upload .tar.gz, key, CA or cert')
-s:append(c)
+s:element('model/file', {}, 'upload', translate('Upload .tar.gz, key, CA or cert'))
 
 return f
