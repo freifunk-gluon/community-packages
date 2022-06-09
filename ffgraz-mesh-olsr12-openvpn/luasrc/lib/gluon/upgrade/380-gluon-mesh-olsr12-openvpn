@@ -32,8 +32,7 @@ if site.mesh.olsrd.olsr12.enable(false) then
 		dev = 'olsr12',
 		dev_type = 'tap',
 
-		data_ciphers = 'none',
-		data_ciphers_fallback = 'none',
+		ciphers = 'none',
 
 		persist_key = true,
 		persist_tun = true,
