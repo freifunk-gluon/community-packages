@@ -146,7 +146,7 @@ wireless.foreach_radio(uci, function(radio, _, _)
 	local function do_config(type)
 		local net = type .. radio['.name']
 
-		local use = uci:get_bool('wireless', net, 'disabled')
+		local use = not uci:get_bool('wireless', net, 'disabled')
 		static_ip(net, uci:get('wireless', net, 'macaddr'), use)
 	end
 
