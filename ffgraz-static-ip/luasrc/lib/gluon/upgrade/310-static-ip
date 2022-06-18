@@ -150,7 +150,12 @@ wireless.foreach_radio(uci, function(radio, _, _)
 		static_ip(net, uci:get('wireless', net, 'macaddr'), use)
 	end
 
-	do_config('mesh_')
+	if uci:get('network', 'mesh_' .. radio['.name'], 'proto') then
+		do_config('mesh_')
+	end
+	if uci:get('network', 'p2p_' .. radio['.name'], 'proto') then
+		do_config('p2p_')
+	end
 	if uci:get('network', 'ibss_' .. radio['.name'], 'proto') then
 		do_config('ibss_')
 	end
