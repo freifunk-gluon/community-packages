@@ -9,7 +9,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-web-mesh-vpn-openvpn
   TITLE:=gluon-web module to upload keys for openvpn mesh-vpn
-  DEPENDS:=+gluon-web-admin +ffgraz-mesh-vpn-openvpn +lua-openssl
+  DEPENDS:=+gluon-web-admin +ffgraz-web-model +ffgraz-mesh-vpn-openvpn +lua-openssl
 endef
 
 $(eval $(call BuildPackageGluon,ffgraz-web-mesh-vpn-openvpn))
