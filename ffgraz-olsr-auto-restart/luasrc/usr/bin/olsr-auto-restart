@@ -1,0 +1,35 @@
+#!/usr/bin/lua
+
+local olsrd = require 'gluon.olsrd'
+
+local oi = olsrd.oi()
+
+local function restart(service)
+	print(string.format('Restarting %s...', service))
+	os.execute(string.format('exec /etc/init.d/%s restart', service))
+end
+
+if not oi.olsr1.running then
+	print('olsr1 not running, starting')
+	restart('olsrd')
+else
+	local neigh1 = olsrd.olsr1_get_nodeinfo('links')
+
+	if #neigh1.links == 0 then
+		print('olsr1 has no neighs, restarting')
+		restart('olsrd')
+	end
+end
+
+if not oi.olsr2.running then
+	print('olsr2 not running, starting')
+	restart('olsrd2')
+else
+	local neigh2 = olsrd.olsr2_get_nodeinfo('nhdpinfo jsonraw link')
+
+	if #neigh2.link == 0 then
+		print('olsr2 has no neighs, restarting')
+		restart('olsrd2')
+	end
+end
+
