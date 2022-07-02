@@ -21,7 +21,8 @@ local vpn = {
 
 	client = true,
 	dev = vpn_core.get_interface(),
-	dev_type = 'tap'
+	dev_type = 'tap',
+	mark = '0x01/0x01' -- this doesnt work, even though it should, so we have a custom fw rule
 }
 
 for key, value in pairs(site.mesh_vpn.openvpn.config()) do
@@ -67,5 +68,13 @@ uci:delete('openvpn', 'mesh_vpn')
 if vpn.enabled then
 	uci:section('openvpn', 'openvpn', 'mesh_vpn', vpn)
 end
+
+uci:section('firewall', 'rule', 'openvpn_mark', {
+	name = 'Mark packets to/from VPN clients',
+        target = 'MARK',
+        proto = 'udp',
+        dest_port = '1194',
+        set_mark = '0x01/0x01'
+})
 
 uci:save('openvpn')
