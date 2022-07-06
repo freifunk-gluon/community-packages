@@ -78,3 +78,4 @@ uci:section('firewall', 'rule', 'openvpn_mark', {
 })
 
 uci:save('openvpn')
+uci:save('firewall')
