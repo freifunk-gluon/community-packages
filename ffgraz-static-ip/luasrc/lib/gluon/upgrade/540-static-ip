@@ -82,7 +82,7 @@ local function static_ip(name, macaddr, actually_use)
 
 	if site.prefix6() then
 		if not static6 and site.node_prefix6() and (site.tmpIp6Everywhere() or name == 'loopback') then
-			local tmp6 = ip.new(site.node_prefix6())
+			local tmp6 = ip.new(site.node_prefix6(), 128)
 
 			-- magic that turns mac into random number
 			local num = ipnum(macaddr, IPV6_PREFIX_MAX - site.node_prefix6_range(64), true)
