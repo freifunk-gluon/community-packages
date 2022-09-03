@@ -48,7 +48,7 @@ local function ipnum(macaddr, prefixOverflow, hex)
 		if out ~= '' then
 			out = out .. ':'
 		end
-		out = out .. string.format("%02x", tonumber(binaryMac:sub(1+i*16,(i+1)*16), 2))
+		out = out .. string.format("%02x", tonumber(binaryMac:sub(1 + i * 16, (i + 1) * 16), 2))
 	end
 
 	return out
@@ -85,7 +85,7 @@ local function static_ip(name, macaddr, actually_use)
 			local tmp6 = ip.new(site.node_prefix6(), 128)
 
 			-- magic that turns mac into random number
-			local num = ipnum(macaddr, IPV6_PREFIX_MAX - site.node_prefix6_range(128), true)
+			local num = ipnum(macaddr .. macaddr, IPV6_PREFIX_MAX - site.node_prefix6_range(128), true)
 
 			-- the rare case where we get 0 or 1 as our mac based number
 			if tonumber(num:gsub(':', ''), 16) < 2 then
