@@ -116,6 +116,9 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		# Bring up VXLAN
 		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 8472 dev $MESH_VPN_IFACE
 		ip link set up dev mesh-vpn
+		
+		# Add VXLAN inteface to BATMAN
+		batctl if add mesh-vpn
 
 		sleep 5
 		# If we have a BATMAN_V env we need to correct the throughput value now
