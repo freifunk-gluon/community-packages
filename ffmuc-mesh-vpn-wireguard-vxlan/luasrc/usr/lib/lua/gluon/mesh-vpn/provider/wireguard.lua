@@ -7,7 +7,13 @@ local vpn_core = require 'gluon.mesh-vpn'
 local M = {}
 
 function M.public_key()
-        return util.trim(util.exec('/usr/bin/wg show wg_mesh_vpn public-key'))
+        local key = util.trim(util.exec("/lib/gluon/mesh-vpn/wireguard_pubkey.sh"))
+
+        if key == '' then
+                key = nil
+        end
+
+        return key
 end
 
 function M.enable(val)
@@ -31,6 +37,10 @@ function M.set_limit(ingress_limit, egress_limit)
         end
 
         uci:save('simple-tc')
+end
+
+function M.mtu()
+        return site.mesh_vpn.wireguard.mtu()
 end
 
 return M
