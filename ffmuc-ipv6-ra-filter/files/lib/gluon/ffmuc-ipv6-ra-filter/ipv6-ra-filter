@@ -1,6 +1,6 @@
 #!/bin/sh
 
-gwl=$(batctl gwl | grep \* | awk '{print $2}')
+gwl=$(batctl gwl | awk '/[*]/{print $2}')
 
 ebtables=$(ebtables-tiny -L IPV6_RA_FILTER)
 if [ "$?" -ne "0" ]; then
