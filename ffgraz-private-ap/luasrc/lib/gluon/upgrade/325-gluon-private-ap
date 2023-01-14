@@ -50,14 +50,12 @@ uci:section('firewall', 'zone', 'ap', {
 	forward = 'ACCEPT',
 })
 
-uci:set('firewall', 'mesh', 'masq', true)
-
-uci:section('firewall', 'redirect', 'ap_masq', {
-	name = 'ap masquadre',
-	src = 'ap',
-	dest = 'mesh',
+uci:section('firewall', 'nat', 'ap_masq', {
+	name = 'ap_masq',
+	src = 'mesh',
+	src_ip = uci:get('network', 'ap', 'ipaddr'),
 	proto = 'all',
-	target = 'SNAT',
+	target = 'MASQUERADE',
 })
 
 uci:section('firewall', 'forwarding', 'afm', {
