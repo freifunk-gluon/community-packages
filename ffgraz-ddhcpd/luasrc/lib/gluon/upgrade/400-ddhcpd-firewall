@@ -20,6 +20,15 @@ uci:section('firewall','rule','mesh_d2d',{
   target = 'ACCEPT',
 })
 
+uci:section('firewall','rule','mmfd_ddhcpd',{
+  name = 'mmfd_ddhcpd',
+  src = 'mmfd',
+  family = 'ipv6',
+  dest_port = '1234',
+  proto = 'udp',
+  target = 'ACCEPT',
+})
+
 uci:section('firewall','rule','client_dhcp',{
   name = 'client_dhcp',
   src = 'loc_client',
