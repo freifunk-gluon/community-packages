@@ -1,0 +1,25 @@
+From a7001036ea93634e1634ce5ea1e1bbc1d88f640a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Maciej=20Kr=C3=BCger?= <mkg20001@gmail.com>
+Date: Thu, 19 Jan 2023 00:00:12 +0100
+Subject: [PATCH] fix dhcp bind
+
+---
+ netsock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/netsock.c b/netsock.c
+index 070031e..3f44d0b 100644
+--- a/netsock.c
++++ b/netsock.c
+@@ -209,7 +209,7 @@ ATTR_NONNULL_ALL int netsock_open_dhcp(ddhcp_epoll_data* data,uint16_t port) {
+   memcpy(&sin.sin_addr, &address_client, sizeof(sin.sin_addr));
+ 
+   if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, data->interface_name,
+-                 (socklen_t)strlen(data->interface_name) + 1)) {
++                 (socklen_t)strlen(data->interface_name))) {
+     perror("can't bind to broadcast device");
+     close(sock);
+     return -1;
+-- 
+2.38.1
+

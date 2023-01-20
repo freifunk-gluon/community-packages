@@ -1,0 +1,44 @@
+From 6ba1ef46179699f6bbf0808349526e605237366b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Maciej=20Kr=C3=BCger?= <mkg20001@gmail.com>
+Date: Thu, 19 Jan 2023 00:38:50 +0100
+Subject: [PATCH] fix copy args
+
+---
+ main.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/main.c b/main.c
+index 9cb07a5..860c950 100644
+--- a/main.c
++++ b/main.c
+@@ -250,11 +250,11 @@ int main(int argc, char** argv) {
+   while ((c = getopt(argc, argv, "C:c:i:St:dvVDhLb:B:N:o:s:H:n:")) != -1) {
+     switch (c) {
+     case 'i':
+-      interface = optarg;
++      interface = strdup(optarg);
+       break;
+ 
+     case 'c':
+-      interface_client = optarg;
++      interface_client = strdup(optarg);
+       break;
+ 
+     case 'b':
+@@ -356,11 +356,11 @@ int main(int argc, char** argv) {
+       break;
+ 
+     case 'C':
+-      config.control_path = optarg;
++      config.control_path = strdup(optarg);
+       break;
+ 
+     case 'H':
+-      config.hook_command = optarg;
++      config.hook_command = strdup(optarg);
+       break;
+ 
+     case 'v':
+-- 
+2.38.1
+
