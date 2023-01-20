@@ -7,7 +7,7 @@ if site.ddhcpd then
 
   uci:section('ddhcpd', 'settings', 'settings', {
     enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
-    block_network = site.ddhcpd.range(),
+    block_network = site.ddhcpd.range(site.prefix4()),
     block_size_pow = site.ddhcpd.block_size(2),
     block_timeout = site.ddhcpd.block_timeout(300),
     dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
