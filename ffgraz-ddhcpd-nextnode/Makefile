@@ -19,4 +19,5 @@ define Package/ffgraz-ddhcpd-nextnode/description
   nextnode integration for ddhcpd
 endef
 
-$(eval $(call BuildPackage,ffgraz-ddhcpd-nextnode))
+$(eval $(call BuildPackageGluon,ffgraz-ddhcpd-nextnode))
+

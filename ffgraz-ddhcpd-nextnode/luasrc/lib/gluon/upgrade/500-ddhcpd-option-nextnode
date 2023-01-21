@@ -18,4 +18,9 @@ uci:section('ddhcpd', 'dhcp_option', 'nextnode_dns', {
 	code = '6',
 })
 
+-- use mmfd
+uci:set('ddhcpd', 'settings', 'dhcp_interface', 'local-node')
+uci:set('ddhcpd', 'settings', 'server_interface', 'mmfd0')
+
+
 uci:save('ddhcpd')
