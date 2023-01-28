@@ -42,7 +42,7 @@ local function intf_setting(intf, desc, enabled)
 			local tmp = ip.new(site.node_prefix4(), site.node_prefix4_range())
 			local isTmp = tmp:contains(ip.new(v4addr):host())
 
-			local w = s4:element('model/warning', {}, intf .. '_w4')
+			local w = s4:element('model/warning', { hide = not isTmp }, intf .. '_w4')
 			if isTmp then
 				if enabled then
 					w.content = translate_format(
@@ -85,10 +85,10 @@ local function intf_setting(intf, desc, enabled)
 		local v6addr = uci:get('gluon-static-ip', intf, 'ip6')
 
 		if site.node_prefix6() and v6addr and site.node_prefix6_temporary() then
-			local tmp = ip.new(site.node_prefix6(), site.node_prefix6_range(64))
+			local tmp = ip.new(site.node_prefix6(), site.node_prefix6_range(128))
 			local isTmp = tmp:contains(ip.new(v6addr):host())
 
-			local w = s6:element('model/warning', {}, intf .. '_w6')
+			local w = s6:element('model/warning', { hide = not isTmp }, intf .. '_w6')
 			if isTmp then
 				if enabled then
 					w.content = translate_format(
