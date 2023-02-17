@@ -1,0 +1,24 @@
+#!/usr/bin/lua
+
+local uci = require("simple-uci").cursor()
+local wireless = require 'gluon.wireless'
+local pretty_hostname = require 'pretty_hostname'
+local hostname = pretty_hostname.get(uci)
+
+wireless.foreach_radio(uci, function(radio)
+	local radio_name = radio['.name']
+	local suffix = radio_name:match('^radio(%d+)$')
+	local name   = "setup_" .. radio_name
+
+	uci:section('wireless', 'wifi-iface', name, {
+		device     = radio_name,
+		network    = 'setup',
+		mode       = 'ap',
+		encryption = 'none',
+		ssid       = 'gluon setup ' .. hostname,
+		ifname     = suffix and 'setup' .. suffix,
+		disabled   = false, -- not uci:get_bool('gluon-setup-mode', 'setup_mode', 'enabled'),
+	})
+end)
+
+uci:save('wireless')
