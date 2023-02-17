@@ -35,7 +35,7 @@ msgid "Optional"
 msgstr ""
 
 msgid "Private AP"
-msgstr "Privates AP"
+msgstr "Privater AP"
 
 msgid "Required"
 msgstr "Aktiviert"
