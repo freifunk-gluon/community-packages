@@ -1,0 +1,29 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require("simple-uci").cursor()
+
+if not site.burning() then
+	return
+end
+
+for section, content in pairs(site.burning()) do
+  if content.create then
+    for _, v in ipairs(content.create) do
+      uci:section(unpack(v))
+    end
+  end
+
+  if content.set then
+    for _, v in ipairs(content.set) do
+      uci:set(unpack(v))
+    end
+  end
+
+  uci:save(section)
+end
+
+local name = uci:get_first("gluon-setup-mode", "setup_mode")
+uci:set("gluon-setup-mode", name, "configured", true)
+uci:save('gluon-setup-mode')
+
