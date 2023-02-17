@@ -1,0 +1,246 @@
+From b6a43fa1fed2a8490bf8721fe3e34d22bd61e5c0 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Maciej=20Kr=C3=BCger?= <mkg20001@gmail.com>
+Date: Sat, 11 Feb 2023 21:58:54 +0100
+Subject: [PATCH] claim hook
+
+---
+ block.c         | 33 ++++++++++++++++++++++++++++++++-
+ ddhcp.c         | 16 ++++++++++++++++
+ dhcp.c          |  2 +-
+ example-hook.sh | 13 ++++++++++---
+ hook.c          |  9 ++++++---
+ hook.h          |  3 ++-
+ tools.c         | 14 ++++++++++++++
+ types.h         |  1 +
+ 8 files changed, 82 insertions(+), 9 deletions(-)
+
+diff --git a/block.c b/block.c
+index 4dece83..7993cfa 100644
+--- a/block.c
++++ b/block.c
+@@ -7,6 +7,7 @@
+ #include "logger.h"
+ #include "statistics.h"
+ #include "tools.h"
++#include "hook.h"
+ 
+ // TODO define sane value
+ #define UPDATE_CLAIM_MAX_BLOCKS 32
+@@ -331,7 +332,9 @@ ATTR_NONNULL_ALL void block_drop_unused(ddhcp_config* config) {
+     block++;
+   }
+ 
+-  if (freeable_block) {
++    struct in_addr addr;
++
++    if (freeable_block) {
+     time_t now = time(NULL);
+     if ( freeable_block->needless_since == 0 ) {
+       DEBUG("block_drop_unused(...): mark block %i to be needless\n",freeable_block->index);
+@@ -341,6 +344,20 @@ ATTR_NONNULL_ALL void block_drop_unused(ddhcp_config* config) {
+     } else {
+       if ( freeable_block->needless_since <= now - config->block_needless_timeout) {
+         DEBUG("block_drop_unused(...): free block %i.\n", freeable_block->index);
++
++          dhcp_lease* lease = block->addresses;
++
++          if (lease) {
++              for (uint32_t lease_index = 0 ; lease_index < block->subnet_len ; lease_index++) {
++                  if (lease->hookclaim == 1) {
++                      addr_add(&block->subnet, &addr, (int)lease_index);
++                      hook_address(HOOK_CLAIM_RELEASE, &addr, (uint8_t *) &config->node_id, config);
++                      lease->hookclaim = 0;
++                  }
++
++                  lease++;
++              }
++          }
+         block_free(freeable_block);
+         config->needless_marks = 0;
+       } else {
+@@ -421,9 +438,23 @@ ATTR_NONNULL_ALL void block_update_claims(ddhcp_config* config) {
+   uint8_t send_packet = 0;
+   uint8_t index = 0;
+   time_t new_block_timeout = now + config->block_timeout;
++  dhcp_lease* lease;
++  struct in_addr addr;
+ 
+   for (uint32_t i = 0; i < config->number_of_blocks; i++) {
+     if (block->state == DDHCP_OURS) {
++        lease = block->addresses;
++
++        for (uint32_t lease_index = 0 ; lease_index < block->subnet_len ; lease_index++) {
++            if (lease->state == FREE && (!lease->hookclaim || block->timeout < timeout_factor)) {
++                addr_add(&block->subnet, &addr, (int)lease_index);
++                hook_address(HOOK_CLAIM, &addr, (uint8_t *) &config->node_id, config);
++                lease->hookclaim = 1;
++            }
++
++            lease++;
++        }
++
+ 
+       if (block->timeout < timeout_factor) {
+         DEBUG("block_update_claims(...): update claim for block %i needed\n", block->index);
+diff --git a/ddhcp.c b/ddhcp.c
+index 5848de5..e914f07 100644
+--- a/ddhcp.c
++++ b/ddhcp.c
+@@ -5,6 +5,7 @@
+ #include "logger.h"
+ #include "tools.h"
+ #include "statistics.h"
++#include "hook.h"
+ 
+ ATTR_NONNULL_ALL int ddhcp_block_init(ddhcp_config* config) {
+   DEBUG("ddhcp_block_init(config)\n");
+@@ -44,8 +45,23 @@ ATTR_NONNULL_ALL int ddhcp_block_init(ddhcp_config* config) {
+ 
+ ATTR_NONNULL_ALL void ddhcp_block_free(ddhcp_config* config) {
+   ddhcp_block* block = config->blocks;
++  struct in_addr addr;
+ 
+   for (uint32_t i = 0; i < config->number_of_blocks; i++) {
++    if (block->addresses && block->state == DDHCP_OURS) {
++      // cleanup remaining hookclaims
++      dhcp_lease* lease = block->addresses;
++
++      for (uint32_t lease_index = 0 ; lease_index < block->subnet_len ; lease_index++) {
++          if (lease->hookclaim == 1) {
++              addr_add(&block->subnet, &addr, (int) lease_index);
++              hook_address(HOOK_CLAIM_RELEASE, &addr, (uint8_t *) &config->node_id, config);
++              lease->hookclaim = 0;
++          }
++
++          lease++;
++      }
++    }
+     block_free(block++);
+   }
+ 
+diff --git a/dhcp.c b/dhcp.c
+index eb5b90c..9af587f 100644
+--- a/dhcp.c
++++ b/dhcp.c
+@@ -572,6 +572,7 @@ ATTR_NONNULL_ALL int dhcp_ack(int socket, dhcp_packet* request, ddhcp_block* lea
+   lease->xid = request->xid;
+   lease->state = LEASED;
+   lease->lease_end = now + find_in_option_store_address_lease_time(&config->options)  + DHCP_LEASE_SERVER_DELTA;
++  lease->hookclaim = 0; // take it over, without unclaiming it
+ 
+   addr_add(&lease_block->subnet, &packet->yiaddr, (int)lease_index);
+ 
+@@ -582,7 +583,6 @@ ATTR_NONNULL_ALL int dhcp_ack(int socket, dhcp_packet* request, ddhcp_block* lea
+   }
+ 
+   DEBUG("dhcp_ack(...): offering address %i %s\n", lease_index, inet_ntoa(packet->yiaddr));
+-  hook_address(HOOK_BEFORE_LEASE, &packet->yiaddr, (uint8_t*) &packet->chaddr, config);
+   statistics_record(config, STAT_DHCP_SEND_PKG, 1);
+   statistics_record(config, STAT_DHCP_SEND_ACK, 1);
+   ssize_t bytes_send = dhcp_packet_send(socket, packet);
+diff --git a/example-hook.sh b/example-hook.sh
+index 6c6c078..285e988 100755
+--- a/example-hook.sh
++++ b/example-hook.sh
+@@ -1,13 +1,20 @@
+ #!/usr/bin/env bash
+ 
+ case $1 in
+-  lease)
++  lease) # when a lease happens
+     echo $@ >> /tmp/hook.log
+     ;;
+-  release)
++  release) # when a client requests a release or a lease expires
+     echo $@ >> /tmp/hook.log
+     ;;
+-  endlearning)
++  endlearning) # once the initial timeout for gathering all blocks ends
+     echo "$@ - learning phase is over" >> /tmp/hook.log
+     ;;
++  # if you want to propagate addresses in some way in the network, those two hooks can be used for that
++  claim) # after ddhcpd has claimed this particular address - you can also use lease|claim)
++    echo $@ >> /tmp/hook.log
++    ;;
++  claimrelease) # before this block is no logner claimed - you can also use release|claimrelease)
++    echo $@ >> /tmp/hook.log
++    ;;
+ esac
+diff --git a/hook.c b/hook.c
+index b7d2a1e..8a07312 100644
+--- a/hook.c
++++ b/hook.c
+@@ -3,7 +3,6 @@
+ #include "tools.h"
+ 
+ #include <unistd.h>
+-#include <sys/types.h>
+ #include <sys/wait.h>
+ 
+ ATTR_NONNULL_ALL void hook_address(uint8_t type, struct in_addr* address, uint8_t* chaddr, ddhcp_config* config) {
+@@ -35,8 +34,12 @@ ATTR_NONNULL_ALL void hook_address(uint8_t type, struct in_addr* address, uint8_
+     action = (char*)"inform";
+     break;
+ 
+-  case HOOK_BEFORE_LEASE:
+-    action = (char*)"beforelease";
++  case HOOK_CLAIM:
++    action = (char*)"claim";
++    break;
++
++  case HOOK_CLAIM_RELEASE:
++    action = (char*)"claimrelease";
+     break;
+ 
+   default:
+diff --git a/hook.h b/hook.h
+index d944574..820a357 100644
+--- a/hook.h
++++ b/hook.h
+@@ -7,7 +7,8 @@
+ #define HOOK_RELEASE 2
+ #define HOOK_INFORM 3
+ #define HOOK_LEARNING_PHASE_END 4
+-#define HOOK_BEFORE_LEASE 5
++#define HOOK_CLAIM 5
++#define HOOK_CLAIM_RELEASE 6
+ 
+ ATTR_NONNULL_ALL void hook_address(uint8_t type, struct in_addr* address, uint8_t* chaddr, ddhcp_config* config);
+ ATTR_NONNULL_ALL void hook(uint8_t type, ddhcp_config* config);
+diff --git a/tools.c b/tools.c
+index 7a41cdc..b000c68 100644
+--- a/tools.c
++++ b/tools.c
+@@ -91,3 +91,17 @@ ATTR_NONNULL_ALL char* hwaddr2c(uint8_t* hwaddr) {
+ 
+   return str;
+ }
++
++ATTR_NONNULL_ALL uint8_t * nodeid2hwaddr(ddhcp_node_id * node_id) {
++    uint8_t * hwaddr = calloc(6, sizeof(uint8_t));
++    if (!hwaddr) {
++        return NULL;
++    }
++
++    // TODO: memcpy?
++    for (int i = 0; i < 6; ++i) {
++        hwaddr[i] = *node_id[2 + i];
++    }
++
++    return hwaddr;
++}
+diff --git a/types.h b/types.h
+index da09071..1ffcbfd 100644
+--- a/types.h
++++ b/types.h
+@@ -102,6 +102,7 @@ struct dhcp_lease {
+   enum dhcp_lease_state state;
+   uint32_t xid;
+   time_t lease_end;
++  uint8_t hookclaim;
+ };
+ typedef struct dhcp_lease dhcp_lease;
+ 
+-- 
+2.38.1
+

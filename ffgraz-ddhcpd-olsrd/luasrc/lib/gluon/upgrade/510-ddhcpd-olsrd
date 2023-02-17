@@ -1,0 +1,8 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+uci:set('ddhcpd', 'settings', 'dhcp_interface', 'local-node')
+uci:set('ddhcpd', 'settings', 'server_interface', 'mmfd0')
+
+uci:save('ddhcpd')

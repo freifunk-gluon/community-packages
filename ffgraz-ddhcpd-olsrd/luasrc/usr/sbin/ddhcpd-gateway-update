@@ -1,0 +1,59 @@
+#!/usr/bin/env lua
+
+local olsrd = require 'gluon.olsrd'
+
+local info = olsrd.oi()
+
+local function ddhcpdctl(...)
+	local exec = 'exec /usr/sbin/ddhcpdctl '
+	for _, arg in ipairs(arg) do
+		-- security-wise this is horrible, but it works
+		local str = "%q"
+		local append = str:format(arg)
+		exec = exec .. append
+	end
+	os.execute(exec)
+end
+
+local gateways = { }
+
+local current_gw = nil
+
+-- usually these two are configured to not both do ipv4 therefore we can assume that we won't end up with two "current_gw"
+-- that would be pretty catastrophic on it's own
+
+if info.olsr2.running then
+	for _, network in ipairs(olsrd.olsr2_get_nodeinfo('olsrv2info jsonraw attached_network').attached_network) do
+		if network.attached_net_src == '0.0.0.0/0' then
+			table.insert(gateways, network.node)
+		end
+	end
+
+	for _, route in ipairs(olsrd.olsr2_get_nodeinfo('olsrv2info jsonraw route').route) do
+		if route.dst == '0.0.0.0/0' then
+			current_gw = route.route_lasthop
+		end
+	end
+end
+
+if info.olsr1.running then
+	for _, hna in ipairs(olsrd.olsr1_get_nodeinfo('hna').hna) do
+		if hna.destination == '0.0.0.0' then
+			table.insert(gateways, hna.gateway)
+			-- FIXME: determine which gateway is the best to use
+			current_gw = hna.gateway
+		end
+	end
+end
+
+print('[ddhcpd-olsrd] found gateway(s): ' .. table.concat(gateways, ','))
+
+if not current_gw then
+	print('[ddhcpd-olsrd] no current gateway, clearing gateway')
+	ddhcpdctl('-r', '3')
+	ddhcpdctl('-r', '6')
+else
+	print('[ddhcpd-olsrd] setting gateway ' .. current_gw)
+	ddhcpdctl('-o', '3:4:' .. current_gw)
+	ddhcpdctl('-o', '6:4:' .. current_gw)
+end
