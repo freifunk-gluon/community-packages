@@ -9,7 +9,7 @@ math.randomseed(os.time())
 local function randomString(length)
 	local ret = {}
 	local r
-	for i = 1, length do
+	for _ = 1, length do
 		r = math.random(1, #charset)
 		table.insert(ret, charset:sub(r, r))
 	end

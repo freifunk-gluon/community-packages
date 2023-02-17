@@ -37,7 +37,8 @@ function Signed:fetch_signed_json(url)
 	if (result:reverse()):find("}") > 1 then
 		result = result:sub(0, result:len() - (result:reverse()):find("}") + 1)
 	end
-	-- sometimes it also ends up in the result (it's usually a \n and another \n - will never mess with json as json escapes it)
+	-- sometimes it also ends up in the result
+	-- (it's usually a \n and another \n - will never mess with json as json escapes it)
 	if result:find("\n") then
 		result = result:sub(0, result:find("\n")) .. result:sub((result:reverse()):find("\n") + 1, result:len())
 	end
@@ -113,16 +114,6 @@ function Signed:fetch_signed_text(url)
 	end
 
 	return result
-end
-
-local function _instantiate(class, ...)
-	local inst = setmetatable({}, {__index = class})
-
-	if inst.__init__ then
-		inst:__init__(...)
-	end
-
-	return inst
 end
 
 return Signed
