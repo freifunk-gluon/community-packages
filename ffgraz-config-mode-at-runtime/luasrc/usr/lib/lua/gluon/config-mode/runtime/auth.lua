@@ -28,7 +28,7 @@ function http:getquery(varname)
     varname = '&' .. varname .. '='
     local _, q = string.find(query, varname)
     if q ~= nil then
-      p = string.find(query, '&', q)
+      local p = string.find(query, '&', q)
       if p == nil then p = -1 else p = p - 1 end
       value = string.sub(query, q + 1, p)
     end

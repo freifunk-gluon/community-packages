@@ -33,6 +33,12 @@ files["**/luasrc/lib/gluon/config-mode*/*"] = {
 	},
 }
 
+files["**/luasrc/lib/gluon/config-mode-runtime/*"] = {
+	globals = {
+		"Auth"
+	},
+}
+
 files["**/check_site.lua"] = {
 	read_globals = {
 		"alternatives",
