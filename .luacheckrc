@@ -13,8 +13,9 @@ include_files = {
 	"**/luasrc/**/*",
 }
 
-files["**/luasrc/lib/gluon/config-mode/*"] = {
+files["**/luasrc/lib/gluon/config-mode*/*"] = {
 	globals = {
+		"Element",
 		"DynamicList",
 		"Flag",
 		"Form",
@@ -71,4 +72,3 @@ files["**/luasrc/lib/gluon/**/controller/*"] = {
 		"template",
 	},
 }
-
