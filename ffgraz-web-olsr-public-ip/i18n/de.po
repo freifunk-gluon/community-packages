@@ -1,0 +1,30 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: Maciej Krüger <mkg20001@gmail.com>\n"
+"Language-Team: \n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.1.1\n"
+"X-Poedit-Basepath: ../luasrc/lib/gluon/config-mode/model\n"
+"X-Poedit-SearchPath-0: .\n"
+
+msgid "Public IP"
+msgstr "Öffentliche IP"
+
+msgid "Enabled"
+msgstr "Aktiviert"
+
+msgid "IPv4 Address"
+msgstr "IPv4 Addresse"
+
+msgid "Peer IP"
+msgstr "IP der Gegenstelle"
+
+msgid "Configuration for OLSR Public IP. You will get the necesarry details from the mesh admins."
+msgstr "Konfiguration für OLSR Öffentliche IP. Du bekommst die benötigten Werte von den Mesh-Administratoren."

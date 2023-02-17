@@ -1,0 +1,21 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+if uci:get_bool('gluon', 'olsr_public_ip', 'enabled') then
+  uci:section('network', 'interface', 'olsr_public_ip', {
+    proto = 'ipip',
+    peeraddr = uci:get('gluon', 'olsr_public_ip', 'peeraddr'),
+    ipaddr = uci:get('gluon-static-ip', 'olsr_public_ip', 'ip4')
+  })
+
+  uci:section('olsrd', 'Hna4', 'olsr_public_ip', {
+    netaddr = uci:get('gluon-static-ip', 'olsr_public_ip', 'ip4'),
+    netmask = '255.255.255.255'
+  })
+else
+  uci:delete('olsrd', 'olsr_public_ip')
+end
+
+uci:save('network')
+uci:save('olsrd')
