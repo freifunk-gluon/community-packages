@@ -1,0 +1,17 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Public IP"
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "IPv4 Address"
+msgstr ""
+
+msgid "Peer IP"
+msgstr ""
+
+msgid "Configuration for OLSR Public IP. You will get the necesarry details from your mesh admins."
+msgstr ""
