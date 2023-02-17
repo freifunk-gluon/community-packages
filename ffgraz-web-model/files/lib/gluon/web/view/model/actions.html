@@ -1,0 +1,14 @@
+<% for _, action in ipairs(self.actions or {}) do %>
+<template>
+	<form<%= attr("id", id .. '.' .. action[1]) %> method="post" enctype="multipart/form-data" action="<%|url(request)%>"></form>
+</template>
+<% end %>
+<div class="gluon-page-actions" <%=
+	attr("id", id) ..
+	attr("data-index", self.index) ..
+	attr("data-depends", self:deplist(self.deps))
+%>>
+	<% for _, action in ipairs(self.actions or {}) do %>
+		<input<%= attr("form", id .. '.' .. action[1]) %> class="gluon-button gluon-button-<%= action[3] and 'reset' or 'submit' %>" type="submit" name="<%= action[1] %>" value="<%= action[2] %>">
+	<% end %>
+</div>

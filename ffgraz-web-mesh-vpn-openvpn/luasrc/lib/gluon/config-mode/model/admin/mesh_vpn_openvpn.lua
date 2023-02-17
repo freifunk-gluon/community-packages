@@ -198,6 +198,23 @@ if unistd.access(tmpfile) then
 	end
 end
 
+function s:parse(http)
+	Element:parse(http)
+	self.isRemove = http:formvalue('remove') ~= nil
+end
+
+function s:write()
+	if self.isRemove then
+		-- unlink files
+		unistd.unlink(cfg.ca)
+		unistd.unlink(cfg.cert)
+		unistd.unlink(cfg.key)
+		-- restore ca
+		os.execute('/lib/gluon/upgrade/400-mesh-vpn-openvpn')
+		s:element('model/info', {}, 'info_clear', 'Successfully cleared configuration')
+	end
+end
+
 if cfg.ca then
 	file_info(cfg.ca, translate('CA Cert'))
 end
@@ -209,6 +226,12 @@ if cfg.key then
 end
 
 s:element('model/file', {}, 'upload', translate('Upload .tar.gz, key, CA or cert'))
+
+s:element('model/actions', {
+	actions = {
+		{ 'remove', translate('Reset'), true }
+	},
+}, 'action')
 
 s:element('model/hideactions', {}, 'hideactions')
 s:element('model/common', {}, 'common')
