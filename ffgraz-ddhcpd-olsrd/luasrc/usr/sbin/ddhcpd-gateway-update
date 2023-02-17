@@ -6,7 +6,7 @@ local info = olsrd.oi()
 
 local function ddhcpdctl(...)
 	local exec = 'exec /usr/sbin/ddhcpdctl '
-	for _, arg in ipairs(arg) do
+	for _, arg in ipairs({...}) do
 		-- security-wise this is horrible, but it works
 		local str = "%q"
 		local append = str:format(arg)
@@ -19,7 +19,9 @@ local gateways = { }
 
 local current_gw = nil
 
--- usually these two are configured to not both do ipv4 therefore we can assume that we won't end up with two "current_gw"
+-- usually these two are configured to not both do ipv4
+-- therefore we can assume that we won't end up with two "current_gw"
+
 -- that would be pretty catastrophic on it's own
 
 if info.olsr2.running then
