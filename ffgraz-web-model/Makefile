@@ -13,4 +13,3 @@ define Package/ffgraz-web-model
 endef
 
 $(eval $(call BuildPackageGluon,ffgraz-web-model))
-

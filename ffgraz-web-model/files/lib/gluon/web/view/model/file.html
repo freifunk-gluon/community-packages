@@ -1,21 +1,28 @@
-<form method="post" enctype="multipart/form-data" action="<%|url(request)%>">
+<% formid = id .. '.form' %>
+<template>
+	<form id="<%= formid %>" method="post" enctype="multipart/form-data" action="<%|url(request)%>"></form>
+</template>
+<div<%=
+	attr("id", id) ..
+	attr("data-index", self.index) ..
+	attr("data-depends", self:deplist(self.deps))
+%>>
 	<% if self.error then %>
-	<p class="error"><%=self.error%></p>
+	<p class="error"><%= self.error %></p>
 	<% end %>
 
 	<div class="gluon-section-node">
 		<div class="gluon-value">
 			<label class="gluon-value-title">
-				<%=self.title%>
+				<%= self.title %>
 			</label>
 			<div class="gluon-value-field">
-				<input type="file" name="file">
+				<input<%= attr('form', formid) %> type="file" name="file">
 			</div>
 		</div>
 	</div>
 
 	<div class="gluon-page-actions">
-		<input type="hidden" name="step" value="2">
-		<input class="gluon-button gluon-button-submit" type="submit" value="<%:Upload%>">
+		<input<%= attr('form', formid) %> class="gluon-button gluon-button-submit" type="submit" value="<%:Upload%>">
 	</div>
-</form>
+</div>
