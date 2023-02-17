@@ -36,3 +36,15 @@ msgstr ""
 
 msgid "Upload .tar.gz, key, CA or cert"
 msgstr ""
+
+msgid "Configuration package"
+msgstr ""
+
+msgid "Reset"
+msgstr ""
+
+msgid "Applied! Rebooting..."
+msgstr ""
+
+msgid "Applied! Reloading..."
+msgstr ""

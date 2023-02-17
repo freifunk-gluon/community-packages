@@ -8,7 +8,7 @@ You may obtain a copy of the License at
 	http://www.apache.org/licenses/LICENSE-2.0
 ]]--
 
-package 'gluon-web-mesh-vpn-openvpn'
+package 'ffgraz-web-mesh-vpn-openvpn'
 
 local file
 local tmpfile = "/tmp/vpninput"

@@ -16,10 +16,6 @@ local ssl = require 'openssl'
 
 local site = require 'gluon.site'
 
-local function translate_format(str, ...)
-	return string.format(translate(str), ...)
-end
-
 local cfg = site.mesh_vpn.openvpn.config()
 
 local f = Form(translate('Mesh VPN'))
@@ -53,7 +49,7 @@ local function try_key(_, input)
 
 	return {
 		type = 'key',
-		display = translate_format('Key %s, %s bits', info.type, info.size * 8),
+		display = translatef('Key %s, %s bits', info.type, info.size * 8),
 		info = info,
 	}
 end
@@ -73,8 +69,8 @@ local function try_cert(_, input)
 	return {
 		type = info.ca and 'cacert' or 'cert',
 		display = info.ca
-			and translate_format('CA Certificate "%s"', subject.CN)
-			or translate_format('Certificate "%s" from "%s"', subject.CN, issuer.CN),
+			and translatef('CA Certificate "%s"', subject.CN)
+			or translatef('Certificate "%s" from "%s"', subject.CN, issuer.CN),
 		info,
 	}
 end
@@ -120,7 +116,7 @@ local function file_info(file, desc)
 	local status
 
 	if unistd.access(file) then
-		status = translate_format('Configured, %s', content_info_str(file))
+		status = translatef('Configured, %s', content_info_str(file))
 	else
 		status = translate('Not configured')
 	end
@@ -167,7 +163,7 @@ local function try_tar(_)
 
 		local i = s:element('model/info', {}, 'install_' .. index)
 		if info.type then
-			i.content = translate_format('Successfully installed %s', info.display)
+			i.content = translatef('Successfully installed %s', info.display)
 		end
 	end
 
@@ -186,8 +182,8 @@ if unistd.access(tmpfile) then
 	elseif info.type == nil then
 		if try_tar() then
 			info = {
-				type = translate('tar configuration'),
-				display = '', -- intentionally left empty
+				type = 'tar',
+				display = translatef('Configuration package'),
 			}
 		end
 
@@ -196,9 +192,9 @@ if unistd.access(tmpfile) then
 
 	local i = s:element('model/info', {}, 'info_install')
 	if info.type then
-		i.content = translate_format('Successfully installed %s', info.display)
+		i.content = translatef('Successfully installed %s', info.display)
 	else
-		i.content = translate_format('Error: Unknown file')
+		i.content = translatef('Error: Unknown file')
 	end
 end
 
@@ -213,5 +209,8 @@ if cfg.key then
 end
 
 s:element('model/file', {}, 'upload', translate('Upload .tar.gz, key, CA or cert'))
+
+s:element('model/hideactions', {}, 'hideactions')
+s:element('model/common', {}, 'common')
 
 return f

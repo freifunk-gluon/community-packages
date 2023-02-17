@@ -31,7 +31,7 @@ msgid "Successfully installed %s"
 msgstr "%s erfolgreich installiert"
 
 msgid "Error: Unknown file"
-msgstr "Fehler: Unbekkannte Datei"
+msgstr "Fehler: Unbekannte Datei"
 
 msgid "CA Cert"
 msgstr "CA Zertifikat"
@@ -44,3 +44,15 @@ msgstr "Mesh Schlüssel"
 
 msgid "Upload .tar.gz, key, CA or cert"
 msgstr "Lade ein .tar.gz, Schlüssel, CA oder Zertifikat hoch"
+
+msgid "Configuration package"
+msgstr "Konfigurations-Paket"
+
+msgid "Reset"
+msgstr "Zurücksetzen"
+
+msgid "Applied! Rebooting..."
+msgstr "Übernommen! Wird neugestartet..."
+
+msgid "Applied! Reloading..."
+msgstr "Übernommen! Wird neu geladen.."
