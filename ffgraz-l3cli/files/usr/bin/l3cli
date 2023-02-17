@@ -1,0 +1,35 @@
+#!/bin/sh
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <command>"
+  echo "Commands:"
+  echo "- get_clients              The daemon will reply with a json structure, currently providing client count."
+  echo "- get_prefixes             This return a list of all prefixes being handled by l3roamd."
+  echo "- add_meshif <interface>   Add <interface> to mesh interfaces. Does the same as -m"
+  echo "- del_meshif <interface>   Remove <interface> from mesh interfaces. Reverts add_meshif"
+  echo "- get_meshifs              Obtain a list of all current mesh interfaces"
+  echo "- add_prefix <prefix>      This will treat <prefix> as if it was added using -p"
+  echo "- del_prefix <prefix>      This will remove <prefix> from the list of client-prefixes and stop accepting queries for clients within that prefix."
+  echo "- add_address <addr> <mac> This will add the ipv6 address to the client represented by <mac>"
+  echo "- del_address <addr> <mac> This will remove the ipv6 address from the client represented by <mac>"
+  echo "- probe <addr> <mac>       This will start a neighbour discovery for a neighbour <mac> with address <addr>"
+  echo "- verbosity <none|verbose|debug>	This will set the verbosity of the l3roamd process"
+fi
+
+set -euo pipefail
+
+SOCK=/var/run/l3roamd.sock
+
+echotol3roamd() {
+	local count=0
+	local line="$1"
+	while ! (echo -e "$line" | uc "$SOCK" >/dev/null 2>&1)
+	do
+		sleep 1
+		echo retrying to connect to l3roamd in PID $$, waited ${count}s >&2
+		count=$((count+1))
+	done
+	return 0
+}
+
+echotol3roamd "$*"
