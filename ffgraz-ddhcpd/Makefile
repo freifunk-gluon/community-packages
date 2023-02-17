@@ -8,9 +8,9 @@ PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
 PKG_LICENSE:=MIT
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/freifunk-gluon/ddhcpd
+PKG_SOURCE_URL:=https://github.com/ffgraz/ddhcpd
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
-PKG_SOURCE_VERSION:=f89f9ca5ef7d1b12ff7c6223b31fcab2f5d25b95
+PKG_SOURCE_VERSION:=345ed5816d62d49dd06a9773d49ca1d000c61e43
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION)-$(PKG_SOURCE_VERSION).tar.gz
 
 PKG_BUILD_PARALLEL:=1
