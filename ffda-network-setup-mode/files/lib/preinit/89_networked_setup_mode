@@ -3,7 +3,7 @@
 . /lib/functions.sh
 
 device_supports_networked_setup_mode() {
-	local is_networked="$(lua -e 'print(require("gluon.setup-mode").supports_networked_activation())')"
+	local is_networked="$(lua -e 'print(require("gluon.network-setup-mode").supports_networked_activation())')"
 	
 	if [ "${is_networked}" = "true" ]; then
 		return 0
