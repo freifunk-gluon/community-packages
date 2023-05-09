@@ -1,0 +1,22 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+-- Get/initialize enabled state
+if site.eol_wifi_ssid() == nil then
+        -- Not applicable
+        os.exit(0)
+end
+
+local eol_wifi_ssid = site.eol_wifi_ssid()
+
+if not uci:get_bool('eol-wifi', 'ssid', 'disabled') then
+        uci:section('eol-wifi', 'ssid', 'ssid', {
+                disabled = false,
+        })
+        uci:save('eol-wifi')
+        -- Change client radio ssid
+        uci:set('wireless', 'client_radio0', 'ssid', eol_wifi_ssid)
+        uci:save('wireless')
+end
