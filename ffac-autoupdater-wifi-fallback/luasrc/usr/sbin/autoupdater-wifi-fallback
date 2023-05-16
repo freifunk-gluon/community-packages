@@ -1,0 +1,160 @@
+#!/usr/bin/lua
+local uci = require('simple-uci').cursor()
+local autil = require 'autoupdater-wifi-fallback.util'
+local util = require 'gluon.util'
+local bit = require 'bit'
+local fcntl = require 'posix.fcntl'
+local unistd = require 'posix.unistd'
+
+local configname = 'autoupdater-wifi-fallback'
+local lockfilename = '/var/lock/' .. configname .. '.lock'
+local force = false
+local min_uptime_secs = 3600
+local branch_name = uci:get('autoupdater', 'settings', 'branch')
+
+local lockfd, err = fcntl.open(lockfilename, bit.bor(fcntl.O_WRONLY, fcntl.O_CREAT), 384) -- mode 0600
+if not lockfd then
+  autil.log('err', err)
+  local err_verbose = string.format("Unable to get file descriptor for lock file %s .", lockfilename)
+  autil.log('err', err_verbose)
+  os.exit(1)
+end
+
+local ok, _ = fcntl.fcntl(lockfd, fcntl.F_SETLK, {
+  l_start = 0,
+  l_len = 0,
+  l_type = fcntl.F_WRLCK,
+  l_whence = unistd.SEEK_SET,
+})
+if not ok then
+  local err_msg = string.format("Unable to lock file %s. ", lockfilename) ..
+    "Make sure there is no other instance of this script running."
+  autil.log('err', err_msg)
+  os.exit(1)
+end
+
+local function parse_args()
+local i = 1
+  while arg[i] do
+    if arg[i] == '-f' then
+      force = true
+    elseif arg[i] == '-b' then
+      i=i+1
+
+      if not arg[i] then
+        autil.log('err', 'Error parsing command line: expected branch name')
+        os.exit(1)
+      end
+
+      branch_name = arg[i]
+    else
+      autil.log('err', "Error parsing command line: unexpected argument: '" .. arg[i] .. "'")
+      os.exit(1)
+    end
+    i = i+1
+  end
+end
+
+local function preflight_check()
+  if not uci:get_bool(configname, 'settings', 'enabled') then
+    return false
+  end
+  if not uci:get_bool('autoupdater', 'settings', 'enabled') then
+    return false
+  end
+  if tonumber(util.readfile('/proc/uptime'):match('^([^ ]+) ')) < min_uptime_secs then
+    return false
+  end
+
+  return true
+end
+
+local function connectivity_check()
+  -- check if default gateway is set
+  local f = io.open('/var/gluon/state/has_default_gw4', 'r')
+  if f then
+    f:close()
+    return true
+  end
+
+  -- connectivity check against updateserver
+  for _, host in ipairs(autil.get_update_hosts(branch_name)) do
+    if os.execute('ping -w2 -c1 ' .. host .. ' > /dev/null 2>&1') == 0 then
+      return true
+    end
+  end
+
+  autil.log('out', 'connectivity check failed')
+  return false
+end
+
+local function run_autoupdater()
+  autil.log('out', 'executing the autoupdater...')
+  os.execute('/usr/sbin/autoupdater -f -b ' .. branch_name)
+end
+
+local function switch_to_fallback_mode(radio, ssid, bssid)
+  autil.log('out', 'connecting to '  .. radio .. ' ' .. ssid .. ' ' .. bssid)
+  uci:delete_all('wireless', 'wifi-iface')
+  uci:section('wireless', 'wifi-iface', 'fallback', {
+    device = radio,
+    network = 'fallback',
+    mode = 'sta',
+    disabled = false,
+    macaddr = util.generate_mac(3, 10),
+    bssid = bssid,
+    ssid = ssid,
+    ifname = 'fallback',
+    encryption = 'none',
+  })
+  uci:set('wireless', radio, 'disabled', false)
+  uci:save('wireless')
+
+  os.execute('wifi')
+  os.execute('sleep 5')
+  uci:revert('wireless')
+  os.execute('sleep 20')
+end
+
+local function revert_to_standard_mode()
+  autil.log('out', 'going back to standard mode')
+  os.execute('/etc/init.d/network restart')
+  os.execute('sleep 30')
+end
+
+parse_args()
+
+if not uci:get('autoupdater', branch_name) then
+  autil.log('err', 'Cant find configuration for branch: ' .. branch_name)
+  os.exit(1)
+end
+
+if (force or preflight_check()) and not connectivity_check() then
+  local offset = 2 * 3600
+  local unreachable_since = os.time()
+  if not uci:get('autoupdater-wifi-fallback', 'settings', 'unreachable_since') then
+    uci:set(configname, 'settings', 'unreachable_since', unreachable_since)
+  else
+    uci:set(configname, 'settings', 'last_run', unreachable_since)
+    unreachable_since = uci:get(configname, 'settings', 'unreachable_since')
+  end
+  uci:save(configname)
+
+  if force or tonumber(unreachable_since) + offset < os.time() then
+    autil.log('out', 'going to fallback mode')
+    for radio, netlist in pairs(autil.get_available_wifi_networks()) do
+      for _, net in ipairs(netlist) do
+        switch_to_fallback_mode(radio, net.ssid, net.bssid)
+        if run_autoupdater() == 0 then
+          break
+        end
+      end
+    end
+    -- this is only reached if no updated happened
+    revert_to_standard_mode()
+  end
+else
+  uci:delete(configname, 'settings', 'unreachable_since')
+  uci:delete(configname, 'settings', 'last_run')
+  uci:save(configname)
+end
