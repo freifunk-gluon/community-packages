@@ -7,21 +7,20 @@ You should use something like the following in the site.conf:
 	
 ```
  mesh_vpn = {
-	mtu = 1400,
+	enabled = true,
 	wireguard = {
-		broker = '01.wg-test.freifunk-aachen.de:8080',
+		broker = 'wg-broker.freifunk-aachen.de/api/add_key',
 		peers = {
 			{
-				publickey ='N9uF5Gg1B5AqWrE9IuvDgzmQePhqhb8Em/HrRpAdnlY=',
-				endpoint ='ffkwsn01.freifunk-koenigswinter.de:30020',
-				link_address = 'fe80::f000:22ff:fe12:01',
+				public_key ='N9uF5Gg1B5AqWrE9IuvDgzmQePhqhb8Em/HrRpAdnlY=',
+				endpoint ='01.wg-node.freifunk-aachen.de:51819',
 			},
 			{
-				publickey ='liatbdT62FbPiDPHKBqXVzrEo6hc5oO5tmEKDMhMTlU=',
-				endpoint ='ffkwsn02.freifunk-koenigswinter.de:30020',
-				link_address = 'fe80::f000:22ff:fe12:02',
+				public_key ='liatbdT62FbPiDPHKBqXVzrEo6hc5oO5tmEKDMhMTlU=',
+				endpoint ='01.wg-node.freifunk-aachen.de:51820',
 			},
 		},
+		mtu = 1400,
 	},
 	
 ```

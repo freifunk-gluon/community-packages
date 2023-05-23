@@ -31,7 +31,7 @@ for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
 	uci:section("wireguard", "peer", "peer_" .. name, {
 		enabled = true,
 		endpoint = peer.endpoint,
-		publickey = peer.public_key,
+		public_key = peer.public_key,
 		link_address = peer.link_address,
 	})
 end

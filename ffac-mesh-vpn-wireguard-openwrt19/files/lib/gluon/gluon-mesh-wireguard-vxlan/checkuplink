@@ -93,7 +93,7 @@ PROTO=https
 fi
 
 NODENAME=$(uci get system.@system[0].hostname)
- BROKER=$(uci get wireguard.mesh_vpn.broker)public_key
+BROKER=$(uci get wireguard.mesh_vpn.broker)
 gluon-wan wget -q  -O- --post-data='{"node_name": "'"$NODENAME"'","public_key": "'"$PUBLICKEY"'"}' $PROTO://$BROKER
 
 # Bring up the wireguard interface
