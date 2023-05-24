@@ -38,8 +38,9 @@ fi
 # Do we already have a private-key? If not generate one
 temp=$(uci get network.wg_mesh.private_key)
 if [ "$?" -ne "0" ]; then
-uci set network.wg_mesh.private_key=$(wg genkey)
-uci commit network
+  uci set network.wg_mesh=interface
+  uci set network.wg_mesh.private_key=$(wg genkey)
+  uci commit network
 fi
 
 # Is wireguard enabled?
