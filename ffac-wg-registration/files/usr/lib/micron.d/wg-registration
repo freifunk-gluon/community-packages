@@ -1,0 +1,1 @@
+* * * * * sleep $(awk 'BEGIN{srand();print int(rand()*40)}') && /lib/gluon/wg-registration/registration.sh
