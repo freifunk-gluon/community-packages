@@ -1,0 +1,19 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+local branch = uci:get('autoupdater', 'settings', 'branch')
+
+if site.update_channel == nil then
+
+	-- print('update_channel not defined in site.conf')
+else
+    local from_name = site.update_channel.from_name() or false --use any from release
+    local to_name = site.update_channel.to_name() or false
+
+    if to_name and (not from_name or from_name == branch) then
+        uci:set('autoupdater', 'settings', 'branch', to_name)
+    end
+    uci:save('autoupdater')
+end
