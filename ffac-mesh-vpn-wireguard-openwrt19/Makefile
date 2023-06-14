@@ -15,4 +15,10 @@ define Package/$(PKG_NAME)
   DEPENDS:=+gluon-mesh-vpn-core +micrond +kmod-wireguard +wireguard-tools +ip-full
 endef
 
+define Package/$(PKG_NAME)/install
+	$(CP) ./files/* $(1)/
+	$(CP) ./luasrc/* $(1)/
+	./gluonShellDiet.sh $(1)/lib/gluon/gluon-mesh-wireguard-vxlan/checkuplink
+endef
+
 $(eval $(call BuildPackageGluon,$(PKG_NAME)))
