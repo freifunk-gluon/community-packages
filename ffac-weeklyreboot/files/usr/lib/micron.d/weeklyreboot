@@ -1,0 +1,2 @@
+# starting thursday morning at 3h15 (to 6h00)
+15 3 * * 4 /lib/gluon/weeklyreboot/weeklyreboot.sh

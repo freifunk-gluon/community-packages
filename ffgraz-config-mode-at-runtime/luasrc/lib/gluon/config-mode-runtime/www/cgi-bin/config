@@ -1,0 +1,8 @@
+#!/usr/bin/lua
+
+require 'gluon.web.cgi' {
+	base_path = '/lib/gluon/config-mode-runtime',
+
+	layout_package = 'ffgraz-config-mode-at-runtime',
+	layout_template = 'theme/layout',
+}

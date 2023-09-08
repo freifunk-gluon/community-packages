@@ -13,8 +13,9 @@ include_files = {
 	"**/luasrc/**/*",
 }
 
-files["**/luasrc/lib/gluon/config-mode/*"] = {
+files["**/luasrc/lib/gluon/config-mode*/*"] = {
 	globals = {
+		"Element",
 		"DynamicList",
 		"Flag",
 		"Form",
@@ -28,6 +29,41 @@ files["**/luasrc/lib/gluon/config-mode/*"] = {
 		"translate",
 		"translatef",
 		"Value",
+		"Warning"
+	},
+}
+
+files["**/luasrc/lib/gluon/config-mode-runtime/*"] = {
+	globals = {
+		"Auth"
+	},
+}
+
+files["**/check_site.lua"] = {
+	read_globals = {
+		"alternatives",
+		"extend",
+		"in_domain",
+		"in_site",
+		"need",
+		"need_alphanumeric_key",
+		"need_array",
+		"need_array_of",
+		"need_boolean",
+		"need_chanlist",
+		"need_domain_name",
+		"need_number",
+		"need_number_range",
+		"need_one_of",
+		"need_string",
+		"need_string_array",
+		"need_string_array_match",
+		"need_string_match",
+		"need_table",
+		"need_value",
+		"obsolete",
+		"table_keys",
+		"this_domain",
 	},
 }
 
@@ -42,4 +78,3 @@ files["**/luasrc/lib/gluon/**/controller/*"] = {
 		"template",
 	},
 }
-

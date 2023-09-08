@@ -1,0 +1,36 @@
+#!/usr/bin/lua
+
+local unistd = require 'posix.unistd'
+local util = require 'gluon.util'
+local site = require 'gluon.site'
+
+local firmware_flag_file = "/tmp/firmware_available"
+local firmware_available = unistd.access("/tmp/firmware.bin")
+
+-- Check if domain-switch is scheduled
+if site.scheduled_sysupgrade() == nil then
+	-- Switch not applicable
+	os.exit(0)
+end
+
+local firmware_server = site.scheduled_sysupgrade.firmware_server()
+
+if not firmware_available then
+	local exit_code = os.execute("autoupdater -n " .. firmware_server)
+	if exit_code == 0 and unistd.access("/tmp/firmware.bin") then
+		firmware_available = true
+	end
+end
+
+if firmware_available then
+	-- Check if we already have firmware available
+	if unistd.access(firmware_flag_file) then
+		os.exit(0)
+	end
+	-- Create firmware available flag
+	local f = io.open(firmware_flag_file, "w")
+	f:write(tostring(util.get_uptime()))
+	f:close()
+else
+	os.remove(firmware_flag_file)
+end

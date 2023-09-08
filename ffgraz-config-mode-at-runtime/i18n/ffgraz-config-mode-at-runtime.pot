@@ -1,0 +1,71 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Apply configuration"
+msgstr ""
+
+msgid ""
+"Applying changes without rebooting is usually faster, but can occasionally "
+"lead to undefined behaviour"
+msgstr ""
+
+msgid "Apply without Reboot"
+msgstr ""
+
+msgid "Reboot and Apply"
+msgstr ""
+
+msgid "Nothing to save"
+msgstr ""
+
+msgid "Overview"
+msgstr ""
+
+msgid "Here you can configure your node"
+msgstr ""
+
+msgid ""
+"This is the same interface as config-mode, except changes get saved "
+"immediately and can be applied at any point in time"
+msgstr ""
+
+msgid "Admin Configuration"
+msgstr ""
+
+msgid "Wizard Page"
+msgstr ""
+
+msgid "JavaScript required!"
+msgstr ""
+
+msgid ""
+"You must enable JavaScript in your browser or the web interface will not "
+"work properly."
+msgstr ""
+
+msgid "Pending changes - Changes will be applied automatically on next reboot"
+msgstr ""
+
+msgid "Apply now..."
+msgstr ""
+
+msgid "Main"
+msgstr ""
+
+msgid "Wizard"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Failed to execute reconfigure"
+msgstr ""
+
+msgid "Welcome!"
+msgstr ""
+
+msgid "Authentication mode: %s"
+msgstr ""
+
+msgid "User ID: %s"
+msgstr ""

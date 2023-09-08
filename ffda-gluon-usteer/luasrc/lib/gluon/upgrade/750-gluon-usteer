@@ -1,0 +1,134 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+local wireless = require 'gluon.wireless'
+local site = require 'gluon.site'
+
+
+local defaults = {
+	["network"]={
+		["enabled"]=site.usteer.network.enabled(true),
+		["wireless"]=site.usteer.network.wireless(true),
+		["wired"]=site.usteer.network.wired(true),
+		["update_interval"]=site.usteer.network.update_interval(5000),
+		["update_timeout"]=site.usteer.network.update_timeout(12),
+	},
+	["band_steering"]={
+		["enabled"]=site.usteer.band_steering.enabled(true),
+		["min_snr"]=site.usteer.band_steering.min_snr(-60),
+		["interval"]=site.usteer.band_steering.interval(40000),
+	},
+}
+
+local function get_config(section, option)
+	local default = defaults[section][option]
+	local user = uci:get("gluon-usteer", section, option)
+
+	if user ~= nil and default == true or default == false then
+		user = uci:get_bool("gluon-usteer", section, option)
+	end
+
+	if user ~= nil then
+		return user
+	end
+
+	return default
+end
+
+local function set_config(config, section, option)
+	-- Get config
+	local conf_val = get_config(section, option)
+
+	if conf_val == nil then return end
+
+
+	uci:set('usteer', 'usteer', config, conf_val)
+end
+
+local function table_contains(table, element)
+	for _, value in pairs(table) do
+		if value == element then
+			return true
+		end
+	end
+	return false
+end
+
+uci:delete_all('usteer', 'usteer')
+
+uci:section('usteer', 'usteer', 'usteer', {
+	syslog = 1,
+	ipv6 = 1,
+	debug_level = 2,
+})
+
+
+-- Band steering
+
+if not get_config('band_steering', 'enabled') then
+	uci:set('usteer', 'usteer', 'band_steering_interval', '0')
+else
+	set_config('band_steering_min_snr', 'band_steering', 'min_snr')
+	set_config('band_steering_interval', 'band_steering', 'interval')
+end
+
+
+-- Network
+
+uci:set('usteer', 'usteer', 'local_mode', not get_config('network', 'enabled'))
+
+set_config('remote_update_interval', 'network', 'update_interval')
+set_config('remote_node_timeout', 'network', 'update_timeout')
+
+local networks = {}
+
+if get_config('network', 'wireless') then
+	wireless.foreach_radio(uci, function(radio)
+		local radio_name = radio['.name']
+		table.insert(networks, 'mesh_' .. radio_name)
+	end)
+end
+
+if get_config('network', 'wired') then
+	local prefix = ''
+	if site.mesh.vxlan(true) then
+		prefix = 'vx_'
+	end
+	table.insert(networks, prefix .. 'mesh_other')
+	table.insert(networks, prefix .. 'mesh_uplink')
+end
+
+uci:set('usteer', 'usteer', 'network', networks)
+
+
+-- Enabled SSIDs
+local client_ssids = {}
+wireless.foreach_radio(uci, function(_, _, config)
+	local ssid = config.ap.ssid()
+	local owe_ssid = config.ap.owe_ssid()
+
+	if ssid and not table_contains(client_ssids, ssid) then
+		table.insert(client_ssids, ssid)
+	end
+
+	if owe_ssid and not table_contains(client_ssids, owe_ssid) then
+		table.insert(client_ssids, owe_ssid)
+	end
+end)
+uci:set('usteer', 'usteer', 'ssid_list', client_ssids)
+uci:save('usteer')
+
+
+-- Firewall
+
+uci:section('firewall', 'rule', 'mesh_usteer_ll', {
+	dest_port = 16720,
+	src = 'mesh',
+	name = 'mesh_usteer_ll',
+	src_ip = 'fe80::/64',
+	target = 'ACCEPT',
+	proto = 'udp',
+})
+
+uci:save('firewall')

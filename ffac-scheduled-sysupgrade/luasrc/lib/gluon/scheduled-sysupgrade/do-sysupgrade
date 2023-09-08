@@ -1,0 +1,58 @@
+#!/usr/bin/lua
+
+local unistd = require 'posix.unistd'
+local util = require 'gluon.util'
+local site = require 'gluon.site'
+
+-- Returns true if node was offline long enough to perform domain switch
+local function switch_after_min_reached()
+	if not unistd.access("/tmp/firmware_available") then
+		return false
+	end
+
+	local switch_after_sec = site.scheduled_sysupgrade.switch_after_existing_mins() * 60
+
+	local current_uptime = util.get_uptime()
+	if current_uptime == nil then
+		return false
+	end
+
+	local f = util.readfile("/tmp/firmware_available")
+	if f == nil then
+		return false
+	end
+	local offline_since = tonumber(f)
+
+	local offline_time_sec = current_uptime - offline_since
+
+	if offline_time_sec > switch_after_sec then
+		return true
+	end
+	return false
+end
+
+-- Returns true in case switch time has passed
+local function switch_time_passed()
+	local current_time = os.time()
+	local switch_time = site.scheduled_sysupgrade.switch_time()
+
+	return switch_time < current_time
+end
+
+if site.scheduled_sysupgrade() == nil then
+	-- Switch not applicable
+	print("No schedule for sysupgrade")
+	os.exit(0)
+end
+
+if not switch_after_min_reached() and not switch_time_passed() then
+	-- Neither switch-time passed nor switch_after_min reached
+	os.exit(0)
+end
+
+
+local success = os.execute("sysupgrade --ignore-minor-compat-version /tmp/firmware.bin")
+
+if success > 0 then
+	os.execute("sysupgrade /tmp/firmware.bin")
+end

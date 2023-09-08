@@ -1,0 +1,37 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require("simple-uci").cursor()
+
+local wg_enabled = uci:get_bool('wireguard', 'mesh_vpn', 'enabled') or false
+
+-- Clean up previous configuration
+uci:delete_all('wireguard', 'peer', function(peer)
+	return peer.preserve ~= '1'
+end)
+-- Clean up previous configuration
+uci:delete_all('wireguard', 'wireguard', function(peer)
+	return peer.preserve ~= '1'
+end)
+
+local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
+	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
+	or wg_enabled -- specific config
+
+uci:section("wireguard", "wireguard", "mesh_vpn", {
+	iface = site.mesh_vpn.wireguard.iface(),
+	limit = site.mesh_vpn.wireguard.limit(),
+	broker = site.mesh_vpn.wireguard.broker(),
+	enabled = mesh_enabled,
+})
+
+for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
+	uci:section("wireguard", "peer", "peer_" .. name, {
+		enabled = true,
+		endpoint = peer.endpoint,
+		public_key = peer.public_key,
+	})
+end
+
+uci:save('wireguard')
+uci:save('gluon')

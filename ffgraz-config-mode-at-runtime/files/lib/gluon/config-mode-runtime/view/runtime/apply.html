@@ -1,0 +1,33 @@
+<form method="post" enctype="multipart/form-data" action="<%|url(request)%>">
+	<% if self.error then %>
+	<p class="error"><%=self.error%></p>
+	<% end %>
+
+	<h2><%:Apply configuration%></h2>
+
+  <% if self.output then %>
+    <div class="gluon-section">
+      <div class="gluon-section-descr">
+        <p><%=self.outputmsg%></p>
+
+        <p>
+          <tt><%= self.output %></tt>
+          <script>
+            document.querySelector('tt').innerHTML = document.querySelector('tt').innerHTML.replace(/\n/g, '<br>')
+          </script>
+        </p>
+      </div>
+    </div>
+  <% else %>
+		<p><%:Applying changes without rebooting is usually faster, but can occasionally lead to undefined behaviour%></p>
+
+    <div class="gluon-page-actions">
+      <% if self.unsaved then %>
+        <input class="gluon-button gluon-button-reset" name="apply_reload" type="submit" value="<%:Apply without Reboot%>">
+        <input class="gluon-button gluon-button-reset" name="apply_reboot" type="submit" value="<%:Reboot and Apply%>">
+      <% else %>
+        <div class="gluon-button gluon-button-invalid"><%:Nothing to save%></div>
+      <% end %>
+    </div>
+  <% end %>
+</form>

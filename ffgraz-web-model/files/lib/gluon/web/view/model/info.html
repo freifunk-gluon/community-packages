@@ -1,0 +1,15 @@
+<%- if not self.hide then -%>
+<div class="gluon-value"<%=
+	attr("id", id) ..
+	attr("data-index", self.index) ..
+	attr("data-depends", self:deplist(self.deps))
+%>>
+	<%- if self.content then -%>
+  <%= self.content %>
+	<%- else -%>
+  <label class="gluon-value-title"><%=self.title%></label>
+
+  <span class="gluon-value-field"><%=self.description%></span>
+	<%- end -%>
+</div>
+<%- end -%>
