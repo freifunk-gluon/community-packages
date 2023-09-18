@@ -25,10 +25,10 @@ check_address_family() {
 	# Check if we have a default route for v6 if not fallback to v4
 	defgw=$(ip -6 route show table 1 | grep 'default via')
 	if [ "$?" -eq "0" ]; then
-		local ipv6="$(gluon-wan nslookup $gateway | grep 'Address [0-9]' | egrep -o '([a-f0-9:]+:+)+[a-f0-9]+')"
+		local ipv6="$(gluon-wan nslookup $gateway | grep 'Address:\? [0-9]' | egrep -o '([a-f0-9:]+:+)+[a-f0-9]+')"
 		echo [$ipv6]$(echo $peer_endpoint | egrep -oe :[0-9]+$)
 	else
-		local ipv4="$(gluon-wan nslookup $gateway | grep 'Address [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
+		local ipv4="$(gluon-wan nslookup $gateway | grep 'Address:\? [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
 		echo $ipv4$(echo $peer_endpoint | egrep -oe :[0-9]+$)
 	fi
 
@@ -52,7 +52,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 	# Check connectivity to supernode
 	wget http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/  --timeout=5 -O/dev/null -q
 	if [ "$?" -eq "0" ]; then
-		GWMAC=$(batctl gwl | grep \* | awk '{print $2}')
+		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
 		batctl ping -c 5 $GWMAC &> /dev/null
 		if [ "$?" -eq "0" ]; then
 			CONNECTED=1
@@ -107,7 +107,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
-		ip6tables -I INPUT 1 -i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT
+                RULE="-i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT"
+                ip6tables -C INPUT $RULE                                                                                
+                if [ $? -ne 0 ]; then                                  
+                        ip6tables -I INPUT 1 $RULE
+                fi                                                                                                             
 		
 		# Bring up VXLAN
 		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local $(interface_linklocal "$MESH_VPN_IFACE") remote $(uci get wireguard.peer_$PEER.link_address) dstport 8472 dev $MESH_VPN_IFACE
