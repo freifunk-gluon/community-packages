@@ -12,4 +12,8 @@ define Package/$(PKG_NAME)
   DEPENDS:=+gluon-core
 endef
 
+define Package/ffac-eol-ssid/conffiles
+/etc/config/eol-ssid
+endef
+
 $(eval $(call BuildPackageGluon,ffac-eol-ssid))

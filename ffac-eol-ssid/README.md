@@ -16,6 +16,10 @@ Then one can add the `ffac-eol-ssid` package to the old version and leave a much
 eol_wifi_ssid = 'erneuern.freifunk.net'
 ```
 
+## Upgrading
+
+This package will migrate uci settings for previous versions of it.
+
 ## Limitations
 
 As this package was created to migrate older devices, it does not respect 5GHz or OWE radio.
