@@ -11,6 +11,18 @@ if uci:get('eol-wifi', 'ssid') ~= nil then
     os.remove('/etc/config/eol-wifi')
 end
 
+-- migrate ffmuc-eol-ssid configuration
+if uci:get('ffmuc', 'eol_ssid') then
+    local ffmuc_ssid_enabled = true
+    if uci:get('ffmuc', 'eol_ssid', 'enabled') ~= nil then
+        ffmuc_ssid_enabled = uci:get_bool('ffmuc', 'eol_ssid', 'enabled')
+    end
+    uci:set('eol-ssid', 'settings', 'enabled', ffmuc_ssid_enabled)
+    uci:save('eol-ssid')
+    uci:delete('ffmuc', 'eol_ssid')
+    uci:save('ffmuc')
+end
+
 if not site.eol_ssid.enabled(false) -- disabled for site/domain
 or uci:get('eol-ssid', 'settings', 'enabled') == 0 -- present & disabled on router
 then
