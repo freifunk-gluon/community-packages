@@ -3,20 +3,27 @@
 local site = require 'gluon.site'
 local uci = require('simple-uci').cursor()
 
+-- migrate older ffac-eol-ssid version with manual eol-wifi.ssid.disabled=1
+if uci:get('eol-wifi', 'ssid') ~= nil then
+    local deprecated_ssid_enabled = not uci:get_bool('eol-wifi', 'ssid', 'disabled')
+    uci:set('eol-ssid', 'settings', 'enabled', deprecated_ssid_enabled)
+    uci:save('eol-ssid')
+    os.remove('/etc/config/eol-wifi')
+end
+
 -- Get/initialize enabled state
 if site.eol_wifi_ssid() == nil then
-        -- Not applicable
-        os.exit(0)
+    -- Not applicable
+    os.exit(0)
+end
+
+-- eol-ssid feature disabled on device
+if not uci:get_bool('eol-ssid', 'settings', 'enabled') then
+    os.exit(0)
 end
 
 local eol_wifi_ssid = site.eol_wifi_ssid()
 
-if not uci:get_bool('eol-wifi', 'ssid', 'disabled') then
-        uci:section('eol-wifi', 'ssid', 'ssid', {
-                disabled = false,
-        })
-        uci:save('eol-wifi')
-        -- Change client radio ssid
-        uci:set('wireless', 'client_radio0', 'ssid', eol_wifi_ssid)
-        uci:save('wireless')
-end
+-- Change client radio ssid
+uci:set('wireless', 'client_radio0', 'ssid', eol_wifi_ssid)
+uci:save('wireless')

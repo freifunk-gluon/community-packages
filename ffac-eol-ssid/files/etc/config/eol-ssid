@@ -1,0 +1,2 @@
+config eol-ssid 'settings'
+        option enabled '1'
