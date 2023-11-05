@@ -7,7 +7,7 @@ PKG_RELEASE:=1
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/$(PKG_NAME)
-  TITLE:=Filters RAs
+  TITLE:=Filters router advertisments of any gateway but the connected gateway
   DEPENDS:=+gluon-ebtables +libgluonutil +libbatadv
 endef
 
