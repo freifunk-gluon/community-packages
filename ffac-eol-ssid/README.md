@@ -13,7 +13,10 @@ Then one can add the `ffac-eol-ssid` package to the old version and leave a much
 ## Site Configuration
 
 ```
-eol_wifi_ssid = 'erneuern.freifunk.net'
+eol_ssid = {
+    enabled = true,
+    ssid = 'erneuern.freifunk.net',
+}
 ```
 
 ## Upgrading

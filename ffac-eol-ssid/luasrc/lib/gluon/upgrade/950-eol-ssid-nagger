@@ -11,18 +11,13 @@ if uci:get('eol-wifi', 'ssid') ~= nil then
     os.remove('/etc/config/eol-wifi')
 end
 
--- Get/initialize enabled state
-if site.eol_wifi_ssid() == nil then
-    -- Not applicable
-    os.exit(0)
+if not site.eol_ssid.enabled(false) -- disabled for site/domain
+or not uci:get_bool('eol-ssid', 'settings', 'enabled') -- disabled on router
+then
+    os.exit(0) -- do not change SSID
 end
 
--- eol-ssid feature disabled on device
-if not uci:get_bool('eol-ssid', 'settings', 'enabled') then
-    os.exit(0)
-end
-
-local eol_wifi_ssid = site.eol_wifi_ssid()
+local eol_wifi_ssid = site.eol_ssid.ssid()
 
 -- Change client radio ssid
 uci:set('wireless', 'client_radio0', 'ssid', eol_wifi_ssid)
