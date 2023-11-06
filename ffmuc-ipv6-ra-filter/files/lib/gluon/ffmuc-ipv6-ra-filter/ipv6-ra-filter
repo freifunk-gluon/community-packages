@@ -3,8 +3,6 @@
 # -e: script stops if any command outside an "if" fails
 set -e
 
-gwl=$(batctl gwl | awk '/[*]/{print $2}')
-
 # Check if we need to initialise the ra-filter chain
 if ! ebtables-tiny -L IPV6_RA_FILTER; then
 	logger -t ipv6_ra_filter "ebtables chain IPV6_RA_FILTER does not exist"
@@ -12,6 +10,16 @@ if ! ebtables-tiny -L IPV6_RA_FILTER; then
 	ebtables-tiny -P IPV6_RA_FILTER DROP
 	ebtables-tiny -A FORWARD -p IPv6 -i bat0 --ip6-proto ipv6-icmp --ip6-icmp-type router-advertisement -j IPV6_RA_FILTER
 	logger -t ipv6_ra_filter "IPV6_RA_FILTER chain initialised"
+fi
+
+# Get current gateway
+# the "grep ." fails if the awk print returns an empty string
+if ! gwl=$(batctl gwl | awk '/[*]/{print $2}' | grep .); then
+	# dropping all RA, as we do not want the clients to learn the RA of the "wrong" gateway in the first minute.
+	logger -t ipv6_ra_filter "Failed to get batman gateway. Dropping any router advertisement."
+	ebtables-tiny -F IPV6_RA_FILTER
+	ebtables-tiny -A IPV6_RA_FILTER -j DROP
+	exit 1
 fi
 
 # Check if filter already set to $gwl
