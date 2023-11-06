@@ -3,6 +3,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=ffmuc-ipv6-ra-filter
 PKG_VERSION:=1
 PKG_RELEASE:=1
+PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
