@@ -1,22 +1,31 @@
 #!/bin/sh
 
+# -e: script stops if any command outside an "if" fails
+set -e
+
 gwl=$(batctl gwl | awk '/[*]/{print $2}')
 
-ebtables=$(ebtables-tiny -L IPV6_RA_FILTER)
-if [ "$?" -ne "0" ]; then
+# Check if we need to initialise the ra-filter chain
+if ! ebtables-tiny -L IPV6_RA_FILTER; then
 	logger -t ipv6_ra_filter "ebtables chain IPV6_RA_FILTER does not exist"
 	ebtables-tiny -N IPV6_RA_FILTER
 	ebtables-tiny -P IPV6_RA_FILTER DROP
 	ebtables-tiny -A FORWARD -p IPv6 -i bat0 --ip6-proto ipv6-icmp --ip6-icmp-type router-advertisement -j IPV6_RA_FILTER
+	logger -t ipv6_ra_filter "IPV6_RA_FILTER chain initialised"
 fi
-ebtables=$(ebtables-tiny -L IPV6_RA_FILTER | grep -q "$gwl")
-if [ "$?" -ne "0" ]; then
-	logger -t ipv6_ra_filter "Setting IPv6 Gateway to $gwl"
-	ebtables-tiny -F IPV6_RA_FILTER
-	ebtables-tiny -A IPV6_RA_FILTER -s $gwl -j ACCEPT
+
+# Check if filter already set to $gwl
+if ebtables-tiny -L IPV6_RA_FILTER | grep -q "$gwl"; then
+	exit 0 # nothing to do
 fi
-if [ "$?" -ne "0" ]; then
-	logger -t ipv6_ra_filter "Setting gateway failed failling back to accept all"
-	ebtables-tiny -F IPV6_RA_FILTER
+
+# Flush the chain before setting new rules
+ebtables-tiny -F IPV6_RA_FILTER
+
+# Try to set gate to $gwl
+if ! ebtables-tiny -A IPV6_RA_FILTER -s "$gwl" -j ACCEPT; then
+	logger -t ipv6_ra_filter "Failed setting gateway to $gwl. Falling back to accept all router advertisements."
 	ebtables-tiny -A IPV6_RA_FILTER -j ACCEPT
+	exit 2
 fi
+logger -t ipv6_ra_filter "Successfully set IPv6 gateway to $gwl."
