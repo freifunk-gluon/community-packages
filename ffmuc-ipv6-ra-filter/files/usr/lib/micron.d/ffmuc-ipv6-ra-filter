@@ -1,0 +1,1 @@
+* * * * * sleep $(awk 'BEGIN{srand();print int(rand()*40)}') && /lib/gluon/ffmuc-ipv6-ra-filter/ipv6-ra-filter
