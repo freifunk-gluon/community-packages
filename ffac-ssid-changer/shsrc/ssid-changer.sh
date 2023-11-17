@@ -55,11 +55,11 @@ if [ "$SETTINGS_SUFFIX" = 'nodename' ]; then
 	# 32 would be possible as well
 	if [ ${#SUFFIX} -gt $((30 - ${#PREFIX})) ]; then
 		# calculate the length of the first part of the node identifier in the offline-ssid
-		HALF=$(( (28 - ${#PREFIX} ) / 2 ))
-		# jump to this charakter for the last part of the name
-		SKIP=$(( ${#SUFFIX} - HALF ))
+		max_suffix_length=$(( (28 - ${#PREFIX} ) / 2 ))
 		# use the first and last part of the nodename for nodes with long name
-		SUFFIX=${SUFFIX:0:$HALF}...${SUFFIX:$SKIP:${#SUFFIX}}
+		suffix_first_chars="$(printf '%s' "$SUFFIX" | head -c ${max_suffix_length})"
+		suffix_last_chars="$(printf '%s' "$SUFFIX" | tail -c ${max_suffix_length})"
+		SUFFIX="${suffix_first_chars}...${suffix_last_chars}"
 	fi
 elif [ "$SETTINGS_SUFFIX" = 'mac' ]; then
 	SUFFIX="$(uci -q get network.bat0.macaddr | /bin/sed 's/://g')"
