@@ -3,10 +3,19 @@
 #################
 # safety checks #
 #################
+log_debug()  {
+	if [ "${SETTINGS_DEBUG_LOGGING}" = "1" ]; then
+		logger -t "ffac-ssid-changer" -p debug "$@"
+	fi
+}
+
 safety_exit() {
-	echo $1, exiting with error code 2
+	log_debug "$1, exiting with error code 2"
 	exit 2
 }
+SETTINGS_DEBUG_LOGGING="$(uci -q get ssid-changer.settings.debug_log_enabled)"
+: "${SETTINGS_DEBUG_LOGGING:="0"}"
+
 pgrep -f autoupdater >/dev/null && safety_exit 'autoupdater running'
 UT=$(sed 's/\..*//g' /proc/uptime)
 [ $UT -gt 60 ] || safety_exit 'less than one minute'
@@ -101,7 +110,7 @@ if [ $TQ_LIMIT_ENABLED = 1 ]; then
 		CHECK=0
 	else
 		# this is just get a clean run if we are in-between the grace periode
-		echo "TQ is $GATEWAY_TQ, do nothing"
+		log_debug "TQ is $GATEWAY_TQ, do nothing"
 		exit 0
 	fi
 else
@@ -118,7 +127,7 @@ M=$(($UP % $MINUTES))
 
 HUP_NEEDED=0
 if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
-	echo "node is online"
+	log_debug "node is online"
 	LOOP=1
 	# check status for all physical devices
 	for HOSTAPD in $(ls /var/run/hostapd-phy*); do
@@ -126,7 +135,7 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 		LOOP=$((LOOP+1))
 		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
 		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
-			echo "SSID $CURRENT_SSID is correct, nothing to do"
+			log_debug "SSID $CURRENT_SSID is correct, nothing to do"
 			break
 		fi
 		CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
@@ -153,7 +162,7 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 		fi
 	done
 elif [ "$CHECK" -eq 0 ]; then
-	echo "node is considered offline"
+	log_debug "node is considered offline"
 	if [ $UP -lt $FIRST ] || [ $M -eq 0 ]; then
 		# set SSID offline, only if uptime is less than FIRST or exactly a multiplicative of switch_timeframe
 		if [ $UP -lt $FIRST ]; then
@@ -170,7 +179,7 @@ elif [ "$CHECK" -eq 0 ]; then
 				LOOP=$((LOOP+1))
 				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
 				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
-					echo "SSID $CURRENT_SSID is correct, nothing to do"
+					log_debug "SSID $CURRENT_SSID is correct, nothing to do"
 					break
 				fi
 				CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
@@ -209,7 +218,7 @@ if [ $HUP_NEEDED = 1 ]; then
 	   ps|grep hostapd|grep .pid|xargs -n 10 /lib/gluon/eulenfunk-hotfix/check_hostapd.sh
 	fi
 	HUP_NEEDED=0
-	echo "HUP!"
+	log_debug "Sent HUP to all hostapd to load the new SSID"
 fi
 
 if [ $M -eq 0 ]; then

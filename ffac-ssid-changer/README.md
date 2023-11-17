@@ -55,6 +55,7 @@ Adapt and add this block to your `site.conf`:
                                 -- toggeling every minute:
       tq_limit_max = 45,        -- upper limit, above that the online SSID will be used
       tq_limit_min = 35         -- lower limit, below that the offline SSID will be used
+      debug_log_enabled = true, -- optional: enable extra debug logs
     },
 
 # Commandline options
