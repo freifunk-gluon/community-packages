@@ -4,7 +4,7 @@
 set -e
 
 # Check if we need to initialise the ra-filter chain
-if ! ebtables-tiny -L IPV6_RA_FILTER; then
+if ! ebtables-tiny -L IPV6_RA_FILTER > /dev/null; then
 	logger -t ipv6_ra_filter "ebtables chain IPV6_RA_FILTER does not exist"
 	ebtables-tiny -N IPV6_RA_FILTER
 	ebtables-tiny -P IPV6_RA_FILTER DROP
