@@ -30,7 +30,7 @@ PREFIX="$(uci -q get ssid-changer.settings.prefix)"
 PREFIX_OWE="$(uci -q get ssid-changer.settings.prefix_owe)"
 : ${PREFIX_OWE:='FF_Off_OWE'}
 
-if [ "$(uci -q get ssid-changer.settings.enabled)" = '0' ]; then 
+if [ "$(uci -q get ssid-changer.settings.enabled)" = '0' ]; then
 	DISABLED='1'
 else
 	DISABLED='0'
@@ -122,7 +122,7 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	LOOP=1
 	# check status for all physical devices
 	for HOSTAPD in $(ls /var/run/hostapd-phy*); do
-		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')" 
+		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
 		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
 		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
@@ -156,17 +156,17 @@ elif [ "$CHECK" -eq 0 ]; then
 	echo "node is considered offline"
 	if [ $UP -lt $FIRST ] || [ $M -eq 0 ]; then
 		# set SSID offline, only if uptime is less than FIRST or exactly a multiplicative of switch_timeframe
-		if [ $UP -lt $FIRST ]; then 
+		if [ $UP -lt $FIRST ]; then
 			T=$FIRST
 		else
 			T=$MINUTES
 		fi
-		#echo minute $M, check if $OFF_COUNT is more than half of $T 
+		#echo minute $M, check if $OFF_COUNT is more than half of $T
 		if [ $OFF_COUNT -ge $(($T / 2)) ]; then
 			# node was offline more times than half of switch_timeframe (or than $FIRST)
 			LOOP=1
 			for HOSTAPD in $(ls /var/run/hostapd-phy*); do
-				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')" 
+				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
 				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
 				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
@@ -203,8 +203,8 @@ fi
 if [ $HUP_NEEDED = 1 ]; then
 	# send HUP to all hostapd to load the new SSID
 	killall -HUP hostapd
-	## check for nonmachting hotapd-pidfiles 
-	if [ -f /lib/gluon/eulenfunk-hotfix/check_hostapd.sh ] ; then 
+	## check for nonmachting hotapd-pidfiles
+	if [ -f /lib/gluon/eulenfunk-hotfix/check_hostapd.sh ] ; then
 	   sleep 2 # settle down
 	   ps|grep hostapd|grep .pid|xargs -n 10 /lib/gluon/eulenfunk-hotfix/check_hostapd.sh
 	fi

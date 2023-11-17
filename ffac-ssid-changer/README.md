@@ -41,7 +41,7 @@ Adapt and add this block to your `site.conf`:
 
     ssid_changer = {
       enabled = true,
-      switch_timeframe = 30,    -- only once every timeframe (in minutes) the SSID will change to the Offline-SSID 
+      switch_timeframe = 30,    -- only once every timeframe (in minutes) the SSID will change to the Offline-SSID
                                 -- set to 1440 to change once a day
                                 -- set to 1 minute to change every time the router gets offline
       first = 5,                -- the first few minutes directly after reboot within which an Offline-SSID may be
