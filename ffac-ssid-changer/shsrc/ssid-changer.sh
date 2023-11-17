@@ -10,7 +10,7 @@ safety_exit() {
 pgrep -f autoupdater >/dev/null && safety_exit 'autoupdater running'
 UT=$(sed 's/\..*//g' /proc/uptime)
 [ $UT -gt 60 ] || safety_exit 'less than one minute'
-[ $(find /var/run -name hostapd-phy* | wc -l) -gt 0 ] || safety_exit 'no hostapd-phy*'
+[ "$(find /var/run -name "hostapd-phy*" | wc -l)" -gt 0 ] || safety_exit 'no hostapd-phy*'
 
 # only once every timeframe minutes the SSID will change to the Offline-SSID
 # (set to 1 minute to change immediately every time the router gets offline)
@@ -65,7 +65,7 @@ ONLINE_SSID_OWE="$(uci -q get wireless.owe_radio0.ssid)"
 [ -n "$ONLINE_SSID_OWE" ] && OWE=true || OWE=false
 
 # get all SSIDs (replace \' with TICX and back to keep a possible tic in an SSID)
-ONLINE_SSIDs="$(uci show | grep wireless.client_radio[0-9]\. | grep ssid  | awk -F '='  '{print $2}' | sed "s/\\\'/TICX/g" | tr \' \~ | sed "s/TICX/\\\'/g" ) "
+ONLINE_SSIDs="$(uci show | grep "wireless.client_radio[0-9]\." | grep ssid  | awk -F '='  '{print $2}' | sed "s/\\\'/TICX/g" | tr \' \~ | sed "s/TICX/\\\'/g" ) "
 # if for whatever reason ONLINE_SSIDs is NULL:
 : ${ONLINE_SSIDs:="~FREIFUNK~"}
 
