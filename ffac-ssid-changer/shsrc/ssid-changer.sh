@@ -121,7 +121,8 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	echo "node is online"
 	LOOP=1
 	# check status for all physical devices
-	for HOSTAPD in $(ls /var/run/hostapd-phy*); do
+	for HOSTAPD in /var/run/hostapd-phy*; do
+		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
 		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
 		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
@@ -165,7 +166,8 @@ elif [ "$CHECK" -eq 0 ]; then
 		if [ $OFF_COUNT -ge $(($T / 2)) ]; then
 			# node was offline more times than half of switch_timeframe (or than $FIRST)
 			LOOP=1
-			for HOSTAPD in $(ls /var/run/hostapd-phy*); do
+			for HOSTAPD in /var/run/hostapd-phy*; do
+				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
 				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
 				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" $HOSTAPD | cut -d"=" -f2)"
