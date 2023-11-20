@@ -1,0 +1,60 @@
+#!/usr/bin/lua
+
+-- Run this after 500-mesh-vpn!
+
+local uci = require('simple-uci').cursor()
+
+local site = require 'gluon.site'
+local vpn_core = require 'gluon.mesh-vpn'
+
+local function get_mem_total()
+	for line in io.lines('/proc/meminfo') do
+		local match = line:match('^MemTotal:%s+(%d+)')
+		if match then
+			return tonumber(match)
+		end
+	end
+end
+
+local function configure_sqm()
+	local limit_enabled = uci:get_bool('gluon', 'mesh_vpn', 'limit_enabled')
+	local limit_downstream = uci:get('gluon', 'mesh_vpn', 'limit_ingress')
+	local limit_upstream = uci:get('gluon', 'mesh_vpn', 'limit_egress')
+
+	-- Only enable if we have sufficient RAM (256MB or more)
+	if get_mem_total() < 240*1024 then
+		return
+	end
+
+	-- Only enable if we actually have a limit configured
+	if not limit_enabled then
+		return
+	end
+
+	-- Disable simple-tc
+	uci:set('simple-tc', 'mesh_vpn', 'enabled', '0')
+
+	-- Create SQM configuration
+	uci:section('sqm', 'queue', 'mesh_vpn', {
+		interface = vpn_core.get_interface(),
+		enabled = true,
+		upload = limit_upstream,
+		download = limit_downstream,
+		qdisc = 'cake',
+		script = 'piece_of_cake.qos',
+		debug_logging = '0',
+		verbosity = '5',
+	})
+end
+
+-- Ensure existing SQM settings are cleared
+uci:delete('sqm', 'mesh_vpn')
+
+-- Enable SQM if configured in site.conf or user-enabled in uci
+local site_state = site.mesh_vpn.fastd.sqm()
+if uci:get_bool('ffda-mesh-vpn-sqm', 'settings', 'enabled') or site_state == true then
+	configure_sqm()
+end
+
+uci:save('simple-tc')
+uci:save('sqm')
