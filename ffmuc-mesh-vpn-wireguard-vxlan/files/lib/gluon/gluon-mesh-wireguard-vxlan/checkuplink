@@ -84,11 +84,12 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		SEGMENT=$(uci get gluon.core.domain)
 
 		# Push public key to broker, test for https and use if supported
-		wget -q https://[::1]
-		if [ $? -eq 1 ]; then
-			PROTO=http
-		else
+
+		if wget -q "https://[::1]"
+		then
 			PROTO=https
+		else
+			PROTO=http
 		fi
 		gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' $PROTO://$(uci get wireguard.mesh_vpn.broker)
 		

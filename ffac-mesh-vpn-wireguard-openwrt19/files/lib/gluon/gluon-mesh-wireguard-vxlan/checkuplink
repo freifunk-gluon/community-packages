@@ -91,11 +91,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" == "true" ] || [ "$(uci get wiregua
 		PUBLICKEY=$(uci get network.wg_mesh.private_key | wg pubkey)
 
 		# Push public key to broker, test for https and use if supported
-		wget -q https://[::1]
-		if [ $? -eq 1 ]; then
-			PROTO=http
-		else
+		if wget -q "https://[::1]"
+		then
 			PROTO=https
+		else
+			PROTO=http
 		fi
 
 		NODENAME=$(uci get system.@system[0].hostname)
