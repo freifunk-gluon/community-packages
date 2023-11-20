@@ -12,7 +12,7 @@ if uci:get('eol-wifi', 'ssid') ~= nil then
 end
 
 if not site.eol_ssid.enabled(false) -- disabled for site/domain
-or not uci:get_bool('eol-ssid', 'settings', 'enabled') -- disabled on router
+or uci:get('eol-ssid', 'settings', 'enabled') == 0 -- present & disabled on router
 then
     os.exit(0) -- do not change SSID
 end
