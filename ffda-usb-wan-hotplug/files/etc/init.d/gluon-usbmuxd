@@ -1,4 +1,6 @@
 #!/bin/sh /etc/rc.common
+# /etc/rc.common imports this script and uses variables defined here
+# shellcheck disable=SC2034
 
 # Only required for OpenWrt 19.07 and below.
 # usbmuxd ships without it's own init script
