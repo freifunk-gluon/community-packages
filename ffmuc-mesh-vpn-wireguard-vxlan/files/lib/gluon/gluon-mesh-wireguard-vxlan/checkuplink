@@ -1,6 +1,10 @@
 #!/bin/busybox sh
 # shellcheck shell=dash
 
+# fail fast and abort early
+set -eu
+# set -o pipefail # TODO: pipefail needs more rework in the script
+
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
@@ -17,7 +21,7 @@ interface_linklocal() {
 	# shellcheck disable=SC2086 # we need to split macaddr here using IFS
 	set -- $macaddr
 	IFS="$oldIFS"
-	echo "fe80::$1$2:$3ff:fe$4:$5$6"
+	echo "fe80::${1}${2}:${3}ff:fe${4}:${5}${6}"
 }
 
 clean_port() {
@@ -86,15 +90,21 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		logger -t checkuplink "Connecting to $endpoint"
 
 		# Delete Interfaces
-		ip link set nomaster dev mesh-vpn > /dev/null 2>&1
-		ip link delete dev mesh-vpn > /dev/null 2>&1
-		ip link del "$MESH_VPN_IFACE" > /dev/null 2>&1
+		{
+			ip link set nomaster dev mesh-vpn >/dev/null 2>&1
+			ip link delete dev mesh-vpn >/dev/null 2>&1
+		} || true
+		ip link delete dev "${MESH_VPN_IFACE}" >/dev/null 2>&1 || true
+
 		PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
 		SEGMENT=$(uci get gluon.core.domain)
 
 		# Push public key to broker, test for https and use if supported
-		wget -q "https://[::1]"
-		if [ $? -eq 1 ]; then
+		ret=0
+		wget -q "https://[::1]" || ret=$?
+		# returns Network Failure =4 if https exists
+		# and Generic Error =1 if no ssl lib available
+		if [ "$ret" -eq 1 ]; then
 			PROTO=http
 		else
 			PROTO=https
@@ -125,7 +135,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		fi
 
 		# Bring up VXLAN
-		ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "$(interface_linklocal "$MESH_VPN_IFACE")" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
+		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "$(interface_linklocal "$MESH_VPN_IFACE")" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
+		then
+			logger -p err -t checkuplink "Unable to create mesh-vpn interface"
+			exit 2
+		fi
 		ip link set up dev mesh-vpn
 
 		sleep 5
