@@ -1,7 +1,10 @@
 #!/bin/sh
+# SC3048 is supported in busybox sh
+# shellcheck disable=SC3048
 
 # Makes your current device blink
 
+# shellcheck source=/dev/null
 . /etc/diag.sh
 
 start() {
