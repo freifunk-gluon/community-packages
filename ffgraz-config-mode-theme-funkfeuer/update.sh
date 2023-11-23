@@ -4,6 +4,8 @@ set -euo pipefail
 
 gluon="$1"
 
+# do not expand CSS code
+# shellcheck disable=SC2016
 freifunk='
 @charset "utf-8";
 
@@ -13,6 +15,8 @@ $ffzusatz:  #009ee0;
 $red:       #ee3300;
 '
 
+# do not expand CSS code
+# shellcheck disable=SC2016
 funkfeuer='
 /* Colors adjusted based on the CI from https://download.funkfeuer.at/misc/Funkfeuer-CI/VIguide_FUNKFEUER_last.pdf */
 
