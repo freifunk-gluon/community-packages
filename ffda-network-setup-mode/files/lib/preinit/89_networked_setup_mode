@@ -1,10 +1,13 @@
-#!/bin/sh
+#!/bin/busybox sh
+# shellcheck shell=dash
 
+# shellcheck source=/dev/null
 . /lib/functions.sh
 
 device_supports_networked_setup_mode() {
-	local is_networked="$(lua -e 'print(require("gluon.network-setup-mode").supports_networked_activation())')"
-	
+	local is_networked
+	is_networked="$(lua -e 'print(require("gluon.network-setup-mode").supports_networked_activation())')"
+
 	if [ "${is_networked}" = "true" ]; then
 		return 0
 	fi
@@ -13,7 +16,8 @@ device_supports_networked_setup_mode() {
 }
 
 should_activate_networked() {
-	local setup_ifnames="$(lua -e 'print(require("gluon.sysconfig").setup_ifname)')"
+	local setup_ifnames
+	setup_ifnames="$(lua -e 'print(require("gluon.sysconfig").setup_ifname)')"
 	local should_start=1
 
 	if ! device_supports_networked_setup_mode; then
@@ -25,7 +29,7 @@ should_activate_networked() {
 		ip link set dev "${iface}" up
 	done
 
-	# shellcheck disable=SC2086
+	# shellcheck disable=SC2086 # setup_ifnames can contain multiple interfaces
 	if /lib/gluon/setup-mode/wait-network-request ${setup_ifnames}; then
 		should_start=0
 	fi
@@ -39,8 +43,9 @@ should_activate_networked() {
 }
 
 network_setup_mode_enable() {
-	local enabled="$(uci -q get 'gluon-setup-mode.@setup_mode[0].enabled')"
-	local configured="$(uci -q get 'gluon-setup-mode.@setup_mode[0].configured')"
+	local enabled configured
+	enabled="$(uci -q get 'gluon-setup-mode.@setup_mode[0].enabled')"
+	configured="$(uci -q get 'gluon-setup-mode.@setup_mode[0].configured')"
 
 	if [ "$enabled" = 1 ] || [ "$configured" != 1 ]; then
 		return 0
