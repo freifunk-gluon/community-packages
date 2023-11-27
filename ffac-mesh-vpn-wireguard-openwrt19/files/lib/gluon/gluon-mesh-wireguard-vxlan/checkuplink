@@ -87,7 +87,6 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		set +C
 		if [ -f "/tmp/connect_peer" ] ; then
 			PEER="$(( ($(cat /tmp/connect_peer) % NUMBER_OF_PEERS) +1 ))"
-			logger -t checkuplink "Selected ttt $PEER"
 		else
 			PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
 		fi
