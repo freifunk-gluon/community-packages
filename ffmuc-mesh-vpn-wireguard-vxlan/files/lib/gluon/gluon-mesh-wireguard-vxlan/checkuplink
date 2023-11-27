@@ -75,8 +75,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 	# If we don't have a connection we try to connect
 	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
-		NTP_SERVER=$(uci get system.ntp.server)
-		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p "$NTP_SERVER" -q
+		NTP_SERVERS=$(uci get system.ntp.server)
+		# shellcheck disable=SC3060  # busybox sh supports string replacement
+		NTP_SERVERS="${NTP_SERVERS// / -p }"  # each separate NTP server needs to be behind a "-p"
+		# shellcheck disable=SC2086  # we need to expand the list of NTP_SERVERS here
+		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ${NTP_SERVERS} -q
 
 		# Get the number of configured peers and randomly select one
 		NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
