@@ -125,8 +125,10 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		uci get network.wg_mesh.private_key | wg set "$MESH_VPN_IFACE" private-key /proc/self/fd/0
 		ip link set up dev "$MESH_VPN_IFACE"
 
+		LINKLOCAL="$(interface_linklocal)"
+
 		# Add link-address and Peer
-		ip address add "$(interface_linklocal "$MESH_VPN_IFACE")"/64 dev "$MESH_VPN_IFACE"
+		ip address add "${LINKLOCAL}"/64 dev "$MESH_VPN_IFACE"
 		if [ "$endpoint" = "" ]; then
 			endpoint=$(uci get wireguard.peer_"$PEER".endpoint)
 		fi
@@ -135,9 +137,9 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		# We need to allow incoming vxlan traffic on mesh iface
 		sleep 10
 		ip6tables -I INPUT 1 -i "$MESH_VPN_IFACE" -m udp -p udp --dport 4789 -j ACCEPT
-		logger -t checkuplink "vxlan link $(interface_linklocal "$MESH_VPN_IFACE")"
+		logger -t checkuplink "vxlan link ${LINKLOCAL}"
 		# Bring up VXLAN
-		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vxlan", 3), 16))')" local "$(interface_linklocal "$MESH_VPN_IFACE")" remote fe80::1 dstport 4789 dev "$MESH_VPN_IFACE" udp6zerocsumtx udp6zerocsumrx
+		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vxlan", 3), 16))')" local "${LINKLOCAL}" remote fe80::1 dstport 4789 dev "$MESH_VPN_IFACE" udp6zerocsumtx udp6zerocsumrx
 		then
 			logger -p err -t checkuplink "Unable to create mesh-vpn interface"
 			exit 2

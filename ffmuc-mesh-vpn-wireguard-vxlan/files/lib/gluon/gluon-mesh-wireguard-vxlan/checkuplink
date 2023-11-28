@@ -120,8 +120,10 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		uci get wireguard.mesh_vpn.privatekey | wg set "$MESH_VPN_IFACE" private-key /proc/self/fd/0
 		ip link set up dev "$MESH_VPN_IFACE"
 
+		LINKLOCAL="$(interface_linklocal)"
+
 		# Add link-address and Peer
-		ip address add "$(interface_linklocal "$MESH_VPN_IFACE")"/64 dev "$MESH_VPN_IFACE"
+		ip address add "${LINKLOCAL}"/64 dev "$MESH_VPN_IFACE"
 		if [ "$endpoint" = "" ]; then
 			endpoint=$(uci get wireguard.peer_"$PEER".endpoint)
 		fi
@@ -138,7 +140,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		fi
 
 		# Bring up VXLAN
-		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "$(interface_linklocal "$MESH_VPN_IFACE")" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
+		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "${LINKLOCAL}" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
 		then
 			logger -p err -t checkuplink "Unable to create mesh-vpn interface"
 			exit 2
