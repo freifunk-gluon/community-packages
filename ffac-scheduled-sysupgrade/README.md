@@ -16,7 +16,9 @@ update. If the only uplink comes from a mesh-on-WAN/LAN connection,
 which already did the update -this does not help - this package resolves
 these situations.
 
-**Sysupgrade must be compatible with `--ignore-minor-compat-version`.**
+If `sysupgrade` does not succeed with `--ignore-minor-compat-version`, it
+will fall back to attempting an upgrade without the parameter. This makes
+the package compatible with older versions of sysupgrade.
 
 Nodes will switch when the defined *switch-time* has passed. In case the
 node was powered off while this was supposed to happen, it might not be
