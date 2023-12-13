@@ -79,7 +79,11 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		# shellcheck disable=SC3060  # busybox sh supports string replacement
 		NTP_SERVERS="${NTP_SERVERS// / -p }"  # each separate NTP server needs to be behind a "-p"
 		# shellcheck disable=SC2086  # we need to expand the list of NTP_SERVERS here
-		gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ${NTP_SERVERS} -q
+		if ! gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ${NTP_SERVERS} -q
+		then
+			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
+			exit 3
+		fi
 
 		# Get the number of configured peers and randomly select one
 		NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
