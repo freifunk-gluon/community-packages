@@ -44,7 +44,7 @@ After this scheme, a community with the short-handle `ffap` would name their pac
 
 The PKG License should be defined as a SPDX ID. See the SPDX FAQ for more details.
 
-https://spdx.org/ids-how
+[spdx.dev/learn/handling-license-info](https://spdx.dev/learn/handling-license-info/#how)
 
 
 ### Sample Makefile
