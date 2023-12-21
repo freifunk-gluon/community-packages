@@ -75,6 +75,7 @@ ONLINE_SSID_OWE="$(uci -q get wireless.owe_radio0.ssid)"
 [ -n "$ONLINE_SSID_OWE" ] && OWE=true || OWE=false
 
 # get all SSIDs (replace \' with TICX and back to keep a possible tic in an SSID)
+# can not grep for "\.ssid" due to owe_transition_ssid
 ONLINE_SSIDs="$(uci show | grep "wireless.client_radio[0-9]\." | grep ssid  | awk -F '='  '{print $2}' | sed "s/\\\'/TICX/g" | tr \' \~ | sed "s/TICX/\\\'/g" ) "
 # if for whatever reason ONLINE_SSIDs is NULL:
 : "${ONLINE_SSIDs:=~FREIFUNK~}"
@@ -133,7 +134,8 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	# check status for all physical devices
 	for HOSTAPD in /var/run/hostapd-phy*; do
 		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
-		ONLINE_SSID="$(echo "$ONLINE_SSIDs" | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
+		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
+		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
 		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
@@ -178,7 +180,8 @@ elif [ "$CHECK" -eq 0 ]; then
 			LOOP=1
 			for HOSTAPD in /var/run/hostapd-phy*; do
 				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
-				ONLINE_SSID="$(echo "$ONLINE_SSIDs" | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
+				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
+				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
 				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
