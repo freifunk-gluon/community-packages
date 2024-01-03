@@ -1,6 +1,6 @@
 local uci = require('simple-uci').cursor()
 
-pkg_i18n = i18n 'ffho-web-ap-timer'
+pkg_i18n = i18n 'ff-web-ap-timer'
 
 if not uci:get('ap-timer', 'settings') then
 	uci:section('ap-timer', 'ap-timer', 'settings')

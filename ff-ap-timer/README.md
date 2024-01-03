@@ -1,7 +1,8 @@
-ffho-ap-timer
+ff-ap-timer
 =============
 
-Timer for the client wifi with three modes (daily, weekly, monthly)
+Timer for the client wifi with three modes (daily, weekly, monthly).
+The ff-ap-timer module can turn the client_radio on and off, but does not touch mesh or private wifi configuration.
 
 /etc/config/ap-timer
 -------------------
