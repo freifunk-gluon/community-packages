@@ -1,0 +1,23 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "AP Timer"
+msgstr ""
+
+msgid "Daily"
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "OFF"
+msgstr ""
+
+msgid "ON"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "You can setup the AP Timer here"
+msgstr ""

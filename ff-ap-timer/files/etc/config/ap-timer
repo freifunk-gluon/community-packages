@@ -1,0 +1,7 @@
+#config ap-timer 'settings'
+#	option enabled '1'
+#	option type 'day'
+#
+#config day 'all'
+#	list on '06:00'
+#	list off '23:00'

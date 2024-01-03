@@ -1,0 +1,32 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"PO-Revision-Date: 2017-06-24 23:00+0200\n"
+"Last-Translator:  <freifunk@kb-light.de>\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "AP Timer"
+msgstr "AP Timer"
+
+msgid "Daily"
+msgstr "Täglich"
+
+msgid "Enabled"
+msgstr "Aktiviert"
+
+msgid "OFF"
+msgstr "Aus"
+
+msgid "ON"
+msgstr "An"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "You can setup the AP Timer here"
+msgstr "Hier kannst du den AP-Timer konfigurieren"
