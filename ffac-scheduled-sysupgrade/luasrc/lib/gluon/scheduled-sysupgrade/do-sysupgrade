@@ -4,7 +4,7 @@ local unistd = require 'posix.unistd'
 local util = require 'gluon.util'
 local site = require 'gluon.site'
 
--- Returns true if node was offline long enough to perform domain switch
+-- Returns true if firmware was downloaded long enough ago to perform domain switch
 local function switch_after_min_reached()
 	if not unistd.access("/tmp/firmware_available") then
 		return false
@@ -21,11 +21,11 @@ local function switch_after_min_reached()
 	if f == nil then
 		return false
 	end
-	local offline_since = tonumber(f)
+	local firmware_available_since = tonumber(f)
 
-	local offline_time_sec = current_uptime - offline_since
+	local firmware_available_time_sec = current_uptime - firmware_available_since
 
-	if offline_time_sec > switch_after_sec then
+	if firmware_available_time_sec > switch_after_sec then
 		return true
 	end
 	return false
