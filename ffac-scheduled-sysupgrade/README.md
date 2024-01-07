@@ -36,7 +36,7 @@ scheduled_sysupgrade : optional (needed for domains to switch)
     firmware_server :
     -   server from which updates are fetched
     switch_after_existing_mins :
-    -   amount of time without reachable gateway to switch unconditionally
+    -   amount of time to switch after the firmware has been successfully downloaded
     switch_time :
     -   UNIX epoch after which domain will be switched
 
