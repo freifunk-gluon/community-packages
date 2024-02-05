@@ -1,0 +1,150 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+local site = require('gluon.site')
+
+local dropbear_key_path = '/etc/dropbear/authorized_keys'
+local ssh_manager_seperator = '# Begin managed keys'
+local ssh_manager_key_trailer = ' # managed key'
+
+local uci_package = 'ffda-ssh-manager'
+local uci_section = 'settings'
+local uci_key_enabled = 'enabled'
+local uci_key_groups = 'groups'
+
+
+local function line_is_trailed_key(line)
+	return string.match(line, ssh_manager_key_trailer .. '$')
+end
+
+local function line_is_seperator(line)
+	return string.match(line, '^' .. ssh_manager_seperator ..  '$')
+end
+
+local function line_is_empty(line)
+	return line == ''
+end
+
+-- Delete all Keys which end with the ssh_manager_key_trailer from the authorized_keys file
+local function delete_managed_keys()
+	local file = io.open(dropbear_key_path, 'r')
+	local lines = {}
+	for line in file:lines() do
+		if not line_is_trailed_key(line) and not line_is_seperator(line) and not line_is_empty(line) then
+			table.insert(lines, line)
+		end
+	end
+	file:close()
+
+	file = io.open(dropbear_key_path, 'w')
+	for _, line in ipairs(lines) do
+		file:write(line, '\n')
+	end
+	file:close()
+end
+
+-- Function to make table values unique
+local function unique(t)
+	local seen = {}
+	local unique_t = {}
+	for _, v in ipairs(t) do
+		if not seen[v] then
+			seen[v] = true
+			table.insert(unique_t, v)
+		end
+	end
+	return unique_t
+end
+
+-- Write all output keys to authorized_keys
+local function write_keys(key_table)
+	local file = io.open(dropbear_key_path, 'a')
+
+	file:write('\n')
+	file:write(ssh_manager_seperator, '\n')
+	for _, key in ipairs(key_table) do
+		file:write(key .. ssh_manager_key_trailer, '\n')
+	end
+	file:close()
+end
+
+-- Get all keys from the groups
+local function get_managed_key_table(groups)
+	-- Need counter because of missing tabe:length
+	local num_group_keys = 0
+	local group_keys = {}
+	for _, group in ipairs(groups) do
+		for site_group_name, site_group_keys in pairs(site.ssh_manager.groups()) do
+			if site_group_name == group then
+				for _, key in ipairs(site_group_keys) do
+					table.insert(group_keys, key)
+					num_group_keys = num_group_keys + 1
+				end
+			end
+		end
+	end
+
+	-- Make table unique
+	group_keys = unique(group_keys)
+
+	return num_group_keys, group_keys
+end
+
+-- Check if the manager is configured
+local function manager_configured()
+	local enabled_set = uci:get(uci_package, uci_section, uci_key_enabled) ~= nil
+	local groups_set = uci:get(uci_package, uci_section, uci_key_groups) ~= nil
+
+	return enabled_set or groups_set
+end
+
+-- Set site defined defaults if not yet defined
+local function site_defaults()
+	local site_default_enabled = site.ssh_manager.default.enabled()
+	local site_default_groups = site.ssh_manager.default.groups()
+
+	-- Only set defaults if not already configured
+	if manager_configured() then
+		return
+	end
+
+	-- Disable if no defaults defined
+	uci:set(uci_package, uci_section, uci_key_enabled, site_default_enabled == true)
+
+	-- Only set groups if defined in site
+	if site_default_groups ~= nil then
+		-- Set groups
+		for _, group in pairs(site_default_groups) do
+			uci:add_list(uci_package, uci_section, uci_key_groups, group)
+		end
+	end
+
+	uci:commit(uci_package)
+end
+
+local function main()
+	local enabled = uci:get_bool(uci_package, uci_section, uci_key_enabled)
+	local groups = uci:get(uci_package, uci_section, uci_key_groups)
+
+	-- Delete all keys managed by ssh-manager regardless of the configuration
+	delete_managed_keys()
+
+	-- Don't continue if ssh-manager is not enabled or no groups are defined
+	if not enabled or groups == nil then
+		return 0
+	end
+
+	-- Get all group keys
+	local num_group_keys, group_keys = get_managed_key_table(groups)
+
+	-- Exit if we have no keys to add
+	if num_group_keys == 0 then
+		return 0
+	end
+
+	-- Append ssh-manager keys to authorized_keys
+	write_keys(group_keys)
+end
+
+site_defaults()
+main()
