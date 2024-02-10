@@ -12,7 +12,7 @@ define Package/ffgraz-config-mode-at-runtime
 	SECTION:=admin
 	CATEGORY:=Administration
 	TITLE:=ffgraz-config-mode-at-runtime
-	DEPEPNDS:= +ffgraz-web-model
+	DEPENDS:= +ffgraz-web-model
 endef
 
 define Package/ffgraz-config-mode-at-runtime/description
