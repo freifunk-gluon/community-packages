@@ -29,6 +29,12 @@ end
 local function delete_managed_keys()
 	local file = io.open(dropbear_key_path, 'r')
 	local lines = {}
+
+	-- Check if file exists
+	if file == nil then
+		return
+	end
+
 	for line in file:lines() do
 		if not line_is_trailed_key(line) and not line_is_seperator(line) and not line_is_empty(line) then
 			table.insert(lines, line)
