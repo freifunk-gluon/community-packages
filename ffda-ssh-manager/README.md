@@ -8,7 +8,7 @@ Configuration is done using UCI. The following config-keys exist:
   - Default: 0
   - Type: boolean
   - Enables gluon-ssh-manager.
-- `ffda-ssh-manager.settings.group`
+- `ffda-ssh-manager.settings.groups`
   - Default: nil
   - Type: list
   - Selects the groups to roll out on a node.
