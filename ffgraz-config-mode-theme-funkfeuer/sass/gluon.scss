@@ -6,8 +6,8 @@
 
 	sass --sourcemap=none -C -t compressed sass/gluon.scss files/lib/gluon/config-mode/www/static/gluon.css
 
-	When commiting changes to this file make sure to commit the respective
-	changes to the compilid version within the same commit!
+	When committing changes to this file make sure to commit the respective
+	changes to the compiled version within the same commit!
 */
 
 /* Colors adjusted based on the CI from https://download.funkfeuer.at/misc/Funkfeuer-CI/VIguide_FUNKFEUER_last.pdf */

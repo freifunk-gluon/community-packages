@@ -12,4 +12,4 @@ GLUON_SITE_PACKAGES := ffgraz-config-mode-theme-funkfeuer -gluon-config-mode-the
 
 # Update
 
-To update the theme with the latest upstream stylesheet, run `cd ffgraz-config-mode-theme-funkeuer && bash update.sh <path/to/gluon-repo>`
+To update the theme with the latest upstream stylesheet, run `cd ffgraz-config-mode-theme-funkfeuer && bash update.sh <path/to/gluon-repo>`
