@@ -5,7 +5,7 @@ this script basically reboots a node once a week on thursday morning at a random
 time between 3h15 and 6h AM.
 
 Create a file `modules` with the following content in your `./gluon/site/`
-directory and add these lines: 
+directory and add these lines:
 
 ```
 GLUON_SITE_FEEDS="community"
