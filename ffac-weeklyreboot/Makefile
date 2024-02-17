@@ -15,7 +15,7 @@ include $(TOPDIR)/../package/gluon.mk
 define Package/$(PKG_NAME)
   SECTION:=gluon
   CATEGORY:=Gluon
-  TITLE:=weekly reboot sheduled on thursday
+  TITLE:=weekly reboot scheduled on thursday
   DEPENDS:=+gluon-core +micrond
 endef
 
