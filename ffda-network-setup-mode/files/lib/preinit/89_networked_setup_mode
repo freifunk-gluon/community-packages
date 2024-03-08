@@ -1,5 +1,4 @@
 #!/bin/busybox sh
-# shellcheck shell=dash
 
 # shellcheck source=/dev/null
 . /lib/functions.sh

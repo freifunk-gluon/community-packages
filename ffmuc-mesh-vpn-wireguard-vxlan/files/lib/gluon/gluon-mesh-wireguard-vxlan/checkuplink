@@ -1,5 +1,4 @@
 #!/bin/busybox sh
-# shellcheck shell=dash
 
 # fail fast and abort early
 set -eu

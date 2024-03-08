@@ -1,5 +1,4 @@
 #!/bin/busybox sh
-# shellcheck shell=dash
 
 CACHE_TTL=600
 CACHE_FILE=/tmp/ddhcp_gw_cache
