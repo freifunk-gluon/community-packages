@@ -82,7 +82,6 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		if ! gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ${NTP_SERVERS} -q
 		then
 			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
-			exit 3
 		fi
 
 		# Get the number of configured peers and randomly select one
