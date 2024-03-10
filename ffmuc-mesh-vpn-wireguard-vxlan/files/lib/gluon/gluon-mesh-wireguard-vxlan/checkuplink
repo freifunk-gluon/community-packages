@@ -75,12 +75,22 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
 		NTP_SERVERS=$(uci get system.ntp.server)
-		# shellcheck disable=SC3060  # busybox sh supports string replacement
-		NTP_SERVERS="${NTP_SERVERS// / -p }"  # each separate NTP server needs to be behind a "-p"
-		# shellcheck disable=SC2086  # we need to expand the list of NTP_SERVERS here
-		if ! gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p ${NTP_SERVERS} -q
+		NTP_SERVERS_ADDRS=""
+		for NTP_SERVER in $NTP_SERVERS; do
+			ipv6="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -E -o '([a-f0-9:]+:+)+[a-f0-9]+')"
+			ipv4="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
+			if ip -6 route show table 1 | grep -q 'default via'
+			then
+				NTP_SERVERS_ADDRS="$(for ip in $ipv6; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
+			else
+				NTP_SERVERS_ADDRS="$(for ip in $ipv4; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
+			fi
+		done
+		# shellcheck disable=SC2086 # otherwise ntpd cries
+		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
 		then
 			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
+			exit 3
 		fi
 
 		# Get the number of configured peers and randomly select one
@@ -114,7 +124,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		else
 			PROTO=https
 		fi
-		gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
+		LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
 
 		# Bring up the wireguard interface
 		ip link add dev "$MESH_VPN_IFACE" type wireguard
