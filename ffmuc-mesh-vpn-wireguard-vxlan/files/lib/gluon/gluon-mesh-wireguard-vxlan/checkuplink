@@ -75,14 +75,15 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 	if [ "$CONNECTED" -ne "1" ]; then
 		logger -t checkuplink "Reconnecting ..."
 		NTP_SERVERS=$(uci get system.ntp.server)
+		NTP_SERVERS_ADDRS=""
 		for NTP_SERVER in $NTP_SERVERS; do
 			ipv6="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -E -o '([a-f0-9:]+:+)+[a-f0-9]+')"
 			ipv4="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
 			if ip -6 route show table 1 | grep -q 'default via'
 			then
-				NTP_SERVERS_ADDRS=$(for ip in $ipv6; do echo -n "-p $ip "; done)
+				NTP_SERVERS_ADDRS="$(for ip in $ipv6; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
 			else
-				NTP_SERVERS_ADDRS=$(for ip in $ipv4; do echo -n "-p $ip "; done)
+				NTP_SERVERS_ADDRS="$(for ip in $ipv4; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
 			fi
 		done
 		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
