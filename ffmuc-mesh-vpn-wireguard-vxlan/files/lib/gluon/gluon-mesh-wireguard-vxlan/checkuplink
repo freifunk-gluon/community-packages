@@ -86,7 +86,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 				NTP_SERVERS_ADDRS="$(for ip in $ipv4; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
 			fi
 		done
-		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
+		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug "${NTP_SERVERS_ADDRS}" -q
 		then
 			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
 			exit 3
