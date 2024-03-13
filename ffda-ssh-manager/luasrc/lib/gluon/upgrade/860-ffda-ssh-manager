@@ -106,8 +106,8 @@ end
 
 -- Set site defined defaults if not yet defined
 local function site_defaults()
-	local site_default_enabled = site.ssh_manager.default.enabled()
-	local site_default_groups = site.ssh_manager.default.groups()
+	local site_default_enabled = site.ssh_manager.defaults.enabled()
+	local site_default_groups = site.ssh_manager.defaults.groups()
 
 	-- Only set defaults if not already configured
 	if manager_configured() then
