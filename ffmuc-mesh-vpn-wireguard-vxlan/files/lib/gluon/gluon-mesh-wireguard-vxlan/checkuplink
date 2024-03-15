@@ -76,16 +76,27 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		logger -t checkuplink "Reconnecting ..."
 		NTP_SERVERS=$(uci get system.ntp.server)
 		NTP_SERVERS_ADDRS=""
+
+		set -o pipefail # Enable pipefail: this script does not fully support pipefail yet, but required below
 		for NTP_SERVER in $NTP_SERVERS; do
-			ipv6="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -E -o '([a-f0-9:]+:+)+[a-f0-9]+')"
-			ipv4="$(gluon-wan nslookup "$NTP_SERVER" | grep 'Address:\? [0-9]' | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")"
+			all_ntp_ips="$(gluon-wan nslookup "$NTP_SERVER" | grep '^Address:\? ' | sed 's/^Address:\? //')"
 			if ip -6 route show table 1 | grep -q 'default via'
 			then
-				NTP_SERVERS_ADDRS="$(for ip in $ipv6; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
+				# We need to match a few special cases for IPv6 here:
+				# - IPs with trailing "::", like 2003:a:87f:c37c::
+				# - IPs with leading "::", like ::1
+				# - IPs not starting with a digit, like fd62:f45c:4d09:180:22b3:ff::
+				# - IPs containing a zone identifier ("%"), like fe80::abcd%enp5s0
+				# As all incoming IPs are already valid IPs, we just grep for all not-IPv4s
+				selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -vE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
 			else
-				NTP_SERVERS_ADDRS="$(for ip in $ipv4; do echo -n "-p $ip "; done) ${NTP_SERVERS_ADDRS}"
+				# We want to match IPv4s and not match RFC2765 2.1) IPs like "::ffff:255.255.255.255"
+				selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
 			fi
+			NTP_SERVERS_ADDRS="$(for ip in $selected_ntp_ips; do echo -n "-p $ip "; done)${NTP_SERVERS_ADDRS}"
 		done
+		set +o pipefail # Disable pipefail: this script does not fully support pipefail yet
+
 		# shellcheck disable=SC2086 # otherwise ntpd cries
 		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
 		then
