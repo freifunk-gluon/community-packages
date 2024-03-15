@@ -45,6 +45,10 @@ check_address_family() {
 
 }
 
+force_wan_connection() {
+	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan "$@"
+}
+
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
 then
@@ -98,7 +102,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		set +o pipefail # Disable pipefail: this script does not fully support pipefail yet
 
 		# shellcheck disable=SC2086 # otherwise ntpd cries
-		if ! LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
+		if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
 		then
 			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
 			exit 3
@@ -135,7 +139,7 @@ if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguar
 		else
 			PROTO=https
 		fi
-		LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
+		force_wan_connection wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
 
 		# Bring up the wireguard interface
 		ip link add dev "$MESH_VPN_IFACE" type wireguard
