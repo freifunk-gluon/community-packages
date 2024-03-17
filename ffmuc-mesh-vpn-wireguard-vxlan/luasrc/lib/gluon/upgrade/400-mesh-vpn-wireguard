@@ -25,7 +25,6 @@ end)
 
 local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
 	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
-	or not uci:get_bool('network', 'wg_mesh', 'disabled') --compatiblity with upstream
 	or wg_enabled -- specific config
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
