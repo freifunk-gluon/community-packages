@@ -49,6 +49,22 @@ force_wan_connection() {
 	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan "$@"
 }
 
+
+mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
+
+# Some legacy code seem to have used "true" instead of the canonical "1".
+# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
+if [[ "${mesh_vpn_enabled}" != "0" ]] && [[ "${mesh_vpn_enabled}" != "1" ]]; then
+	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
+	mesh_vpn_enabled="1"
+fi
+
+if [[ "${mesh_vpn_enabled}" == "0" ]]; then
+	# Stop the script if mesh_vpn is disabled
+	exit 0
+fi
+
+
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
 then
@@ -56,126 +72,123 @@ then
 	uci commit wireguard
 fi
 
-# Is wireguard enabled?
-if [ "$(uci get wireguard.mesh_vpn.enabled)" = "true" ] || [ "$(uci get wireguard.mesh_vpn.enabled)" = "1" ]; then
 
-	#We assume we are not connected by default
-	CONNECTED=0
+#We assume we are not connected by default
+CONNECTED=0
 
-	MESH_VPN_IFACE=$(uci get wireguard.mesh_vpn.iface)
+MESH_VPN_IFACE=$(uci get wireguard.mesh_vpn.iface)
 
-	# Check connectivity to supernode
+# Check connectivity to supernode
 
-	if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
+if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
+then
+	GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
+	if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
 	then
-		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
-		if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
-		then
-			CONNECTED=1
-		fi
+		CONNECTED=1
 	fi
+fi
 
-	# If we don't have a connection we try to connect
-	if [ "$CONNECTED" -ne "1" ]; then
-		logger -t checkuplink "Reconnecting ..."
-		NTP_SERVERS=$(uci get system.ntp.server)
-		NTP_SERVERS_ADDRS=""
+# If we don't have a connection we try to connect
+if [ "$CONNECTED" -ne "1" ]; then
+	logger -t checkuplink "Reconnecting ..."
+	NTP_SERVERS=$(uci get system.ntp.server)
+	NTP_SERVERS_ADDRS=""
 
-		set -o pipefail # Enable pipefail: this script does not fully support pipefail yet, but required below
-		for NTP_SERVER in $NTP_SERVERS; do
-			all_ntp_ips="$(gluon-wan nslookup "$NTP_SERVER" | grep '^Address:\? ' | sed 's/^Address:\? //')"
-			if ip -6 route show table 1 | grep -q 'default via'
-			then
-				# We need to match a few special cases for IPv6 here:
-				# - IPs with trailing "::", like 2003:a:87f:c37c::
-				# - IPs with leading "::", like ::1
-				# - IPs not starting with a digit, like fd62:f45c:4d09:180:22b3:ff::
-				# - IPs containing a zone identifier ("%"), like fe80::abcd%enp5s0
-				# As all incoming IPs are already valid IPs, we just grep for all not-IPv4s
-				selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -vE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
-			else
-				# We want to match IPv4s and not match RFC2765 2.1) IPs like "::ffff:255.255.255.255"
-				selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
-			fi
-			NTP_SERVERS_ADDRS="$(for ip in $selected_ntp_ips; do echo -n "-p $ip "; done)${NTP_SERVERS_ADDRS}"
-		done
-		set +o pipefail # Disable pipefail: this script does not fully support pipefail yet
-
-		# shellcheck disable=SC2086 # otherwise ntpd cries
-		if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
+	set -o pipefail # Enable pipefail: this script does not fully support pipefail yet, but required below
+	for NTP_SERVER in $NTP_SERVERS; do
+		all_ntp_ips="$(gluon-wan nslookup "$NTP_SERVER" | grep '^Address:\? ' | sed 's/^Address:\? //')"
+		if ip -6 route show table 1 | grep -q 'default via'
 		then
-			logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
-			exit 3
-		fi
-
-		# Get the number of configured peers and randomly select one
-		NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
-		PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
-		PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
-
-		logger -t checkuplink "Selected peer $PEER"
-
-		endpoint="$(check_address_family "$PEER_PUBLICKEY" "$(uci get wireguard.peer_"$PEER".endpoint)")"
-
-		logger -t checkuplink "Connecting to $endpoint"
-
-		# Delete Interfaces
-		{
-			ip link set nomaster dev mesh-vpn >/dev/null 2>&1
-			ip link delete dev mesh-vpn >/dev/null 2>&1
-		} || true
-		ip link delete dev "${MESH_VPN_IFACE}" >/dev/null 2>&1 || true
-
-		PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
-		SEGMENT=$(uci get gluon.core.domain)
-
-		# Push public key to broker, test for https and use if supported
-		ret=0
-		wget -q "https://[::1]" || ret=$?
-		# returns Network Failure =4 if https exists
-		# and Generic Error =1 if no ssl lib available
-		if [ "$ret" -eq 1 ]; then
-			PROTO=http
+			# We need to match a few special cases for IPv6 here:
+			# - IPs with trailing "::", like 2003:a:87f:c37c::
+			# - IPs with leading "::", like ::1
+			# - IPs not starting with a digit, like fd62:f45c:4d09:180:22b3:ff::
+			# - IPs containing a zone identifier ("%"), like fe80::abcd%enp5s0
+			# As all incoming IPs are already valid IPs, we just grep for all not-IPv4s
+			selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -vE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
 		else
-			PROTO=https
+			# We want to match IPv4s and not match RFC2765 2.1) IPs like "::ffff:255.255.255.255"
+			selected_ntp_ips="$(echo "${all_ntp_ips}" | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b')"
 		fi
-		force_wan_connection wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
+		NTP_SERVERS_ADDRS="$(for ip in $selected_ntp_ips; do echo -n "-p $ip "; done)${NTP_SERVERS_ADDRS}"
+	done
+	set +o pipefail # Disable pipefail: this script does not fully support pipefail yet
 
-		# Bring up the wireguard interface
-		ip link add dev "$MESH_VPN_IFACE" type wireguard
-		wg set "$MESH_VPN_IFACE" fwmark 1
-		uci get wireguard.mesh_vpn.privatekey | wg set "$MESH_VPN_IFACE" private-key /proc/self/fd/0
-		ip link set up dev "$MESH_VPN_IFACE"
-
-		LINKLOCAL="$(interface_linklocal)"
-
-		# Add link-address and Peer
-		ip address add "${LINKLOCAL}"/64 dev "$MESH_VPN_IFACE"
-		if [ "$endpoint" = "" ]; then
-			endpoint=$(uci get wireguard.peer_"$PEER".endpoint)
-		fi
-		gluon-wan wg set "$MESH_VPN_IFACE" peer "$(uci get wireguard.peer_"$PEER".publickey)" persistent-keepalive 25 allowed-ips "$(uci get wireguard.peer_"$PEER".link_address)/128" endpoint "$endpoint"
-
-		# We need to allow incoming vxlan traffic on mesh iface
-		sleep 10
-
-		RULE="-i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT"
-		# shellcheck disable=SC2086 # we need to split RULE here twice
-		if ! ip6tables -C INPUT $RULE
-		then
-			ip6tables -I INPUT 1 $RULE
-		fi
-
-		# Bring up VXLAN
-		if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "${LINKLOCAL}" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
-		then
-			logger -p err -t checkuplink "Unable to create mesh-vpn interface"
-			exit 2
-		fi
-		ip link set up dev mesh-vpn
-
-		sleep 5
-		# If we have a BATMAN_V env we need to correct the throughput value now
-		batctl hardif mesh-vpn throughput_override 1000mbit;
+	# shellcheck disable=SC2086 # otherwise ntpd cries
+	if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
+	then
+		logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
+		exit 3
 	fi
+
+	# Get the number of configured peers and randomly select one
+	NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
+	PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
+	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
+
+	logger -t checkuplink "Selected peer $PEER"
+
+	endpoint="$(check_address_family "$PEER_PUBLICKEY" "$(uci get wireguard.peer_"$PEER".endpoint)")"
+
+	logger -t checkuplink "Connecting to $endpoint"
+
+	# Delete Interfaces
+	{
+		ip link set nomaster dev mesh-vpn >/dev/null 2>&1
+		ip link delete dev mesh-vpn >/dev/null 2>&1
+	} || true
+	ip link delete dev "${MESH_VPN_IFACE}" >/dev/null 2>&1 || true
+
+	PUBLICKEY=$(uci get wireguard.mesh_vpn.privatekey | wg pubkey)
+	SEGMENT=$(uci get gluon.core.domain)
+
+	# Push public key to broker, test for https and use if supported
+	ret=0
+	wget -q "https://[::1]" || ret=$?
+	# returns Network Failure =4 if https exists
+	# and Generic Error =1 if no ssl lib available
+	if [ "$ret" -eq 1 ]; then
+		PROTO=http
+	else
+		PROTO=https
+	fi
+	force_wan_connection wget -q  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$PROTO://$(uci get wireguard.mesh_vpn.broker)"
+
+	# Bring up the wireguard interface
+	ip link add dev "$MESH_VPN_IFACE" type wireguard
+	wg set "$MESH_VPN_IFACE" fwmark 1
+	uci get wireguard.mesh_vpn.privatekey | wg set "$MESH_VPN_IFACE" private-key /proc/self/fd/0
+	ip link set up dev "$MESH_VPN_IFACE"
+
+	LINKLOCAL="$(interface_linklocal)"
+
+	# Add link-address and Peer
+	ip address add "${LINKLOCAL}"/64 dev "$MESH_VPN_IFACE"
+	if [ "$endpoint" = "" ]; then
+		endpoint=$(uci get wireguard.peer_"$PEER".endpoint)
+	fi
+	gluon-wan wg set "$MESH_VPN_IFACE" peer "$(uci get wireguard.peer_"$PEER".publickey)" persistent-keepalive 25 allowed-ips "$(uci get wireguard.peer_"$PEER".link_address)/128" endpoint "$endpoint"
+
+	# We need to allow incoming vxlan traffic on mesh iface
+	sleep 10
+
+	RULE="-i $MESH_VPN_IFACE -m udp -p udp --dport 8472 -j ACCEPT"
+	# shellcheck disable=SC2086 # we need to split RULE here twice
+	if ! ip6tables -C INPUT $RULE
+	then
+		ip6tables -I INPUT 1 $RULE
+	fi
+
+	# Bring up VXLAN
+	if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "${LINKLOCAL}" remote "$(uci get wireguard.peer_"$PEER".link_address)" dstport 8472 dev "$MESH_VPN_IFACE"
+	then
+		logger -p err -t checkuplink "Unable to create mesh-vpn interface"
+		exit 2
+	fi
+	ip link set up dev mesh-vpn
+
+	sleep 5
+	# If we have a BATMAN_V env we need to correct the throughput value now
+	batctl hardif mesh-vpn throughput_override 1000mbit;
 fi
