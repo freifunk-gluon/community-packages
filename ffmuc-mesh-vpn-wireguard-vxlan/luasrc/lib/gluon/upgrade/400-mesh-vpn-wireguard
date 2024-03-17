@@ -29,7 +29,6 @@ local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
 	iface = site.mesh_vpn.wireguard.iface(),
-	limit = site.mesh_vpn.wireguard.limit(),
 	broker = site.mesh_vpn.wireguard.broker(),
 	enabled = mesh_enabled,
 	privatekey = privkey,
