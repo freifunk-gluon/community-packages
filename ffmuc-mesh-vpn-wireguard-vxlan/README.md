@@ -5,7 +5,7 @@ This package adds support for WireGuard+VXLAN as Mesh VPN protocol stack as it i
 ### Dependencies
 
 This relies on [wgkex](https://github.com/freifunkMUC/wgkex), the FFMUC WireGuard key exchange broker running on the configured broker address. The broker programms the gateway to accept the WireGuard key which is transmitted during connection.
-Starting with the key exchange API v2, the wgkex broker also returns WireGuard peer data for a gateway selected by the broker, which this package then configures as mesh VPN peer/endpoint. This can be enabled by setting the `loadbalancing` option to `1`.
+Starting with the key exchange API v2, the wgkex broker also returns WireGuard peer data for a gateway selected by the broker, which this package then configures as mesh VPN peer/endpoint. This can be enabled by setting the `loadbalancing` option accordingly.
 
 For the health-checks a webserver of some kind needs to listen to `HTTP GET` requests on the gateways.
 
@@ -29,8 +29,15 @@ You should use something like the following in the site.conf:
 		iface = 'wg_mesh_vpn', -- not 'mesh-vpn', this is used for the VXLAN interface
 		mtu = 1406,
 		broker = 'broker.ffmuc.net', -- base path of broker, will be combined with API path
-		loadbalancing = '1' -- controls whether to use the loadbalancing/gateway assignment feature of the broker
-		peers = { -- only needed if 'loadbalancing = '0''
+
+		-- loadbalancing controls whether the client can enable the loadbalancing/gateway assignment feature of the broker
+		-- on: the client will always use loadbalancing
+		-- off: the client cannot enable loadbalancing
+		-- on-by-default: the client can enable/disable loadbalancing and will use loadbalancing by default
+		-- off-by-default: the client can enable/disable loadbalancing and will not use loadbalancing by default
+		loadbalancing = 'on-by-default', -- optional
+
+		peers = { -- not needed if loadbalancing = 'on'
 			{
 				publickey = 'TszFS3oFRdhsJP3K0VOlklGMGYZy+oFCtlaghXJqW2g=',
 				endpoint = 'gw04.ext.ffmuc.net:40011',
