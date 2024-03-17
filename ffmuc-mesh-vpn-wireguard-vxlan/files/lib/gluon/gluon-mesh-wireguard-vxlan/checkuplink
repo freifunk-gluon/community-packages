@@ -49,8 +49,8 @@ force_wan_connection() {
 	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan "$@"
 }
 
-
-mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
+# Use the gluon.mesh_vpn.enabled to toggle VPN on/off (set during config mode)
+mesh_vpn_enabled="$(uci get gluon.mesh_vpn.enabled)"
 
 # Some legacy code seem to have used "true" instead of the canonical "1".
 # This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
