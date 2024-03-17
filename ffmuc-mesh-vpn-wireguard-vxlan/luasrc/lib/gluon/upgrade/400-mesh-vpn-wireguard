@@ -38,4 +38,3 @@ for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
 end
 
 uci:save('wireguard')
-uci:save('gluon')
