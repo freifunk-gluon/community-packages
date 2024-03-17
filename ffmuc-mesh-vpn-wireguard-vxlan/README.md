@@ -4,36 +4,29 @@ You can use this package for connecting with wireguard to the Freifunk Munich ne
 
 You should use something like the following in the site.conf:
 
-	
-```
+```lua
  mesh_vpn = {
-	mtu = 1400,
 	wireguard = {
-		enabled = '1',
-		iface = 'mesh-vpn',
-		limit = '1', -- actually unused
+		enabled = true,
+		iface = 'wg_mesh_vpn', -- not 'mesh-vpn', this is used for the VXLAN interface
+		mtu = 1406,
 		broker = 'broker.ffmuc.net/api/v1/wg/key/exchange',
 		peers = {
-				{
-					publickey ='N9uF5Gg1B5AqWrE9IuvDgzmQePhqhb8Em/HrRpAdnlY=',
-					endpoint ='ffkwsn01.freifunk-koenigswinter.de:30020',
-					link_address = 'fe80::f000:22ff:fe12:01',
-				},
-				{
-					publickey ='liatbdT62FbPiDPHKBqXVzrEo6hc5oO5tmEKDMhMTlU=',
-					endpoint ='ffkwsn02.freifunk-koenigswinter.de:30020',
-					link_address = 'fe80::f000:22ff:fe12:02',
-				},
-				{
-					publickey ='xakSGG39D1v90j3Z9eVWzojh6nDbnsVUc/RByVdcKB0=',
-					endpoint ='ffkwsn03.freifunk-koenigswinter.de:30020',
-					link_address = 'fe80::f000:22ff:fe12:07',
-				},
-
+			{
+				publickey = 'TszFS3oFRdhsJP3K0VOlklGMGYZy+oFCtlaghXJqW2g=',
+				endpoint = 'gw04.ext.ffmuc.net:40011',
+				link_address = 'fe80::27c:16ff:fec0:6c74',
 			},
+			{
+				publickey = 'igyqOmWiz4EZxPG8ZzU537MnHhaqlwfa7HarB3KmnEg=',
+				endpoint = 'gw05.ext.ffmuc.net:40011',
+				link_address = 'fe80::281:8eff:fef0:73aa',
+			},
+		},
 	},
-	
+
 ```
+
 And you should include the package in the site.mk of course!
 
 ### Dependencies
