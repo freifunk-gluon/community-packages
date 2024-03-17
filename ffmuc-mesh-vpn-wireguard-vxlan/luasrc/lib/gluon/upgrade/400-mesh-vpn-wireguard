@@ -6,6 +6,14 @@ local uci = require("simple-uci").cursor()
 local wg_enabled = uci:get_bool('wireguard', 'mesh_vpn', 'enabled') or false
 local privkey = uci:get("wireguard", "mesh_vpn", "privatekey") or ""
 
+local function valid_wireguard_key(wireguard_key)
+	return wireguard_key and wireguard_key:match("^" .. ("[%a%d+/]"):rep(42) .. "[AEIMQUYcgkosw480]=$")
+end
+
+if not valid_wireguard_key(privkey) then
+	privkey = ""
+end
+
 -- Clean up previous configuration
 uci:delete_all('wireguard', 'peer', function(peer)
 	return peer.preserve ~= '1'
