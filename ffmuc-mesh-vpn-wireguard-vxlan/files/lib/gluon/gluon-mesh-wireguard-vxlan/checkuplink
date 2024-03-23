@@ -117,6 +117,63 @@ is_loadbalancing_enabled() {
 	return 0
 }
 
+get_wgkex_data(){
+	local version="$1"
+	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
+	
+	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
+
+	if ! WGKEX_DATA=$(force_wan_connection wget -q -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
+		logger -p err -t checkuplink "Contacting wgkex broker failed, response: $WGKEX_DATA"
+		exit 1
+	else
+		logger -p info -t checkuplink "Got data from wgkex broker: $WGKEX_DATA"
+		echo $WGKEX_DATA
+	fi
+}
+
+use_api_v1(){
+	WGKEX_DATA=$(get_wgkex_data v1)
+
+	# Get the number of configured peers and randomly select one
+	NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
+	PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
+
+	logger -p info -t checkuplink "Selected peer $PEER"
+	PEER_HOSTPORT="$(uci get wireguard.peer_"$PEER".endpoint)"
+	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
+	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
+	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
+	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+
+	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
+	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
+}
+
+
+
+use_api_v2() {
+	WGKEX_DATA=$(get_wgkex_data v2)
+
+	# Parse the returned JSON in a Lua script, returning the endpoint address, port, pubkey and first allowed IP, separated by newlines
+	if ! data=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/parse-wgkex-response.lua "$WGKEX_DATA"); then
+		logger -p err -t checkuplink "Parsing wgkex broker data failed"
+		logger -p info -t checkuplink "Falling back to API v1"
+		use_api_v1
+	else
+		logger -p debug -t checkuplink "Successfully parsed wgkex broker data"
+		PEER_ADDRESS="$(echo "$data" | sed -n 1p)"
+		PEER_PORT="$(echo "$data" | sed -n 2p)"
+		PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
+		PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
+
+		PEER_ADDRESS="$(resolve_host "$PEER_ADDRESS")"
+		PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+	fi
+}
+
+
+
 
 mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
 
@@ -219,54 +276,11 @@ WGKEX_BROKER_BASE_PATH="$(get_site_string mesh_vpn.wireguard.broker | sed 's|/ap
 
 if is_loadbalancing_enabled; then
 	# Use /api/v2, get gateway peer details from broker response
-	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/v2/wg/key/exchange"
-	logger -p info -t checkuplink "Loadbalancing enabled. Contacting wgkex broker $WGKEX_BROKER"
-	if ! WGKEX_DATA=$(force_wan_connection wget -q -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
-		logger -p err -t checkuplink "Contacting wgkex broker failed, response: $WGKEX_DATA"
-		exit 1
-	fi
-
-	logger -p info -t checkuplink "Got data from wgkex broker: $WGKEX_DATA"
-
-	# Parse the returned JSON in a Lua script, returning the endpoint address, port, pubkey and first allowed IP, separated by newlines
-	if ! data=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/parse-wgkex-response.lua "$WGKEX_DATA"); then
-		logger -p err -t checkuplink "Parsing wgkex broker data failed"
-		exit 1
-	fi
-
-	logger -p debug -t checkuplink "Successfully parsed wgkex broker data"
-
-	PEER_ADDRESS="$(echo "$data" | sed -n 1p)"
-	PEER_PORT="$(echo "$data" | sed -n 2p)"
-	PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
-	PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
-
-	PEER_ADDRESS="$(resolve_host "$PEER_ADDRESS")"
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+	use_api_v2
 
 else
 	# Use /api/v1, get gateway peer details from config
-	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/v1/wg/key/exchange"
-	logger -p info -t checkuplink "Loadbalancing disabled. Contacting wgkex broker $WGKEX_BROKER"
-	if ! force_wan_connection wget -q -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"; then
-		logger -p err -t checkuplink "Contacting wgkex broker failed"
-		exit 1
-	fi
-
-	# Get the number of configured peers and randomly select one
-	NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
-	PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
-
-	logger -p info -t checkuplink "Selected peer $PEER"
-
-	PEER_HOSTPORT="$(uci get wireguard.peer_"$PEER".endpoint)"
-	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
-	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
-
-	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
-	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
+	use_api_v1
 
 fi
 
