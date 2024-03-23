@@ -162,12 +162,12 @@ use_api_v2() {
 		use_api_v1
 	else
 		logger -p debug -t checkuplink "Successfully parsed wgkex broker data"
-		PEER_ADDRESS="$(echo "$data" | sed -n 1p)"
+		PEER_HOST="$(echo "$data" | sed -n 1p)"
 		PEER_PORT="$(echo "$data" | sed -n 2p)"
 		PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
 		PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
 
-		PEER_ADDRESS="$(resolve_host "$PEER_ADDRESS")"
+		PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
 		PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 	fi
 }
@@ -284,7 +284,7 @@ else
 
 fi
 
-logger -p info -t checkuplink "Connecting to $PEER_ENDPOINT"
+logger -p info -t checkuplink "Connecting to $PEER_HOST($PEER_ENDPOINT)"
 
 # Bring up the wireguard interface
 ip link add dev "$MESH_VPN_IFACE" type wireguard
