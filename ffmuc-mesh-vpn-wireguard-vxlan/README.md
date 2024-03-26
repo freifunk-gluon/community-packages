@@ -52,6 +52,13 @@ You should use something like the following in the site.conf:
 	},
 ```
 
+If permitted via `on/off-by-default`, a user can override loadbalancing with `uci`:
+
+```sh
+uci set wireguard.mesh_vpn.loadbalancing=0 # override loadbalancing to be always off
+uci set wireguard.mesh_vpn.loadbalancing=1 # override loadbalancing to be always on
+```
+
 And you should include the package in the site.mk of course!
 
 ### Interesting Links
