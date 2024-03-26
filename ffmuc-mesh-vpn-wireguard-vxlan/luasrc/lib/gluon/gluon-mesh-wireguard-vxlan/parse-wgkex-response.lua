@@ -1,6 +1,6 @@
 -- check whether an argument was passed
 if arg[1] == "" then
-    error("Malformed JSON responsen, no data provided")
+    error("Malformed JSON response, no data provided")
 end
 
 local json = require 'jsonc'
