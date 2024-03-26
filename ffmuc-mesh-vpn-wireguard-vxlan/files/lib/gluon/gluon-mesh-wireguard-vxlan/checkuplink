@@ -137,7 +137,10 @@ use_api_v1(){
 
 	# Get the number of configured peers and randomly select one
 	NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")
-	PEER="$(awk -v min=1 -v max="$NUMBER_OF_PEERS" 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')"
+
+	# Do not use awk's srand() as it only uses second-precision for the initial seed that leads to many routers getting the same "random" number
+	# /dev/urandom + busybox' hexdump will provide sufficently "good" random numbers on a router with at least "-n 4"
+	PEER=$(( $(hexdump -n 4 -e '"%u"' </dev/urandom) % NUMBER_OF_PEERS + 1 ))
 
 	logger -p info -t checkuplink "Selected peer $PEER"
 	PEER_HOSTPORT="$(uci get wireguard.peer_"$PEER".endpoint)"
