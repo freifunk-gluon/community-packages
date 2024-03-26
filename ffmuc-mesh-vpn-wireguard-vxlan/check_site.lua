@@ -6,6 +6,11 @@ local function check_peer(k)
 	need_string(in_domain(extend(k, {'link_address'})))
 end
 
-need_table({'mesh_vpn', 'wireguard', 'peers'}, check_peer)
 need_number({'mesh_vpn', 'wireguard', 'mtu'})
 need_string({'mesh_vpn', 'wireguard', 'broker'})
+
+local loadbalancing = need_one_of({ 'mesh_vpn', 'wireguard', 'loadbalancing' },
+	{ 'on', 'off', 'on-by-default', 'off-by-default' }, false)
+if loadbalancing ~= 'on' then -- peers are not required when loadbalancing is enforced
+	need_table({'mesh_vpn', 'wireguard', 'peers'}, check_peer)
+end

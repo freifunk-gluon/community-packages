@@ -18,22 +18,22 @@ end
 uci:delete_all('wireguard', 'peer', function(peer)
 	return peer.preserve ~= '1'
 end)
--- Clean up previous configuration
-uci:delete_all('wireguard', 'wireguard', function(peer)
-	return peer.preserve ~= '1'
-end)
+
+-- Delete unused configurations from older versions
+uci:delete("wireguard", "iface")
+uci:delete("wireguard", "limit")
+uci:delete("wireguard", "broker")
 
 local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
 	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
 	or wg_enabled -- specific config
 
 uci:section("wireguard", "wireguard", "mesh_vpn", {
-	iface = site.mesh_vpn.wireguard.iface(),
-	broker = site.mesh_vpn.wireguard.broker(),
 	enabled = mesh_enabled,
 	privatekey = privkey,
 })
 
+-- TODO: consider removing wireguard.peer and using site directly
 for name, peer in pairs(site.mesh_vpn.wireguard.peers()) do
 	uci:section("wireguard", "peer", "peer_" .. name, {
 		enabled = true,
