@@ -135,7 +135,7 @@ use_api_v1(){
 	WGKEX_DATA=$(get_wgkex_data v1)
 
 	# Parse the returned JSON in a Lua script
-    if ! data=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/parse-wgkex-response.lua "$WGKEX_DATA"); then
+	if ! data=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/parse-wgkex-response.lua "$WGKEX_DATA"); then
 		logger -p err -t checkuplink "Parsing wgkex broker data failed"
 		return 1
 	fi
