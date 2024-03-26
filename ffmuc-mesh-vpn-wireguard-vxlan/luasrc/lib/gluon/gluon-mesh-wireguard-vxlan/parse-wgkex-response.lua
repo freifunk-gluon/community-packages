@@ -1,3 +1,8 @@
+-- check whether an argument was passed
+if arg[1] == "" then
+    error("Malformed JSON responsen, no data provided")
+end
+
 local json = require 'jsonc'
 
 local input = assert(arg[1])
