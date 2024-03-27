@@ -12,7 +12,7 @@ end
 local address = assert(data.Endpoint.Address, "Malformed JSON response, missing required value: Address")
 local port = assert(data.Endpoint.Port, "Malformed JSON response, missing required value: Port")
 local publicKey = assert(data.Endpoint.PublicKey, "Malformed JSON response, missing required value: PublicKey")
-local allowedIPs1 = assert(data.Endpoint.AllowedIPs[1], "Malformed JSON response, missing required value: AllowedIPs[1]")
+local allowedIPs1 = assert(data.Endpoint.AllowedIPs[1], "Malformed JSON response, missing required value: AllowedIPs")
 
 print(address)
 print(port)
