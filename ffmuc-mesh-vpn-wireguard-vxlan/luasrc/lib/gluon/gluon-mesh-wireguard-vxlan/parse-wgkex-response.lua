@@ -9,12 +9,12 @@ if data.Message == "OK" then
 end
 
 -- v2
-if not data.Endpoint or not data.Endpoint.Address or not data.Endpoint.Port
-    or not data.Endpoint.PublicKey or not data.Endpoint.AllowedIPs or not data.Endpoint.AllowedIPs[1] then
-    error("Malformed JSON response, missing required value")
-end
+local address = assert(data.Endpoint.Address, "Malformed JSON response, missing required value: Address")
+local port = assert(data.Endpoint.Port, "Malformed JSON response, missing required value: Port")
+local publicKey = assert(data.Endpoint.PublicKey, "Malformed JSON response, missing required value: PublicKey")
+local allowedIPs1 = assert(data.Endpoint.AllowedIPs[1], "Malformed JSON response, missing required value: AllowedIPs[1]")
 
-print(data.Endpoint.Address)
-print(data.Endpoint.Port)
-print(data.Endpoint.PublicKey)
-print(data.Endpoint.AllowedIPs[1])
+print(address)
+print(port)
+print(publicKey)
+print(allowedIPs1)
