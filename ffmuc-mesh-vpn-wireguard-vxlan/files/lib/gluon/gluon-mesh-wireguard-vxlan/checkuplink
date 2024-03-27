@@ -125,15 +125,20 @@ get_wgkex_data(){
 
 	if ! WGKEX_DATA=$(force_wan_connection wget -q -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
 		logger -p err -t checkuplink "Contacting wgkex broker failed, response: $WGKEX_DATA"
-		return 1
+	else
+		logger -p info -t checkuplink "Got data from wgkex broker: $WGKEX_DATA"
+		echo "$WGKEX_DATA"
 	fi
-
-	logger -p info -t checkuplink "Got data from wgkex broker: $WGKEX_DATA"
-	echo "$WGKEX_DATA"
 }
 
 use_api_v1(){
 	WGKEX_DATA=$(get_wgkex_data v1)
+
+	# Parse the returned JSON in a Lua script
+	if ! data=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/parse-wgkex-response.lua "$WGKEX_DATA"); then
+		logger -p err -t checkuplink "Parsing wgkex broker data failed"
+		return 1
+	fi
 
 	# Get the number of configured peers and randomly select one
 	NUMBER_OF_PEERS=$(uci -q show wireguard | grep -E -ce "peer_[0-9]+.endpoint")

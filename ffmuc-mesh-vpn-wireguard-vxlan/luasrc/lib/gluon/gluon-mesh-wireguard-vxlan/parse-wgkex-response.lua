@@ -1,12 +1,22 @@
 local json = require 'jsonc'
 
-local input = assert(arg[1])
-local data = assert(json.parse(input))
-if not data.Endpoint or not data.Endpoint.Address or not data.Endpoint.Port
-    or not data.Endpoint.PublicKey or not data.Endpoint.AllowedIPs or not data.Endpoint.AllowedIPs[1] then
-    error("Malformed JSON response, missing required value")
+local input = assert(arg[1], "Malformed JSON response, no data provided")
+local data = assert(json.parse(input), "Malformed JSON response, wrong JSON format")
+
+-- v1
+if data.Message == "OK" then
+        return
 end
-print(data.Endpoint.Address)
-print(data.Endpoint.Port)
-print(data.Endpoint.PublicKey)
-print(data.Endpoint.AllowedIPs[1])
+
+-- v2
+assert(data.Endpoint, "Malformed JSON response, missing required value: Endpoint")
+local address = assert(data.Endpoint.Address, "Malformed JSON response, missing required value: Address")
+local port = assert(data.Endpoint.Port, "Malformed JSON response, missing required value: Port")
+local publicKey = assert(data.Endpoint.PublicKey, "Malformed JSON response, missing required value: PublicKey")
+assert(data.Endpoint.AllowedIPs, "Malformed JSON response, missing required value: AllowedIPs")
+local allowedIPs1 = assert(data.Endpoint.AllowedIPs[1], "Malformed JSON response, missing required value: AllowedIPs1")
+
+print(address)
+print(port)
+print(publicKey)
+print(allowedIPs1)
