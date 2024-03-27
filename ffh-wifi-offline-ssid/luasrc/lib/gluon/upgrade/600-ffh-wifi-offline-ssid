@@ -1,0 +1,36 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+if site.ffh_wifi_offline_ssid then
+	local site_disabled = site.ffh_wifi_offline_ssid.disabled() or '0'
+
+	uci:section('ffh-wifi-offline-ssid', 'settings', 'settings', {
+		disabled	= uci:get('ffh-wifi-offline-ssid', 'settings', 'disabled') or site_disabled,
+		threshold	= site.ffh_wifi_offline_ssid.threshold() or 5,
+		prefix 		= site.ffh_wifi_offline_ssid.prefix() or 'Offline_',
+		suffix		= site.ffh_wifi_offline_ssid.suffix() or 'hostname',
+	})
+
+	uci:save('ffh-wifi-offline-ssid')
+
+	uci:section('ffh-check-connection', 'script', 'ffh_wifi_offline', {
+		enabled		= true,
+		interval	= 1,
+		command		= 'ffh-wifi-offline-ssid offline',
+		groups		= {site.ffh_wifi_offline_ssid.target_group(),},
+		trigger		= 'offline',
+	})
+
+	uci:section('ffh-check-connection', 'script', 'ffh_wifi_online', {
+		enabled		= true,
+		interval	= 1,
+		command		= 'ffh-wifi-offline-ssid online',
+		groups		= {site.ffh_wifi_offline_ssid.target_group(),},
+		onchange	= true,
+		trigger		= 'online',
+	})
+
+	uci:save('ffh-check-connection')
+end

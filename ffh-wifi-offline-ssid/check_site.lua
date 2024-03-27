@@ -1,0 +1,5 @@
+need_boolean({'ffh_wifi_offline_ssid', 'disabled'}, false)
+need_string({'ffh_wifi_offline_ssid', 'target_group'}, true)
+need_number({'ffh_wifi_offline_ssid', 'threshold'}, false)
+need_string({'ffh_wifi_offline_ssid', 'prefix'}, false)
+need_one_of({'ffh_wifi_offline_ssid', 'suffix'}, {'hostname', 'mac', 'none'}, false)
