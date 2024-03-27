@@ -20,9 +20,9 @@ uci:delete_all('wireguard', 'peer', function(peer)
 end)
 
 -- Delete unused configurations from older versions
-uci:delete("wireguard", "iface")
-uci:delete("wireguard", "limit")
-uci:delete("wireguard", "broker")
+uci:delete("wireguard", "mesh_vpn", "iface")
+uci:delete("wireguard", "mesh_vpn", "limit")
+uci:delete("wireguard", "mesh_vpn", "broker")
 
 local mesh_enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled') -- default
 	or uci:get_bool('fastd', 'mesh_vpn', 'enabled') --migration
