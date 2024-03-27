@@ -1,12 +1,7 @@
--- check whether an argument was passed
-if arg[1] == "" then
-    error("Malformed JSON response, no data provided")
-end
-
 local json = require 'jsonc'
 
-local input = assert(arg[1])
-local data = assert(json.parse(input))
+local input = assert(arg[1], "Malformed JSON response, no data provided")
+local data = assert(json.parse(input), "Malformed JSON response, wrong JSON format")
 
 -- v1
 if data.Message == "OK" then
