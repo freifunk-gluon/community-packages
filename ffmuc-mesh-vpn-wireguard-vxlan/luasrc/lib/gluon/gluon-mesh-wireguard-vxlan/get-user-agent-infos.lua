@@ -15,11 +15,11 @@ local kernel = assert(data.kernel, "Malformed JSON response, missing required va
 local infos = info.get_info()
 
 local gluon_version = assert(infos.gluon_version, "Malformed gluon-info, missing required value: gluon version")
-local firmware_release = assert(infos.firmware_release, "Malformed gluon-info, missing required value: firmware release")
+local fw_release = assert(infos.firmware_release, "Malformed gluon-info, missing required value: firmware release")
 
 print(gluon_version)
 print(board_name)
 print(Openwrt_version)
 print(kernel)
 print(target)
-print(firmware_release)
+print(fw_release)
