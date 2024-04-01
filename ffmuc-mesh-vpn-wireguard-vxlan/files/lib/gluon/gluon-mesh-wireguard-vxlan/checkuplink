@@ -135,9 +135,11 @@ get_user_agent(){
 }
 
 get_wgkex_data(){
-	local version="$1"
+	local version user_agent 
+	version="$1"
+	user_agent=$(get_user_agent)
+
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
-	local user_agent=$(get_user_agent)
 	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
 
 	if ! WGKEX_DATA=$(force_wan_connection wget -q -U="$user_agent"  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
