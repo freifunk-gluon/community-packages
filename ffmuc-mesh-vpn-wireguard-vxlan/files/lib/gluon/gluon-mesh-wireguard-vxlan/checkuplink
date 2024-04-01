@@ -20,19 +20,6 @@ print(site.${path}())
 EOF
 }
 
-get_site_bool() {
-	local path="$1"
-
-	lua <<EOF
-local site = require 'gluon.site'
-if site.${path}() then
-    print("true")
-else
-	print("false")
-end
-EOF
-}
-
 interface_linklocal() {
 	# We generate a predictable v6 address
 	local macaddr oldIFS
