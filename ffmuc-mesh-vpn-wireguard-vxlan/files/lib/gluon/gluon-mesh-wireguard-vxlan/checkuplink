@@ -120,14 +120,15 @@ is_loadbalancing_enabled() {
 get_user_agent(){
 	local userAgentInfos=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua) 
 	
-	openwrt_version="$(echo "$userAgentInfos" | sed -n 1p)"
-	kernel="$(echo "$userAgentInfos" | sed -n 2p)"
-	gluon_version="$(echo "$userAgentInfos" | sed -n 3p)"
-	firmware_release="$(echo "$userAgentInfos" | sed -n 4p)"
-	model="$(echo "$userAgentInfos" | sed -n 5p)"
+	gluon_version="$(echo "$userAgentInfos" | sed -n 1p)"
+	board_name="$(echo "$userAgentInfos" | sed -n 2p)"
+	openwrt_version="$(echo "$userAgentInfos" | sed -n 3p)"
+	kernel="$(echo "$userAgentInfos" | sed -n 4p)"
+	target="$(echo "$userAgentInfos" | sed -n 5p)"
+	firmware_release="$(echo "$userAgentInfos" | sed -n 6p)"
 
-	#OpenWrt/21.02.0 (kernel/5.10.206; gluon/v2023.1.2+; firmware/v2024.3.1;) VMware, Inc. VMware Virtual Platform
-	local user_agent="OpenWrt/$openwrt_version (kernel/$kernel) gluon/$gluon_version firmware/$firmware_release $model"
+	#gluon/v2023.1.2+ (vmware-inc-vmware-virtual-platform) OpenWrt/22.03-SNAPSHOT (kernel/5.10.206; x86/64) firmware/v2024.3.1
+	local user_agent="gluon/$gluon_version ($board_name) OpenWrt/$openwrt_version (kernel/$kernel; $target) firmware/$firmware_release"
 
 	echo $user_agent
 }
