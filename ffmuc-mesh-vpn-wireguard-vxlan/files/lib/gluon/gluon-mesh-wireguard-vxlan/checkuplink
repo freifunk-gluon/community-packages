@@ -336,5 +336,5 @@ check_connectivity
 
 if [[ "$CONNECTED" == 0 ]]; then
 	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
-	exit 0
+	exit 4
 fi
