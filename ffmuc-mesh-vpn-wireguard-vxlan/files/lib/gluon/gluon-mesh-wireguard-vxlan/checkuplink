@@ -130,7 +130,7 @@ get_user_agent(){
 	#gluon/v2023.1.2+ (vmware-inc-vmware-virtual-platform) OpenWrt/22.03-SNAPSHOT (kernel/5.10.206; x86/64) firmware/v2024.3.1
 	local user_agent="gluon/$gluon_version ($board_name) OpenWrt/$openwrt_version (kernel/$kernel; $target) firmware/$fw_release"
 
-	echo $user_agent
+	echo "$user_agent"
 }
 
 get_wgkex_data(){
