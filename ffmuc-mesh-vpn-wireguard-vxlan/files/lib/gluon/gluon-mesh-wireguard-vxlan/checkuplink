@@ -181,20 +181,16 @@ use_api_v2() {
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
 
-check_connectivity() {
+is_connected() {
 	if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
 	then
 		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
 		if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
 		then
-			CONNECTED=1
+			return 1
 		fi
 	fi
-
-	if [[ "$CONNECTED" == 1 ]]; then
-		# We have a connection, we are done
-		exit 0
-	fi
+	return 0
 }
 
 
@@ -221,13 +217,14 @@ then
 fi
 
 
-#We assume we are not connected by default
-CONNECTED=0
-
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
 
+
 # Check connectivity to supernode
-check_connectivity
+if is_connected; then
+	# We have a connection, we are done
+	exit 0
+fi
 
 logger -t checkuplink "Reconnecting ..."
 NTP_SERVERS=$(uci get system.ntp.server)
@@ -332,9 +329,10 @@ sleep 5
 batctl hardif mesh-vpn throughput_override 1000mbit;
 
 # Check again if connected
-check_connectivity
-
-if [[ "$CONNECTED" == 0 ]]; then
+if is_connected; then
+	logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
+	exit 0
+else
 	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
 	exit 4
 fi
