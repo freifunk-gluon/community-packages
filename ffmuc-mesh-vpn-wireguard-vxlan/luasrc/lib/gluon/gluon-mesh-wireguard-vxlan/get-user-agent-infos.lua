@@ -17,4 +17,5 @@ local infos = info.get_info()
 local gluon_version = assert(infos.gluon_version, "Malformed gluon-info, missing required value: gluon version")
 local fw_release = assert(infos.firmware_release, "Malformed gluon-info, missing required value: firmware release")
 
-print(string.format("gluon/%s (%s) OpenWrt/%s (kernel/%s; %s) firmware/%s", gluon_version, board_name, Openwrt_version, kernel, target, fw_release))
+print(string.format("gluon/%s (%s) OpenWrt/%s (kernel/%s; %s) firmware/%s", 
+gluon_version, board_name, Openwrt_version, kernel, target, fw_release))
