@@ -127,7 +127,7 @@ get_user_agent(){
 	model="$(echo "$userAgentInfos" | sed -n 5p)"
 
 	#OpenWrt/21.02.0 (kernel/5.10.206; gluon/v2023.1.2+; firmware/v2024.3.1;) VMware, Inc. VMware Virtual Platform
-	local user_agent="OpenWrt/$openwrt_version (kernel/$kernel; gluon/$gluon_version; firmware/$firmware_release;) $model"
+	local user_agent="OpenWrt/$openwrt_version (kernel/$kernel) gluon/$gluon_version firmware/$firmware_release $model"
 
 	echo $user_agent
 }
