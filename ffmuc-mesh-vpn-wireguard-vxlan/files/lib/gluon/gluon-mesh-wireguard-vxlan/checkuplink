@@ -181,7 +181,21 @@ use_api_v2() {
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
 
+check_connectivity() {
+	if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
+	then
+		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
+		if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
+		then
+			CONNECTED=1
+		fi
+	fi
 
+	if [[ "$CONNECTED" == 1 ]]; then
+		# We have a connection, we are done
+		exit 0
+	fi
+}
 
 
 mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
@@ -213,20 +227,7 @@ CONNECTED=0
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
 
 # Check connectivity to supernode
-
-if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
-then
-	GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
-	if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
-	then
-		CONNECTED=1
-	fi
-fi
-
-if [[ "$CONNECTED" == 1 ]]; then
-	# We have a connection, we are done
-	exit 0
-fi
+check_connectivity
 
 logger -t checkuplink "Reconnecting ..."
 NTP_SERVERS=$(uci get system.ntp.server)
@@ -329,3 +330,11 @@ ip link set up dev mesh-vpn
 sleep 5
 # If we have a BATMAN_V env we need to correct the throughput value now
 batctl hardif mesh-vpn throughput_override 1000mbit;
+
+# Check again if connected
+check_connectivity
+
+if [[ "$CONNECTED" == 0 ]]; then
+	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
+	exit 0
+fi
