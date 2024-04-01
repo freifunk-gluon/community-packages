@@ -120,8 +120,9 @@ is_loadbalancing_enabled() {
 get_wgkex_data(){
 	local version="$1"
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
-        local user_agent="OpenWrt xx.xx Gluon xx.xx checkuplink x.x"
-
+        local user_agent="Mozilla/5.0 OpenWrt xx.xx Gluon xx.xx Modell/xxx checkuplink/1.0"
+#more examples
+#OpenWrt/21.02.0 (GLUON/2024.1; Checkuplink/2.0) x64
 	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
 
 	if ! WGKEX_DATA=$(force_wan_connection wget -q -U=$user_agent  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
