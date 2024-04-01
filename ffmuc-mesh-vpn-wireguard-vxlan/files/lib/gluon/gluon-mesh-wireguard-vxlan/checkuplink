@@ -121,9 +121,9 @@ is_loadbalancing_enabled() {
 get_wgkex_data(){
 	local version user_agent 
 	version="$1"
+	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
 	user_agent=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua) 
 
-	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
 	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
 
 	if ! WGKEX_DATA=$(force_wan_connection wget -q -U "$user_agent"  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
