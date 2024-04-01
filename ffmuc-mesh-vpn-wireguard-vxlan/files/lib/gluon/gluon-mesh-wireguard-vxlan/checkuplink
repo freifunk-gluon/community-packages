@@ -118,7 +118,8 @@ is_loadbalancing_enabled() {
 }
 
 get_user_agent(){
-	local userAgentInfos=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua) 
+	local userAgentInfos gluon_version board_name openwrt_version kernel fw_release user_agent
+	userAgentInfos=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua) 
 	
 	gluon_version="$(echo "$userAgentInfos" | sed -n 1p)"
 	board_name="$(echo "$userAgentInfos" | sed -n 2p)"
@@ -128,7 +129,7 @@ get_user_agent(){
 	fw_release="$(echo "$userAgentInfos" | sed -n 6p)"
 
 	#gluon/v2023.1.2+ (vmware-inc-vmware-virtual-platform) OpenWrt/22.03-SNAPSHOT (kernel/5.10.206; x86/64) firmware/v2024.3.1
-	local user_agent="gluon/$gluon_version ($board_name) OpenWrt/$openwrt_version (kernel/$kernel; $target) firmware/$fw_release"
+	user_agent="gluon/$gluon_version ($board_name) OpenWrt/$openwrt_version (kernel/$kernel; $target) firmware/$fw_release"
 
 	echo "$user_agent"
 }
@@ -139,7 +140,7 @@ get_wgkex_data(){
 	local user_agent=$(get_user_agent)
 	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
 
-	if ! WGKEX_DATA=$(force_wan_connection wget -q -U=$user_agent  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
+	if ! WGKEX_DATA=$(force_wan_connection wget -q -U="$user_agent"  -O- --post-data='{"domain": "'"$SEGMENT"'","public_key": "'"$PUBLICKEY"'"}' "$WGKEX_BROKER"); then
 		logger -p err -t checkuplink "Contacting wgkex broker failed, response: $WGKEX_DATA"
 	else
 		logger -p info -t checkuplink "Got data from wgkex broker: $WGKEX_DATA"
