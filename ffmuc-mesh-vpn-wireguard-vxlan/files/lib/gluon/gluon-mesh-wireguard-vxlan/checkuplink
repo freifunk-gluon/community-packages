@@ -187,10 +187,10 @@ is_connected() {
 		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
 		if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
 		then
-			return 1
+			return 0 # true
 		fi
 	fi
-	return 0
+	return 1 # false
 }
 
 
@@ -328,6 +328,7 @@ sleep 5
 # If we have a BATMAN_V env we need to correct the throughput value now
 batctl hardif mesh-vpn throughput_override 1000mbit;
 
+sleep 5
 # Check again if connected
 if is_connected; then
 	logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
