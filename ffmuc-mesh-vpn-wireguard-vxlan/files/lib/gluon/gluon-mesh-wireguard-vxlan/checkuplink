@@ -316,10 +316,9 @@ sleep 5
 batctl hardif mesh-vpn throughput_override 1000mbit;
 
 # Check again if connected
-if is_connected; then
-	logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
-	exit 0
-else
+if ! is_connected; then
 	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
 	exit 4
 fi
+
+logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
