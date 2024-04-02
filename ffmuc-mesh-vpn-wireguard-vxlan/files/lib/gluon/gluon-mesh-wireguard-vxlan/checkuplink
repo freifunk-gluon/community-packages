@@ -20,19 +20,6 @@ print(site.${path}())
 EOF
 }
 
-get_site_bool() {
-	local path="$1"
-
-	lua <<EOF
-local site = require 'gluon.site'
-if site.${path}() then
-    print("true")
-else
-	print("false")
-end
-EOF
-}
-
 interface_linklocal() {
 	# We generate a predictable v6 address
 	local macaddr oldIFS
@@ -184,7 +171,17 @@ use_api_v2() {
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
 
-
+is_connected() {
+	if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
+	then
+		GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
+		if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
+		then
+			return 0 # true
+		fi
+	fi
+	return 1 # false
+}
 
 
 mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
@@ -210,23 +207,11 @@ then
 fi
 
 
-#We assume we are not connected by default
-CONNECTED=0
-
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
 
+
 # Check connectivity to supernode
-
-if wget "http://[$(wg  | grep fe80 | awk '{split($3,A,"/")};{print A[1]}')%$MESH_VPN_IFACE]/"  --timeout=5 -O/dev/null -q
-then
-	GWMAC=$(batctl gwl | awk '/[*]/{print $2}')
-	if batctl ping -c 5 "$GWMAC" > /dev/null 2>&1
-	then
-		CONNECTED=1
-	fi
-fi
-
-if [[ "$CONNECTED" == 1 ]]; then
+if is_connected; then
 	# We have a connection, we are done
 	exit 0
 fi
@@ -332,3 +317,11 @@ ip link set up dev mesh-vpn
 sleep 5
 # If we have a BATMAN_V env we need to correct the throughput value now
 batctl hardif mesh-vpn throughput_override 1000mbit;
+
+# Check again if connected
+if ! is_connected; then
+	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
+	exit 4
+fi
+
+logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
