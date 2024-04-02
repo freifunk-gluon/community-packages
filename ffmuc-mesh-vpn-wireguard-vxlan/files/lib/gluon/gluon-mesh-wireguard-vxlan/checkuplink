@@ -4,6 +4,20 @@
 set -eu
 # set -o pipefail # TODO: pipefail needs more rework in the script
 
+mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
+
+if [[ "${mesh_vpn_enabled}" == "0" ]]; then
+	# Stop the script if mesh_vpn is disabled
+	exit 0
+fi
+
+# Some legacy code seem to have used "true" instead of the canonical "1".
+# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
+if [[ "${mesh_vpn_enabled}" != "0" ]] && [[ "${mesh_vpn_enabled}" != "1" ]]; then
+	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
+	mesh_vpn_enabled="1"
+fi
+
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
@@ -179,20 +193,6 @@ is_connected() {
 	fi
 	return 1 # false
 }
-
-mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
-
-# Some legacy code seem to have used "true" instead of the canonical "1".
-# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
-if [[ "${mesh_vpn_enabled}" != "0" ]] && [[ "${mesh_vpn_enabled}" != "1" ]]; then
-	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
-	mesh_vpn_enabled="1"
-fi
-
-if [[ "${mesh_vpn_enabled}" == "0" ]]; then
-	# Stop the script if mesh_vpn is disabled
-	exit 0
-fi
 
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
