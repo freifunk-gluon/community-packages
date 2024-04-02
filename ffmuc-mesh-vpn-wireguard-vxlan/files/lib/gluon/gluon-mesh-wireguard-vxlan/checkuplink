@@ -18,6 +18,7 @@ else
 	exit
 fi
 
+# start function section
 get_site_string() {
 	local path="$1"
 
@@ -186,6 +187,8 @@ is_connected() {
 	fi
 	return 1 # false
 }
+# end function section
+
 
 # Some legacy code seem to have used "true" instead of the canonical "1".
 # This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
