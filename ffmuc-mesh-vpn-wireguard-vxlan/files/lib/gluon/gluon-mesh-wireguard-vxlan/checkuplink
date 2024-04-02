@@ -104,8 +104,7 @@ is_loadbalancing_enabled() {
 	return 0
 }
 
-
-get_wgkex_data(){
+get_wgkex_data() {
 	local version user_agent 
 	version="$1"
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
@@ -121,7 +120,7 @@ get_wgkex_data(){
 	fi
 }
 
-use_api_v1(){
+use_api_v1() {
 	WGKEX_DATA=$(get_wgkex_data v1)
 
 	# Parse the returned JSON in a Lua script
@@ -147,8 +146,6 @@ use_api_v1(){
 	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
 	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
 }
-
-
 
 use_api_v2() {
 	WGKEX_DATA=$(get_wgkex_data v2)
@@ -183,7 +180,6 @@ is_connected() {
 	return 1 # false
 }
 
-
 mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
 
 # Some legacy code seem to have used "true" instead of the canonical "1".
@@ -198,7 +194,6 @@ if [[ "${mesh_vpn_enabled}" == "0" ]]; then
 	exit 0
 fi
 
-
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
 then
@@ -206,9 +201,7 @@ then
 	uci commit wireguard
 fi
 
-
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
-
 
 # Check connectivity to supernode
 if is_connected; then
