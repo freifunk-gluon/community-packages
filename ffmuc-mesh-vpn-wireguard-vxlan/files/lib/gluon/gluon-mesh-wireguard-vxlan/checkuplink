@@ -18,12 +18,6 @@ else
 	exit
 fi
 
-# Some legacy code seem to have used "true" instead of the canonical "1".
-# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
-if [[ "${mesh_vpn_enabled}" != "1" ]]; then
-	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
-fi
-
 get_site_string() {
 	local path="$1"
 
@@ -192,6 +186,12 @@ is_connected() {
 	fi
 	return 1 # false
 }
+
+# Some legacy code seem to have used "true" instead of the canonical "1".
+# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
+if [[ "${mesh_vpn_enabled}" != "1" ]]; then
+	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
+fi
 
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
