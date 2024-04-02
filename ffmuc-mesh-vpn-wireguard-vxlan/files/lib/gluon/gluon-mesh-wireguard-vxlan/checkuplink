@@ -11,17 +11,17 @@ if [[ "${mesh_vpn_enabled}" == "0" ]]; then
 	exit 0
 fi
 
-# Some legacy code seem to have used "true" instead of the canonical "1".
-# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
-if [[ "${mesh_vpn_enabled}" != "1" ]]; then
-	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
-fi
-
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
 	logger -p err -t checkuplink "Lock file exists... exiting."
 	exit
+fi
+
+# Some legacy code seem to have used "true" instead of the canonical "1".
+# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
+if [[ "${mesh_vpn_enabled}" != "1" ]]; then
+	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
 fi
 
 get_site_string() {
