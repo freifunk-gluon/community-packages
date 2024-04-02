@@ -151,13 +151,13 @@ use_api_v1() {
 
 	logger -p info -t checkuplink "Selected peer $PEER"
 	PEER_HOSTPORT="$(uci get wireguard.peer_"$PEER".endpoint)"
-	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
-	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 
+	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
+	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
 	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
 	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
+	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
+	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
 
 use_api_v2() {
@@ -172,11 +172,11 @@ use_api_v2() {
 	fi
 
 	logger -p debug -t checkuplink "Successfully parsed wgkex broker data"
+	
 	PEER_HOST="$(echo "$data" | sed -n 1p)"
 	PEER_PORT="$(echo "$data" | sed -n 2p)"
 	PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
 	PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
-
 	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
