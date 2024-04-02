@@ -6,7 +6,7 @@ local info = require 'gluon.info'
 local data = assert(json.parse(util.exec('ubus call system board')), "Malformed JSON response, wrong JSON format")
 
 assert(data.release, "Malformed JSON response, missing required value: release")
-local Openwrt_version = assert(data.release.version, "Malformed JSON response, missing required value: version")
+local openwrt_version = assert(data.release.version, "Malformed JSON response, missing required value: version")
 local target = assert(data.release.target, "Malformed JSON response, missing required value: target")
 local board_name = assert(data.board_name, "Malformed JSON response, missing required value: board_name")
 local kernel = assert(data.kernel, "Malformed JSON response, missing required value: kernel")
@@ -18,4 +18,4 @@ local gluon_version = assert(infos.gluon_version, "Malformed gluon-info, missing
 local fw_release = assert(infos.firmware_release, "Malformed gluon-info, missing required value: firmware release")
 
 print(string.format("gluon/%s (%s) OpenWrt/%s (kernel/%s; %s) firmware/%s",
-gluon_version, board_name, Openwrt_version, kernel, target, fw_release))
+gluon_version, board_name, openwrt_version, kernel, target, fw_release))
