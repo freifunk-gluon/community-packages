@@ -20,7 +20,7 @@ fi
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
-	echo "Lock file exists... exiting"
+	logger -p err -t checkuplink "Lock file exists... exiting."
 	exit
 fi
 
@@ -235,7 +235,7 @@ set +o pipefail # Disable pipefail: this script does not fully support pipefail 
 # shellcheck disable=SC2086 # otherwise ntpd cries
 if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
 then
-	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
+	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}... exiting."
 	exit 3
 fi
 
@@ -301,7 +301,7 @@ fi
 # Bring up VXLAN
 if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "${LINKLOCAL}" remote "$PEER_LINKADDRESS" dstport 8472 dev "$MESH_VPN_IFACE"
 then
-	logger -p err -t checkuplink "Unable to create mesh-vpn interface"
+	logger -p err -t checkuplink "Unable to create mesh-vpn interface... exiting."
 	exit 2
 fi
 ip link set up dev mesh-vpn
@@ -312,7 +312,7 @@ batctl hardif mesh-vpn throughput_override 1000mbit;
 
 # Check again if connected
 if ! is_connected; then
-	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
+	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings... exiting."
 	exit 4
 fi
 
