@@ -14,7 +14,7 @@ fi
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
-	logger -p err -t checkuplink "Lock file exists... exiting."
+	logger -p notice -t checkuplink "Lock file exists... exiting."
 	exit
 fi
 
