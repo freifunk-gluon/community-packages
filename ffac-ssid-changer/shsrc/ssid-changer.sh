@@ -86,9 +86,9 @@ if [ ! -f $TMP ]; then echo "0">$TMP; fi
 OFF_COUNT=$(cat $TMP)
 
 TQ_LIMIT_ENABLED="$(uci -q get ssid-changer.settings.tq_limit_enabled)"
-# if true, the offline ssid will only be set if there is no gateway reacheable
+# if true, the offline ssid will only be set if there is no gateway reachable
 # upper and lower limit to turn the offline_ssid on and off
-# in-between these two values the SSID will never be changed to preven it from toggeling every Minute.
+# in-between these two values the SSID will never be changed to prevent it from toggling every Minute.
 : "${TQ_LIMIT_ENABLED:=0}"
 
 if [ "$TQ_LIMIT_ENABLED" = 1 ]; then
@@ -111,7 +111,7 @@ if [ "$TQ_LIMIT_ENABLED" = 1 ]; then
 	elif [ "$GATEWAY_TQ" -lt "$TQ_LIMIT_MIN" ]; then
 		CHECK=0
 	else
-		# this is just get a clean run if we are in-between the grace periode
+		# this is just get a clean run if we are in-between the grace period
 		log_debug "TQ is $GATEWAY_TQ, do nothing"
 		exit 0
 	fi
@@ -218,7 +218,7 @@ fi
 if [ $HUP_NEEDED = 1 ]; then
 	# send HUP to all hostapd to load the new SSID
 	killall -HUP hostapd
-	## check for nonmachting hotapd-pidfiles
+	## check for nonmatching hostapd-pidfiles
 	if [ -f /lib/gluon/eulenfunk-hotfix/check_hostapd.sh ] ; then
 	   sleep 2 # settle down
 	   # shellcheck disable=SC2009
