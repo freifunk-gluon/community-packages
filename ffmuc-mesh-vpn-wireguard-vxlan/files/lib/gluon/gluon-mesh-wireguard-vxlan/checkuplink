@@ -115,7 +115,7 @@ get_wgkex_data() {
 	local version user_agent 
 	version="$1"
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
-	user_agent=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua) 
+	user_agent=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua)
 
 	logger -p info -t checkuplink "Contacting wgkex broker $WGKEX_BROKER"
 
@@ -216,7 +216,8 @@ NTP_SERVERS_ADDRS=""
 
 set -o pipefail # Enable pipefail: this script does not fully support pipefail yet, but required below
 for NTP_SERVER in $NTP_SERVERS; do
-	all_ntp_ips="$(gluon-wan nslookup "$NTP_SERVER" | grep '^Address:\? ' | sed 's/^Address:\? //')"
+	# older versions of nslookup use "Address 1:" with increasing numbers, newer just use "Address:"
+	all_ntp_ips="$(gluon-wan nslookup "$NTP_SERVER" | grep '^Address \?[0-9]*:\? ' | sed 's/^Address \?[0-9]*:\? //')"
 	if ip -6 route show table 1 | grep -q 'default via'
 	then
 		# We need to match a few special cases for IPv6 here:
