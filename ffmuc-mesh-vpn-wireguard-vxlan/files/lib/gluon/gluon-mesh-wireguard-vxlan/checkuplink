@@ -112,7 +112,7 @@ is_loadbalancing_enabled() {
 }
 
 get_wgkex_data() {
-	local version user_agent 
+	local version user_agent
 	version="$1"
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
 	user_agent=$(lua /lib/gluon/gluon-mesh-wireguard-vxlan/get-user-agent-infos.lua)
