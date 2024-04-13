@@ -146,9 +146,9 @@ customwget() {
 	--header="X-Board-Name: $board_name" \
 	--header="X-Openwrt-Version: $openwrt_version" \
 	--header="X-Kernel-Version: $kernel" \
-	--header="X-Target_Name: $target" \
+	--header="X-Target-Name: $target" \
 	--header="X-Firmware-Version: $fw_release" \
-	--  -O- "$@"
+	-O- "$@"
 }
 
 get_wgkex_data() {
