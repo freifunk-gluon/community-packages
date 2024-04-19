@@ -34,4 +34,6 @@ uci:section('node-whisperer', 'settings', 'settings', {
     disabled = disabled,
 })
 uci:set('node-whisperer', 'settings', 'information', sources)
+-- This also works on single-band devices
+uci:set('node-whisperer', 'settings', 'interface', {'client0', 'client1'})
 uci:commit('node-whisperer')
