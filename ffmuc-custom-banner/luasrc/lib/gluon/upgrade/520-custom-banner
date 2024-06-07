@@ -1,0 +1,107 @@
+#!/usr/bin/lua
+
+local site = require "gluon.site"
+local uci = require("simple-uci").cursor()
+local info = require "gluon.info"
+
+local banner_path = "/etc/banner"
+local banner_backup_path = "/etc/banner.original"
+local banner_template_path = "/etc/banner.gluon"
+
+
+-- don't update the banner if customer banner is explicitly disabled
+if site.custom_banner() and site.custom_banner.enabled() == false then
+    os.exit()
+end
+
+local function file_exists(path)
+    local file = io.open(path, "r")
+
+    if file ~= nil then
+        io.close(file)
+        return true
+    end
+
+    return false
+end
+
+local function read_file(filepath)
+    local fh = assert(io.open(filepath, "rb"))
+    local contents = assert(fh:read(_VERSION <= "Lua 5.2" and "*a" or "a"))
+    fh:close()
+    return contents
+end
+
+-- Write a string to a file.
+local function write_file(filename, contents)
+    local fh = assert(io.open(filename, "wb"))
+    fh:write(contents)
+    fh:flush()
+    fh:close()
+end
+
+-- Check if banner is "original" by checking the first few lines for the OpenWRT ASCII art
+-- https://github.com/openwrt/openwrt/blob/2ded629864de779df8ddd0224a875edf17f9fea5/package/base-files/files/etc/banner
+local function is_banner_original(path)
+    if os.execute("head -n 6 " .. path .. " | md5sum | grep 0e85ae0983251ed04e91a85d9b7c5fe3") == 0 then
+        return true
+    end
+    return false
+end
+
+-- restore original banner
+if uci:get("custom-banner", "settings", "enabled") == "0" then
+    if file_exists(banner_backup_path) then
+        os.rename(banner_backup_path, banner_path)
+    end
+    os.exit()
+end
+
+-- create a backup of the banner if the active banner is original (e.g. after an upgrade)
+if is_banner_original(banner_path) then
+    -- rename (and overwrite) existing backup
+    os.rename(banner_path, banner_backup_path)
+end
+
+
+local site_name = site.site_name() or "Freifunk"
+local gluon_info = info.get_info()
+local banner_template = read_file(banner_template_path)
+
+local new_banner = banner_template
+new_banner = string.gsub(new_banner, "%%SITE_NAME%%", site_name)
+new_banner = string.gsub(new_banner, "%%FIRMWARE_VERSION%%", gluon_info.firmware_release)
+new_banner = string.gsub(new_banner, "%%MODEL%%", gluon_info.hardware_model)
+
+
+if gluon_info.domain then
+    -- TODO: check if there is an easier way to get the human readable domain name
+    local json = require('jsonc')
+    local domain_data = assert(json.parse(
+        read_file('/lib/gluon/domains/' .. gluon_info.domain .. '.json'),
+        "Malformed domain, wrong JSON format")
+    )
+    local domain_name = domain_data.domain_names[gluon_info.domain] or "N/A"
+    new_banner = string.gsub(new_banner, "%%DOMAIN%%", domain_name)
+else
+    -- if there is not map link in the site, remove the whole line that contains MAP_LINK
+    new_banner = string.gsub(new_banner, "[^\n]*%%DOMAIN%%[^\n]*\n?", "")
+end
+
+if site.custom_banner.map_url() then
+    local map_mac = string.gsub(gluon_info.mac_address, ":", "")
+    new_banner = string.gsub(new_banner, "%%MAP_LINK%%", site.custom_banner.map_url() .. map_mac)
+else
+    -- if there is not map link in the site, remove the whole line that contains MAP_LINK
+    new_banner = string.gsub(new_banner, "[^\n]*%%MAP_LINK%%[^\n]*\n?", "")
+end
+
+if site.custom_banner.contact_url() then
+    new_banner = string.gsub(new_banner, "%%CONTACT%%", site.custom_banner.contact_url())
+else
+    -- if there is not map link in the site, remove the whole line that contains CONTACT
+    new_banner = string.gsub(new_banner, "[^\n]*%%CONTACT%%[^\n]*\n?", "")
+end
+
+-- TODO: write this file to RAM (and regen on reboot) and link symlink it, to save space
+write_file(banner_path, new_banner)

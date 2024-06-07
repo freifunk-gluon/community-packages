@@ -1,0 +1,16 @@
+     ________
+    / ____/ /_  ______  ____
+   / / __/ / / / / __ \/ __ \
+  / /_/ / / /_/ / /_/ / / / /
+  \____/_/\__,_/\____/_/ /_/
+---------------------------------------
+ Community: %SITE_NAME% %FIRMWARE_VERSION%
+ Domain:    %DOMAIN%
+ Model:     %MODEL%
+ Node Info: %MAP_LINK%
+ Contact:   %CONTACT%
+ Important Commands:
+  - autoupdater (run autoupdater)
+  - logread     (show device log)
+ https://github.com/freifunk-gluon/gluon/wiki/Commandline-administration
+---------------------------------------
