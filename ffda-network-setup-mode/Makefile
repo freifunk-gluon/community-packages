@@ -9,16 +9,16 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffda-network-setup-mode
+define Package/$(PKG_NAME)
   TITLE:=Activate setup-mode using a magic packet
   DEPENDS:=+gluon-core
 endef
 
-define Package/ffda-network-setup-mode/install
+define Package/$(PKG_NAME)/install
 	$(Gluon/Build/Install)
 
 	$(INSTALL_DIR) $(1)/lib/gluon/setup-mode
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wait-network-request $(1)/lib/gluon/setup-mode
 endef
 
-$(eval $(call BuildPackageGluon,ffda-network-setup-mode))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

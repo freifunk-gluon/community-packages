@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-mesh-vpn-openvpn
+define Package/$(PKG_NAME)
   TITLE:=Support for connecting meshes via custom openvpn configuration
   DEPENDS:=+gluon-core +gluon-mesh-vpn-core +openvpn +lua-openssl
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-mesh-vpn-openvpn))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

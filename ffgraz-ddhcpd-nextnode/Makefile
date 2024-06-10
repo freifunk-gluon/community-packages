@@ -8,16 +8,16 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-ddhcpd-nextnode
+define Package/$(PKG_NAME)
 	SECTION:=net
 	CATEGORY:=Network
 	DEPENDS:=+ffgraz-ddhcpd
 	TITLE:=ddhcpd nextnode integration
 endef
 
-define Package/ffgraz-ddhcpd-nextnode/description
+define Package/$(PKG_NAME)/description
   nextnode integration for ddhcpd
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-ddhcpd-nextnode))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))
 

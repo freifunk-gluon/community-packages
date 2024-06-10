@@ -9,9 +9,9 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffmuc-mesh-vpn-wireguard-vxlan
+define Package/$(PKG_NAME)
   TITLE:=Support for connecting meshes via wireguard
   DEPENDS:=+gluon-mesh-vpn-core +micrond +kmod-wireguard +wireguard-tools +ip-full +lua-jsonc
 endef
 
-$(eval $(call BuildPackageGluon,ffmuc-mesh-vpn-wireguard-vxlan))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

@@ -9,13 +9,13 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffda-mesh-vpn-fastd-sqm
+define Package/$(PKG_NAME)
   TITLE:=Enable SQM instead of simple-tc on fastd mesh vpn interface
   DEPENDS:=+gluon-mesh-vpn-fastd +sqm-scripts
 endef
 
-define Package/ffda-mesh-vpn-fastd-sqm/description
+define Package/$(PKG_NAME)/description
   Enable SQM instead of simple-tc on fastd mesh vpn interface
 endef
 
-$(eval $(call BuildPackageGluon,ffda-mesh-vpn-fastd-sqm))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

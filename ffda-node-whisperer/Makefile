@@ -20,20 +20,20 @@ MAKE_VARS += \
 
 Build/Compile=$(call Build/Compile/Default)
 
-define Package/ffda-node-whisperer
+define Package/$(PKG_NAME)
   TITLE:=Package to provide diagnostic information using WiFi beacons
   DEPENDS:=+gluon-core +libubox +libubus +libblobmsg-json +libnl-tiny +libbatadv +libgluonutil
 endef
 
-define Package/ffda-node-whisperer/description
+define Package/$(PKG_NAME)/description
   Package to provide diagnostic information using WiFi beacons
 endef
 
-define Package/ffda-node-whisperer/conffiles
+define Package/$(PKG_NAME)/conffiles
 /etc/config/node-whisperer
 endef
 
-define Package/ffda-node-whisperer/install
+define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/etc/init.d $(1)/etc/config $(1)/lib/gluon/upgrade
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/node-whisperer $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/openwrt/node-whisperer/files/node-whisperer.init $(1)/etc/init.d/node-whisperer
@@ -41,4 +41,4 @@ define Package/ffda-node-whisperer/install
 	$(INSTALL_BIN) ./files/node-whisperer.upgrade.lua $(1)/lib/gluon/upgrade/150-node-whisperer
 endef
 
-$(eval $(call BuildPackageGluon,ffda-node-whisperer))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

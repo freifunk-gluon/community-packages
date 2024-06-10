@@ -9,13 +9,13 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffda-usb-wan-hotplug
+define Package/$(PKG_NAME)
   TITLE:=Automatically adds USB ethernet devices to the WAN bridge
   DEPENDS:=+gluon-core +luaposix +libubus-lua +kmod-usb-net-rndis +kmod-usb-net-ipheth +usbmuxd
 endef
 
-define Package/ffda-usb-wan-hotplug/description
+define Package/$(PKG_NAME)/description
   Automatically adds USB ethernet devices to the WAN bridge.
 endef
 
-$(eval $(call BuildPackageGluon,ffda-usb-wan-hotplug))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

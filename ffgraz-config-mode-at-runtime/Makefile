@@ -8,18 +8,18 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-config-mode-at-runtime
+define Package/$(PKG_NAME)
 	SECTION:=admin
 	CATEGORY:=Administration
-	TITLE:=ffgraz-config-mode-at-runtime
+	TITLE:=$(PKG_NAME)
 	DEPENDS:= +ffgraz-web-model
 endef
 
-define Package/ffgraz-config-mode-at-runtime/description
+define Package/$(PKG_NAME)/description
 	Enable config mode server on port 81 during runtime
 endef
 
-define Package/ffgraz-config-mode-at-runtime/install
+define Package/$(PKG_NAME)/install
 	$(Gluon/Build/Install)
 
 	$(INSTALL_DIR) $(1)/lib/gluon/config-mode-runtime/view/ $(1)/lib/gluon/config-mode-runtime/www/static/
@@ -34,4 +34,4 @@ define Package/ffgraz-config-mode-at-runtime/install
 	$(LN) /lib/gluon/config-mode/www/static/gluon.css $(1)/lib/gluon/config-mode-runtime/www/static/
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-config-mode-at-runtime))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

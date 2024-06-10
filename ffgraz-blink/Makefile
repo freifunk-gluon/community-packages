@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-blink
+define Package/$(PKG_NAME)
   TITLE:=Adds the gluon-blink command to make your current device blink
   DEPENDS:=+gluon-core
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-blink))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

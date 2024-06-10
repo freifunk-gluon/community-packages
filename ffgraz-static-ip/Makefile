@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-static-ip
+define Package/$(PKG_NAME)
   TITLE:=Static IP assignment and configuration for gluon
   DEPENDS:=+gluon-core +luci-lib-ip
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-static-ip))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

@@ -9,13 +9,13 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffda-ssh-manager
+define Package/$(PKG_NAME)
   TITLE:=Package to provide group-based SSH key management
   DEPENDS:=+gluon-core
 endef
 
-define Package/ffda-ssh-manager/description
+define Package/$(PKG_NAME)/description
   Package to provide group-based SSH key management
 endef
 
-$(eval $(call BuildPackageGluon,ffda-ssh-manager))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

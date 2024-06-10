@@ -11,10 +11,10 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-config-mode-theme-funkfeuer
+define Package/$(PKG_NAME)
 	TITLE:=Gluon config mode theme for gluon-web customized for funkfeuer
 	DEPENDS:=+gluon-core +gluon-web
 	PROVIDES:=gluon-config-mode-theme
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-config-mode-theme-funkfeuer))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

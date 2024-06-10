@@ -9,20 +9,20 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-ddhcpd-batman-adv
+define Package/$(PKG_NAME)
 	SECTION:=net
 	CATEGORY:=Network
 	DEPENDS:=+micrond +ffgraz-ddhcpd
 	TITLE:=ddhcpd batman-adv integration
 endef
 
-define Package/ffgraz-ddhcpd-batman-adv/description
+define Package/$(PKG_NAME)/description
   batman-adv integration for ddhcpd
 endef
 
-define Package/ffgraz-ddhcpd-batman-adv/install
+define Package/$(PKG_NAME)/install
 	$(call Gluon/Build/Install,$(1))
 	$(CP) ./files/* $(1)/
 endef
 
-$(eval $(call BuildPackage,ffgraz-ddhcpd-batman-adv))
+$(eval $(call BuildPackage,$(PKG_NAME)))

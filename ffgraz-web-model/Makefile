@@ -7,9 +7,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-web-model
+define Package/$(PKG_NAME)
   TITLE:=Module that adds custom web-model elements to gluon-web-model
   DEPENDS:=+gluon-web-model
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-web-model))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

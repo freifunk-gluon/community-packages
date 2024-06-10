@@ -19,14 +19,14 @@ TARGET_CFLAGS += -DLOG_LEVEL_LIMIT=5
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-ddhcpd
+define Package/$(PKG_NAME)
 	SECTION:=net
 	CATEGORY:=Network
 	DEPENDS:=+libnl-tiny
 	TITLE:=ddhcpd
 endef
 
-define Package/ffgraz-ddhcpd/description
+define Package/$(PKG_NAME)/description
 	distributed dhcp server
 endef
 
@@ -35,11 +35,11 @@ define Build/Compile
 	CFLAGS="$(TARGET_CFLAGS)" LIBNL_NAME=libnl-tiny BUILD_DIR="$(BUILD_DIR)" $(MAKE) -C $(PKG_BUILD_DIR) $(TARGET_CONFIGURE_OPTS)
 endef
 
-define Package/ffgraz-ddhcpd/install
+define Package/$(PKG_NAME)/install
 	$(call Gluon/Build/Install,$(1))
 	$(INSTALL_DIR) $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ddhcpd  $(1)/usr/sbin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ddhcpdctl $(1)/usr/sbin/
 endef
 
-$(eval $(call BuildPackage,ffgraz-ddhcpd))
+$(eval $(call BuildPackage,$(PKG_NAME)))

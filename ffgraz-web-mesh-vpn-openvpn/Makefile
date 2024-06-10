@@ -7,9 +7,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-web-mesh-vpn-openvpn
+define Package/$(PKG_NAME)
   TITLE:=gluon-web module to upload keys for openvpn mesh-vpn
   DEPENDS:=+gluon-web-admin +ffgraz-web-model +ffgraz-mesh-vpn-openvpn +lua-openssl
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-web-mesh-vpn-openvpn))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

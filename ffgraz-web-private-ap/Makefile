@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-web-private-ap
+define Package/$(PKG_NAME)
   DEPENDS:=+gluon-web-admin +ffgraz-private-ap
   TITLE:=UI for activating a private AP
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-web-private-ap))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

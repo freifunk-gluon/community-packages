@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-private-ap
+define Package/$(PKG_NAME)
   TITLE:=Provides a virtual access point for the nodes client network
   DEPENDS:=+gluon-core
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-private-ap))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

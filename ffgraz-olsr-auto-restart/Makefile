@@ -8,9 +8,9 @@ PKG_LICENSE:=MIT
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffgraz-olsr-auto-restart
+define Package/$(PKG_NAME)
   TITLE:=Automatically restart olsr
   DEPENDS:= +gluon-mesh-olsrd +micrond
 endef
 
-$(eval $(call BuildPackageGluon,ffgraz-olsr-auto-restart))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))

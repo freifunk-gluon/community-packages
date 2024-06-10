@@ -9,13 +9,13 @@ PKG_LICENSE:=GPL-2.0-or-later
 
 include $(TOPDIR)/../package/gluon.mk
 
-define Package/ffda-purge-contact-info
+define Package/$(PKG_NAME)
   TITLE:=Purge contact-info on a Gluon node
   DEPENDS:=+gluon-core
 endef
 
-define Package/ffda-purge-contact-info/description
+define Package/$(PKG_NAME)/description
   Simple package to remove user-entered contact information.
 endef
 
-$(eval $(call BuildPackageGluon,ffda-purge-contact-info))
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))
