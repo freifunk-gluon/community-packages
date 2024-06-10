@@ -216,8 +216,9 @@ elif [ "$CHECK" -eq 0 ]; then
 fi
 
 if [ $HUP_NEEDED = 1 ]; then
-	# send HUP to all hostapd to load the new SSID
-	killall -HUP hostapd
+	# HUP does not work with openwrt-23.05 somehow, use ubus reload
+	# to load the new SSID
+	ubus call hostapd reload
 	## check for nonmatching hostapd-pidfiles
 	if [ -f /lib/gluon/eulenfunk-hotfix/check_hostapd.sh ] ; then
 	   sleep 2 # settle down
