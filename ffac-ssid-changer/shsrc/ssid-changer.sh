@@ -19,7 +19,7 @@ SETTINGS_DEBUG_LOGGING="$(uci -q get ssid-changer.settings.debug_log_enabled)"
 pgrep -f autoupdater >/dev/null && safety_exit 'autoupdater running'
 UT=$(sed 's/\..*//g' /proc/uptime)
 [ "$UT" -gt 60 ] || safety_exit 'less than one minute'
-[ "$(find /var/run -name "hostapd-phy*" | wc -l)" -gt 0 ] || safety_exit 'no hostapd-phy*'
+[ "$(find /var/run -name "hostapd-*" | wc -l)" -gt 0 ] || safety_exit 'no hostapd-*'
 
 # only once every timeframe minutes the SSID will change to the Offline-SSID
 # (set to 1 minute to change immediately every time the router gets offline)
@@ -132,8 +132,8 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	log_debug "node is online"
 	LOOP=1
 	# check status for all physical devices
-	for HOSTAPD in /var/run/hostapd-phy*; do
-		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
+	for HOSTAPD in /var/run/hostapd-*; do
+		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
 		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
@@ -178,8 +178,8 @@ elif [ "$CHECK" -eq 0 ]; then
 		if [ "$OFF_COUNT" -ge $((T / 2)) ]; then
 			# node was offline more times than half of switch_timeframe (or than $FIRST)
 			LOOP=1
-			for HOSTAPD in /var/run/hostapd-phy*; do
-				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-phy* files
+			for HOSTAPD in /var/run/hostapd-*; do
+				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
 				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
