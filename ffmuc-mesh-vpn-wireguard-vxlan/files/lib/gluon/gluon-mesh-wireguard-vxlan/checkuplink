@@ -4,10 +4,17 @@
 set -eu
 # set -o pipefail # TODO: pipefail needs more rework in the script
 
+mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
+
+if [[ "${mesh_vpn_enabled}" == "0" ]]; then
+	# Stop the script if mesh_vpn is disabled
+	exit 0
+fi
+
 if { set -C; true 2>/dev/null >/var/lock/checkuplink.lock; }; then
 	trap "rm -f /var/lock/checkuplink.lock" EXIT
 else
-	echo "Lock file exists... exiting"
+	logger -p notice -t checkuplink "Lock file exists... exiting."
 	exit
 fi
 
@@ -104,8 +111,7 @@ is_loadbalancing_enabled() {
 	return 0
 }
 
-
-get_wgkex_data(){
+get_wgkex_data() {
 	local version user_agent
 	version="$1"
 	WGKEX_BROKER="$PROTO://$WGKEX_BROKER_BASE_PATH/api/$version/wg/key/exchange"
@@ -121,7 +127,7 @@ get_wgkex_data(){
 	fi
 }
 
-use_api_v1(){
+use_api_v1() {
 	WGKEX_DATA=$(get_wgkex_data v1)
 
 	# Parse the returned JSON in a Lua script
@@ -139,16 +145,14 @@ use_api_v1(){
 
 	logger -p info -t checkuplink "Selected peer $PEER"
 	PEER_HOSTPORT="$(uci get wireguard.peer_"$PEER".endpoint)"
-	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
-	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 
+	PEER_HOST="$(clean_port "$PEER_HOSTPORT")"
+	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
 	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
 	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
+	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
+	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
-
-
 
 use_api_v2() {
 	WGKEX_DATA=$(get_wgkex_data v2)
@@ -162,11 +166,11 @@ use_api_v2() {
 	fi
 
 	logger -p debug -t checkuplink "Successfully parsed wgkex broker data"
+	
 	PEER_HOST="$(echo "$data" | sed -n 1p)"
 	PEER_PORT="$(echo "$data" | sed -n 2p)"
 	PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
 	PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
-
 	PEER_ADDRESS="$(resolve_host "$PEER_HOST")"
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
 }
@@ -183,21 +187,13 @@ is_connected() {
 	return 1 # false
 }
 
-
-mesh_vpn_enabled="$(uci get wireguard.mesh_vpn.enabled)"
+# start main logic
 
 # Some legacy code seem to have used "true" instead of the canonical "1".
 # This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
-if [[ "${mesh_vpn_enabled}" != "0" ]] && [[ "${mesh_vpn_enabled}" != "1" ]]; then
+if [[ "${mesh_vpn_enabled}" != "1" ]]; then
 	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
-	mesh_vpn_enabled="1"
 fi
-
-if [[ "${mesh_vpn_enabled}" == "0" ]]; then
-	# Stop the script if mesh_vpn is disabled
-	exit 0
-fi
-
 
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
@@ -206,9 +202,7 @@ then
 	uci commit wireguard
 fi
 
-
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
-
 
 # Check connectivity to supernode
 if is_connected; then
@@ -244,7 +238,7 @@ set +o pipefail # Disable pipefail: this script does not fully support pipefail 
 # shellcheck disable=SC2086 # otherwise ntpd cries
 if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
 then
-	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}."
+	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}... exiting."
 	exit 3
 fi
 
@@ -310,7 +304,7 @@ fi
 # Bring up VXLAN
 if ! ip link add mesh-vpn type vxlan id "$(lua -e 'print(tonumber(require("gluon.util").domain_seed_bytes("gluon-mesh-vpn-vxlan", 3), 16))')" local "${LINKLOCAL}" remote "$PEER_LINKADDRESS" dstport 8472 dev "$MESH_VPN_IFACE"
 then
-	logger -p err -t checkuplink "Unable to create mesh-vpn interface"
+	logger -p err -t checkuplink "Unable to create mesh-vpn interface... exiting."
 	exit 2
 fi
 ip link set up dev mesh-vpn
@@ -321,7 +315,7 @@ batctl hardif mesh-vpn throughput_override 1000mbit;
 
 # Check again if connected
 if ! is_connected; then
-	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings"
+	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings... exiting."
 	exit 4
 fi
 
