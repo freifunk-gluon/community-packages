@@ -132,8 +132,9 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	log_debug "node is online"
 	LOOP=1
 	# check status for all physical devices
-	for HOSTAPD in /var/run/hostapd-*; do
+	for HOSTAPD in /var/run/hostapd-*.conf; do
 		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
+		grep "^bridge=br-client" "$HOSTAPD" || break # handle case of private wifi
 		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
@@ -178,8 +179,9 @@ elif [ "$CHECK" -eq 0 ]; then
 		if [ "$OFF_COUNT" -ge $((T / 2)) ]; then
 			# node was offline more times than half of switch_timeframe (or than $FIRST)
 			LOOP=1
-			for HOSTAPD in /var/run/hostapd-*; do
+			for HOSTAPD in /var/run/hostapd-*.conf; do
 				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
+				grep "^bridge=br-client" "$HOSTAPD" || break # handle case of private wifi
 				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
