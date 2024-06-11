@@ -134,14 +134,14 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 	# check status for all physical devices
 	for HOSTAPD in /var/run/hostapd-*.conf; do
 		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
-		grep "^bridge=br-client" "$HOSTAPD" > /dev/null || break # handle case of private wifi
+		grep "^bridge=br-client" "$HOSTAPD" > /dev/null || continue # handle case of private wifi
 		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
 		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
 			log_debug "SSID $CURRENT_SSID is correct, nothing to do"
-			break
+			continue
 		fi
 		CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 		if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
@@ -181,14 +181,14 @@ elif [ "$CHECK" -eq 0 ]; then
 			LOOP=1
 			for HOSTAPD in /var/run/hostapd-*.conf; do
 				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
-				grep "^bridge=br-client" "$HOSTAPD" || break # handle case of private wifi
+				grep "^bridge=br-client" "$HOSTAPD" || continue # handle case of private wifi
 				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
 				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
 					log_debug "SSID $CURRENT_SSID is correct, nothing to do"
-					break
+					continue
 				fi
 				CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
 				if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
