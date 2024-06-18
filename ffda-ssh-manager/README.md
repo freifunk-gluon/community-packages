@@ -30,7 +30,7 @@ If you omit default settings from your `site.conf`, ssh-manager will automatical
 selected.
 
 
-## Append behvaior
+## Append behavior
 
 In case a key is defined in multiple activated groups, the key will only be appended once to `authorized_keys`.
 

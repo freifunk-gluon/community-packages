@@ -4,7 +4,7 @@ local uci = require('simple-uci').cursor()
 local site = require('gluon.site')
 
 local dropbear_key_path = '/etc/dropbear/authorized_keys'
-local ssh_manager_seperator = '# Begin managed keys'
+local ssh_manager_separator = '# Begin managed keys'
 local ssh_manager_key_trailer = ' # managed key'
 
 local uci_package = 'ffda-ssh-manager'
@@ -17,8 +17,8 @@ local function line_is_trailed_key(line)
 	return string.match(line, ssh_manager_key_trailer .. '$')
 end
 
-local function line_is_seperator(line)
-	return string.match(line, '^' .. ssh_manager_seperator ..  '$')
+local function line_is_separator(line)
+	return string.match(line, '^' .. ssh_manager_separator ..  '$')
 end
 
 local function line_is_empty(line)
@@ -36,7 +36,7 @@ local function delete_managed_keys()
 	end
 
 	for line in file:lines() do
-		if not line_is_trailed_key(line) and not line_is_seperator(line) and not line_is_empty(line) then
+		if not line_is_trailed_key(line) and not line_is_separator(line) and not line_is_empty(line) then
 			table.insert(lines, line)
 		end
 	end
@@ -67,7 +67,7 @@ local function write_keys(key_table)
 	local file = io.open(dropbear_key_path, 'a')
 
 	file:write('\n')
-	file:write(ssh_manager_seperator, '\n')
+	file:write(ssh_manager_separator, '\n')
 	for _, key in ipairs(key_table) do
 		file:write(key .. ssh_manager_key_trailer, '\n')
 	end
