@@ -1,0 +1,117 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+local unistd = require 'posix.unistd'
+local util = require 'gluon.util'
+local wireless = require 'gluon.wireless'
+
+local prog_name = 'ffh-wifi-offline-ssid'
+local offline_file = '/tmp/ffh-offline-ffh_wifi_offline'
+
+local disabled = (uci:get('ffh-wifi-offline-ssid', 'settings', 'disabled') == '1') or false
+if disabled then
+	print(prog_name .. " is disabled. Exiting...")
+	os.exit(0)
+end
+
+local threshold_mins = tonumber(uci:get(prog_name, 'settings', 'threshold')) or 0
+
+local uptime_mins = math.floor(util.get_uptime() / 60)
+local offline_mins = uptime_mins
+if unistd.access(offline_file) then
+	offline_mins = uptime_mins - (tonumber(util.readfile(offline_file)) or 0)
+end
+
+if arg[1] == "offline" and offline_mins < threshold_mins then
+	print((threshold_mins - offline_mins) .. ' minutes remaining until the node is considered offline. Exiting...')
+	os.exit(0)
+end
+
+local phys = {count = 0}
+uci:foreach('wireless', 'wifi-device', function(config)
+	local phy = wireless.find_phy(config)
+	if phy then
+		phys[config['.name']] = phy
+		phys['count'] = phys['count'] + 1
+	end
+end)
+
+if phys['count'] == 0 then
+	print('No radios detected. Exiting...')
+	os.exit(0)
+end
+
+local ssids = {}
+uci:foreach('wireless', 'wifi-iface', function(config)
+	if config['mode'] == 'ap' and config['network'] == 'client' and config['ssid'] then
+		table.insert(ssids, {ssid = config['ssid'], phy = phys[config['device']]})
+	end
+end)
+
+if #ssids == 0 then
+	print('No client networks active. Exiting...')
+	os.exit(0)
+end
+
+-- Use something short to leave space for the hostname
+-- (no '~' allowed!)
+local prefix = uci:get(prog_name, 'settings', 'prefix') or 'Offline_'
+
+-- Generate the SSID either with 'hostname', 'mac' or only using the prefix
+local settings_suffix = uci:get(prog_name, 'settings', 'suffix') or 'hostname'
+
+local suffix = ''
+if settings_suffix == 'hostname' then
+	local pretty_hostname = require 'pretty_hostname'
+	suffix = pretty_hostname.get(uci)
+	-- 32 would be possible as well
+	if (string.len(suffix) > 30 - string.len(prefix)) then
+		-- Calculate the length of the first part of the node identifier in the offline-ssid
+		local half = math.floor((28 - string.len(prefix)) / 2)
+		-- Jump to this character for the last part of the name
+		local skip = string.len(suffix) - half
+		-- Use the first and last part of the nodename for nodes with long name
+		suffix = string.sub(suffix, 0, half) .. '...' .. string.sub(suffix, skip)
+	end
+elseif settings_suffix == 'mac' then
+	local sysconfig = require 'gluon.sysconfig'
+	suffix = sysconfig.primary_mac
+end
+
+local offline_ssid = prefix .. suffix
+
+local hup_needed = 0
+local ssid_grep = 'grep "^ssid='
+for _, ssid in ipairs(ssids) do
+	local hostapd = '/var/run/hostapd-' .. ssid.phy .. '.conf'
+	
+	if arg[1] == "offline" then
+		old_ssid = ssid.ssid
+		new_ssid = offline_ssid
+	else
+		old_ssid = offline_ssid
+		new_ssid = ssid.ssid
+	end
+
+	if os.execute(ssid_grep .. new_ssid .. '" ' .. hostapd) == 0 then
+		print('Current SSID "' .. new_ssid .. '" for ' .. ssid.phy .. ' is already correct. Skipping...')
+		break
+	end
+
+	-- Confirm that the old SSID was set
+	if os.execute(ssid_grep .. old_ssid .. '" ' .. hostapd) ~= 0 then
+		util.log(prog_name .. ': Warning: Neither found SSID "' .. ssid.ssid .. '" nor "' .. offline_ssid .. '" on ' .. ssid.phy .. '.')
+	end
+
+	local current_ssid = util.trim(util.exec(ssid_grep .. '" ' .. hostapd .. ' | cut -d"=" -f2'))
+
+	util.log(prog_name .. ': Current SSID is "' .. current_ssid .. '". Changing it to "' .. new_ssid .. '"...')
+	os.execute('sed -i "s~^ssid=' .. current_ssid .. '~ssid=' .. new_ssid .. '~" ' .. hostapd)
+	hup_needed = 1
+end
+
+-- Send hup to all hostapd instances to apply the new SSID(s)
+if hup_needed == 1 then
+	print("Applying new SSIDs...")
+	os.execute('killall -hup hostapd')
+end
