@@ -12,6 +12,10 @@ local uci = require('simple-uci').cursor()
 
 -- Use GPS as Stream
 local file = io.open(TTY_DEVICE, "r")
+if not file then
+    print("Error: Unable to open " .. TTY_DEVICE)
+    os.exit(2)
+end
 
 while true do
     local this_line = file:read("*line")
