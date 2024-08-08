@@ -1,0 +1,7 @@
+# map mac addresses to names for batctl
+# format:
+# <mac> <name>
+# Note names should not contian spaces
+
+# example:
+00:1f:16:12:8f:ae chrissi-korolev-eth
