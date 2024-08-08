@@ -1,0 +1,53 @@
+#!/bin/sh
+
+export WG_COLOR_MODE=never
+
+run_command() {
+    echo ">>>>> $1 @ $(date -Iseconds): Start >>>>>"
+    eval "$1" 2>&1
+    echo "<<<<< $1 @ $(date -Iseconds): Stop (exit=$?) <<<<<"
+}
+
+run_command "uci get system.@system[0].pretty_hostname"
+run_command "status"
+run_command "ps w"
+run_command "ip addr"
+run_command "ip -4 route show"
+run_command "ip -6 route show"
+run_command "wg show"
+run_command "cat /tmp/gluon/wan-dnsmasq/resolv.conf"
+run_command "cat /tmp/state/network"
+run_command "dmesg"
+run_command "logread"
+run_command "uci show"
+run_command "free -h"
+run_command "df -h"
+run_command "cat /proc/version"
+run_command "cat /proc/meminfo"
+run_command "cat /proc/vmstat"
+run_command "cat /proc/cpuinfo"
+run_command "iptables -t filter -vnL"
+run_command "iptables -t mangle -vnL"
+run_command "iptables -t nat -vnL"
+run_command "ebtables-tiny -t filter -L"
+run_command "ebtables-tiny -t broute -L"
+run_command "ebtables-tiny -t nat -L"
+run_command "ip neigh"
+run_command "cat /proc/net/dev"
+run_command "cat /proc/interrupts"
+for cmd in interface backbonetable claimtable dat_cache gateways mcast_flags neighbors originators transglobal translocal; do
+    run_command "batctl $cmd"
+done
+run_command "iw phy"
+run_command "iw dev"
+run_command "iw reg get"
+for dev in client0 client1; do
+    run_command "iw dev $dev survey dump"
+    run_command "iw dev $dev station dump -v"
+done
+for mesh in mesh0 mesh1; do
+    run_command "iw dev $mesh station dump -v"
+    run_command "iw dev $mesh mpath dump"
+    run_command "iw dev $mesh mpp dump"
+done
+run_command "cat /sys/kernel/debug/crashlog"
