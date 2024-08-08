@@ -1,0 +1,24 @@
+#!/bin/sh
+TTYPATH="/sys${DEVPATH}/tty"
+lockpath="/var/lock/update-location-gps_${DEVNAME}.lock"
+
+if [ "${ACTION}" = "add" ]; then
+	enabled=$(uci get update-location-gps.settings.enabled)
+	[ "${enabled}" != "1" ] && exit 0
+	test -e "${lockpath}" && exit 0
+	if test -e  "${TTYPATH}"; then
+		echo "hotplug-update-location-gps: TTY device ${DEVNAME} was plugged in" > /dev/kmsg
+		echo "${DEVPATH}" > "${lockpath}"
+		echo "*/5 * * * *  /usr/bin/update-location-gps /dev/${DEVNAME} | logger -t update-location-gps" > "/usr/lib/micron.d/update-location-gps_${DEVNAME}"
+		/etc/init.d/micrond restart
+	fi
+fi
+
+if [ "${ACTION}" = "remove" ]; then
+	if [ "${DEVPATH}" = "$(cat "${lockpath}")" ]; then
+		echo "hotplug-update-location-gps: TTY device ${DEVNAME} was removed" > /dev/kmsg
+		rm -f "/usr/lib/micron.d/update-location-gps_${DEVNAME}"
+		/etc/init.d/micrond restart
+		rm "${lockpath}"
+	fi
+fi
