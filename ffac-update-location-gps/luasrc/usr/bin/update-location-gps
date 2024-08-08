@@ -5,21 +5,50 @@ if not arg[1] then
     os.exit(1)
 end
 
--- Get GPS device tty
-local TTY_DEVICE = arg[1]
-
 local uci = require('simple-uci').cursor()
+local bit = require 'bit'
+local fcntl = require 'posix.fcntl'
+local unistd = require 'posix.unistd'
+
+-- Get GPS device tty
+local tty_device = arg[1]
 
 -- Use GPS as Stream
-local file = io.open(TTY_DEVICE, "r")
+local file = io.open(tty_device, "r")
 if not file then
-    print("Error: Unable to open " .. TTY_DEVICE)
+    print("Error: Unable to open " .. tty_device)
     os.exit(2)
 end
 
-while true do
+local lockfilename = "/var/lock/update-location-gps_" .. string.gsub(tty_device, "/", "_")
+
+local lockfd, err = fcntl.open(lockfilename, bit.bor(fcntl.O_WRONLY, fcntl.O_CREAT), 384) -- mode 0600
+if not lockfd then
+  print('err', err)
+  local err_verbose = string.format("Unable to get file descriptor for lock file %s .", lockfilename)
+  print('err', err_verbose)
+  os.exit(1)
+end
+
+local ok, _ = fcntl.fcntl(lockfd, fcntl.F_SETLK, {
+  l_start = 0,
+  l_len = 0,
+  l_type = fcntl.F_WRLCK,
+  l_whence = unistd.SEEK_SET,
+})
+if not ok then
+  -- silent as this is run in cron
+  os.exit(1)
+end
+
+local line_count = 0
+local max_lines = 50
+
+while line_count < max_lines do
     local this_line = file:read("*line")
     if not this_line then break end  -- Exit loop if no more lines
+
+    line_count = line_count + 1  -- Increment the line counter
 
     local nc = this_line:match("^([^,]+)")
 
