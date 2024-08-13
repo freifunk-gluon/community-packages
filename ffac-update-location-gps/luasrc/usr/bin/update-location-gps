@@ -93,7 +93,6 @@ while line_count < max_lines do
 
             print("GPS position is valid Lat/Lon:", lat, lon)
             -- set temp location in gluon-node-info
-            uci:set('gluon-node-info', '@location[0]', 'share_location', '1')
             uci:set('gluon-node-info', '@location[0]', 'latitude', lat)
             uci:set('gluon-node-info', '@location[0]', 'longitude', lon)
             uci:save('gluon-node-info')
