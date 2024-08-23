@@ -9,10 +9,14 @@ It seems to work without coreutils-stty installed, which did fail the installati
 The location is only updated in memory - and only if a valid GPS fix is available.
 After a reboot, the old location from the config is set.
 
-## hotplug limitation
+## behvario and lockfiles
 
-After a sysupgrade/autoupdate - the USB dongle has to be unplugged and plugged in once for the detection to work again.
-For reboots, this works fine as is.
+This creates a lockfile `/var/lock/hotplug-update-location-gps_$DEVNAME.lock` per found TTY device and sets up a cron job which runs every 5 minutes to check if coordinates are available from the stream.
+If the TTY is not in use, the open stream waits for the first line to be read (never) and is stuck.
+A lockfile `/var/lock/update-location-gps_$TTYDEVICE` is used to check if the cron is already running/stuck and does not start another reading terminal in that case.
+
+On creation and removal of the micron.d job, the micron.d service is restarted
+
 
 ## further information
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 TTYPATH="/sys${DEVPATH}/tty"
-lockpath="/var/lock/update-location-gps_${DEVNAME}.lock"
+lockpath="/var/lock/hotplug-update-location-gps_${DEVNAME}.lock"
 
 if [ "${ACTION}" = "add" ]; then
 	enabled=$(uci get update-location-gps.settings.enabled)
