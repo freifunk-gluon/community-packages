@@ -1,5 +1,5 @@
 #!/bin/sh
-if ls /sys/kernel/debug/ieee80211/phy*/mt76/rf_regval > /dev/null && ! cat /sys/kernel/debug/ieee80211/phy*/mt76/rf_regval > /dev/null; then
+if ls /sys/kernel/debug/ieee80211/phy*/mt76/rf_regval 2>&1 > /dev/null && ! cat /sys/kernel/debug/ieee80211/phy*/mt76/rf_regval > /dev/null; then
     logger -s -t "ffac-mt7915-hotfix" -p err "wifi firmware crashed, scheduled reboot in 5 seconds"
     sleep 5
     # Autoupdate?
