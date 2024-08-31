@@ -1,0 +1,9 @@
+# Map mac addresses to names for batctl
+# Format:
+# <mac> <name>
+#
+# For your convenience the following script populates this file for you:
+# $ update-bat-hosts <url-to-nodes-json> [--gw]
+
+# example:
+00:1f:16:12:8f:ae chrissi-korolev-eth

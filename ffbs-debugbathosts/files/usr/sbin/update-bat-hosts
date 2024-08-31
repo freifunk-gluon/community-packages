@@ -1,0 +1,95 @@
+#!/usr/bin/lua
+-- SPDX-FileCopyrightText: Florian Maurer
+-- SPDX-License-Identifier: MIT
+
+local jsonc = require("jsonc")
+
+local function truncate_hostname(hostname, max_length)
+    -- If the hostname is already within the maximum length, return it as is
+    if #hostname <= max_length then
+        return hostname
+    end
+
+    -- Define the number of characters to keep at the start and end
+    local keep_start = math.floor((max_length - 3) / 2)
+    local keep_end = max_length - 3 - keep_start
+
+    -- Concatenate the start, ellipses, and end of the hostname
+    return hostname:sub(1, keep_start) .. "..." .. hostname:sub(-keep_end)
+end
+
+-- Function to fetch JSON data using wget
+local function fetch_json_from_url(url)
+    local tmpfile = "/tmp/nodes.json" -- Temporary file to store the downloaded JSON data
+    local success = os.execute("wget -q -O " .. tmpfile .. " " .. url)
+    if success > 0 then
+        error("Failed to download JSON file from " .. url)
+    end
+    local file = io.open(tmpfile, "r")
+    if not file then
+        error("Failed to open the downloaded JSON file")
+    end
+
+    local json_data = file:read("*all")
+    file:close()
+
+    return json_data
+end
+
+-- Function to parse the JSON data and output MAC addresses with hostnames
+local function parse_and_print_mac_addresses(json_data, gateway_only)
+    local data = jsonc.parse(json_data)
+    if not data then
+        error("Failed to parse JSON data")
+    end
+    local seen_hostnames = {} -- Table to keep track of seen hostnames
+
+    local file = io.open("/tmp/bat-hosts", "w")
+    if not file then
+        error("Failed to open /tmp/bat-hosts")
+    end
+
+    file:write("# map mac addresses to names for batctl\n")
+    file:write("# format:\n")
+    file:write("# <mac> <name>\n")
+    file:write("#\n")
+    file:write("# For your convenience the following script populates this file for you:\n")
+    file:write("# $ update-bat-hosts <url-to-nodes-json> [--gw]\n\n")
+
+    -- Iterate over nodes and extract MAC addresses with corresponding hostnames
+    for _, node in ipairs(data.nodes) do
+        local hostname = truncate_hostname(node.nodeinfo.hostname:gsub("%s", "-"), 30)
+        local mesh = node.nodeinfo.network.mesh
+
+        -- only parse if gateway filter is off or is gateway
+        -- and if mesh info exists and host was not seen yet (otherwise this would give warnings)
+        if (not gateway_only or node.flags.gateway) and mesh and not seen_hostnames[hostname] then
+            seen_hostnames[hostname] = true
+            for _, mesh_interface in pairs(mesh) do
+                local interfaces = mesh_interface.interfaces
+                -- Loop through wireless, other, and tunnel interfaces
+                for iface, mac_list in pairs(interfaces) do
+                    for idx, mac in ipairs(mac_list) do
+                        file:write(mac .. " " .. hostname .. "-" .. iface .. "" .. idx .. "\n")
+                    end
+                end
+            end
+        end
+    end
+end
+
+if #arg == 0 then
+   print("Useage: update-bat-hosts <nodes.json url> [--gw]")
+   os.exit(1)
+end
+
+local url = arg[1]
+
+local gateway_only = false
+if #arg == 2 and arg[2] == '--gw' then
+    gateway_only = true
+end
+
+local json_data = fetch_json_from_url(url)
+parse_and_print_mac_addresses(json_data, gateway_only)
+os.execute("mv /tmp/bat-hosts /etc/bat-hosts")
