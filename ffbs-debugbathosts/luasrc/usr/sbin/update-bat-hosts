@@ -79,14 +79,14 @@ local function parse_and_print_mac_addresses(json_data, gateway_only)
 end
 
 if #arg == 0 then
-   print("Useage: update-bat-hosts <nodes.json url> [--gw]")
+   print("Useage: update-bat-hosts <nodes.json url> [--gw-only]")
    os.exit(1)
 end
 
 local url = arg[1]
 
 local gateway_only = false
-if #arg == 2 and arg[2] == '--gw' then
+if #arg == 2 and arg[2] == '--gw-only' then
     gateway_only = true
 end
 
