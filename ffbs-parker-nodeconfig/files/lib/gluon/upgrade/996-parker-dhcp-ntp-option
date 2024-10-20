@@ -1,7 +1,9 @@
 #!/usr/bin/lua
 
+local site = require 'gluon.site'
+local ntp_server = site.ntp_servers()[1]
 
 local uci = require('uci')
 local x = uci.cursor()
-x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,172.16.0.123'})
+x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,' .. ntp_server})
 x:commit('dhcp')    
