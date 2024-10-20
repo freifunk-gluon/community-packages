@@ -1,0 +1,7 @@
+#!/usr/bin/lua
+
+
+local uci = require('uci')
+local x = uci.cursor()
+x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,172.16.0.123'})
+x:commit('dhcp')    

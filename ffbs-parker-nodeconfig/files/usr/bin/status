@@ -1,0 +1,37 @@
+#!/bin/sh
+
+tmpdir=/tmp/ff-Ohb0ba0u/
+
+brief_interface() {
+	echo `ip a show dev $1 | grep state | awk '{print $9}'` `ip a show dev $1 | grep inet | awk '{ print $2}'`
+}
+
+echo -n 'gluon model:         '; cat /tmp/sysinfo/model
+echo -n 'gluon release:       '; cat /lib/gluon/release
+echo -n 'uname:               '; uname -a
+echo -n 'autoupdater:         '
+if [ $(uci get autoupdater.settings.enabled) == "1" ]; then echo "enabled ($(uci get autoupdater.settings.branch))"; else echo "disabled"; fi
+echo -n 'uptime:             '; uptime
+echo -n 'available memory:    '; awk '( $1 == "MemAvailable:" ) { printf("%.1f MiB\n", $2/1024) }' /proc/meminfo
+echo -n 'available flash:     '; df -h / | awk '( $6 == "/" ) { print $4 " " $5 }'
+
+if ip a | grep -q "br-setup"; then
+
+	echo    'Node in setup mode'
+
+else
+
+	echo -n 'batman gateway mode: '; batctl gw_mode
+	echo -n 'batman neighbours:   '; batctl n -H | wc -l
+	echo -n 'uplink status:       '; brief_interface 'br-wan'
+	echo -n 'mesh status:         '; brief_interface 'br-client'
+	echo -n 'nodeconfig:          '; cat /tmp/nodeconfig-report; echo
+	echo -n 'vpn status:          '; if uci show gluon.mesh_vpn.enabled | grep -q '1' ; then echo enabled; else echo disabled; fi
+	echo 'dhcp clients:'
+	awk '{ printf("  %-32s  %s  %-16s  %ds left\n", $4, $2, $3, $1-systime()) }' /tmp/dhcp.leases | sort
+	echo 'wireguard handshakes:'
+	wg show all latest-handshakes | awk '{ printf("  %-8s  %8ds ago\n", $1, systime()-$3) }'
+	if [ ! -e ${tmpdir}/nodeconfig-successful ]; then echo !!! nodeconfig-serice did not yet run. Give the node some more time to start up.; fi
+	if [ ! -e ${tmpdir}/noderoute-successful ]; then echo !!! noderoute-serice did not yet run. Give the node some more time to start up.; fi
+fi
+

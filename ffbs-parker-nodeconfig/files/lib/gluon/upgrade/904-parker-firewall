@@ -1,0 +1,103 @@
+#!/bin/sh
+
+# this script adds rules needed for parker to the
+# gluon firewall-setup.
+
+# allow dhcpv4 on br-client
+uci set firewall.mesh_dhcpv4_parker='rule'
+uci set firewall.mesh_dhcpv4_parker.dest_port=67
+uci set firewall.mesh_dhcpv4_parker.src='mesh'
+uci set firewall.mesh_dhcpv4_parker.target='ACCEPT'
+uci set firewall.mesh_dhcpv4_parker.proto='udp'
+uci set firewall.mesh_dhcpv4_parker.family='ipv4'
+
+# allow dns on br-client
+uci set firewall.mesh_dns_parker='rule'
+uci set firewall.mesh_dns_parker.dest_port=53
+uci set firewall.mesh_dns_parker.src='mesh'
+uci set firewall.mesh_dns_parker.target='ACCEPT'
+uci set firewall.mesh_dns_parker.proto='tcpudp'
+
+# allow ICMPv4 on br-client
+uci set firewall.mesh_ICMPv4_parker='rule'
+uci set firewall.mesh_ICMPv4_parker.icmp_type='echo-request'
+uci set firewall.mesh_ICMPv4_parker.src='mesh'
+uci set firewall.mesh_ICMPv4_parker.family='ipv4'
+uci set firewall.mesh_ICMPv4_parker.target='ACCEPT'
+uci set firewall.mesh_ICMPv4_parker.proto='icmp'
+
+# allow ICMPv4 on vpn_parker
+uci set firewall.vpn_parker_ICMPv4_parker='rule'
+uci set firewall.vpn_parker_ICMPv4_parker.icmp_type='echo-request'
+uci set firewall.vpn_parker_ICMPv4_parker.src='vpn_parker'
+uci set firewall.vpn_parker_ICMPv4_parker.family='ipv4'
+uci set firewall.vpn_parker_ICMPv4_parker.target='ACCEPT'
+uci set firewall.vpn_parker_ICMPv4_parker.proto='icmp'
+
+# add a zone for all the wc_c+ -interfaces
+uci set firewall.vpn_parker='zone'
+uci set firewall.vpn_parker.device='wg_c+'
+uci set firewall.vpn_parker.input='REJECT'
+uci set firewall.vpn_parker.output='ACCEPT'
+uci set firewall.vpn_parker.forward='REJECT'
+uci set firewall.vpn_parker.name='vpn_parker'
+uci set firewall.vpn_parker.mtu_fix='1'
+
+# allow forwarding between br-client and wg_c+ -interfaces
+uci set firewall.mesh_vpn_parker='forwarding'
+uci set firewall.mesh_vpn_parker.src='mesh'
+uci set firewall.mesh_vpn_parker.dest='vpn_parker'
+
+uci set firewall.vpn_parker_mesh='forwarding'
+uci set firewall.vpn_parker_mesh.src='vpn_parker'
+uci set firewall.vpn_parker_mesh.dest='mesh'
+
+# allow respondd to be reached from mesh an vpn_parker
+uci set firewall.respondd_mesh_parker=rule
+uci set firewall.respondd_mesh_parker.dest_port='1001'
+uci set firewall.respondd_mesh_parker.name='respondd_mesh_parker'
+uci set firewall.respondd_mesh_parker.src_ip='2001:bf7:381::/64'
+uci set firewall.respondd_mesh_parker.target='ACCEPT'
+uci set firewall.respondd_mesh_parker.proto='udp'
+uci set firewall.respondd_mesh_parker.src='mesh'
+
+uci set firewall.respondd_vpn_parker_mesh=rule
+uci set firewall.respondd_vpn_parker_mesh.dest_port='1001'
+uci set firewall.respondd_vpn_parker_mesh.name='respondd_vpn_parker_mesh'
+uci set firewall.respondd_vpn_parker_mesh.src_ip='2001:bf7:381::/64'
+uci set firewall.respondd_vpn_parker_mesh.target='ACCEPT'
+uci set firewall.respondd_vpn_parker_mesh.proto='udp'
+uci set firewall.respondd_vpn_parker_mesh.src='vpn_parker'
+
+# allow ICMPv6 from vpn_parker
+uci set firewall.vpn_parker_ICMPv6_in_parker=rule
+uci set firewall.vpn_parker_ICMPv6_in_parker.icmp_type='echo-request'
+uci set firewall.vpn_parker_ICMPv6_in_parker.src='vpn_parker'
+uci set firewall.vpn_parker_ICMPv6_in_parker.limit='1000/sec'
+uci set firewall.vpn_parker_ICMPv6_in_parker.family='ipv6'
+uci set firewall.vpn_parker_ICMPv6_in_parker.target='ACCEPT'
+uci set firewall.vpn_parker_ICMPv6_in_parker.proto='icmp'
+
+# allow SSH via tunnel
+uci set firewall.vpn_parker_ssh=rule
+uci set firewall.vpn_parker_ssh.dest_port='22'
+uci set firewall.vpn_parker_ssh.src='vpn_parker'
+uci set firewall.vpn_parker_ssh.name='vpn_parker_ssh'
+uci set firewall.vpn_parker_ssh.target='ACCEPT'
+uci set firewall.vpn_parker_ssh.proto='tcp'
+
+# allow HTTP via tunnel
+uci set firewall.vpn_parker_http=rule
+uci set firewall.vpn_parker_http.dest_port='80'
+uci set firewall.vpn_parker_http.src='vpn_parker'
+uci set firewall.vpn_parker_http.name='vpn_parker_ssh'
+uci set firewall.vpn_parker_http.target='ACCEPT'
+uci set firewall.vpn_parker_http.proto='tcp'
+
+# skip wan table rules created by netifd with prio 20000
+uci set network.wan_skip=rule
+uci set network.wan_skip.priority=15000
+uci set network.wan_skip.lookup=main
+uci set network.wan6_skip=rule6
+uci set network.wan6_skip.priority=15000
+uci set network.wan6_skip.lookup=main

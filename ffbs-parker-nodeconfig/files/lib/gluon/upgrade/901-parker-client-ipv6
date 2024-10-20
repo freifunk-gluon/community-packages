@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# create an interface to allow the node to
+# get a ipv6 address on br-client
+
+uci set network.client6=interface
+uci set network.client6.ifname='br-client'
+uci set network.client6.proto='dhcpv6'
+uci set network.client6.sourcefilter='0'
+uci set network.client6.peerdns='0'
+uci set network.client6.reqprefix='no'
+
+# allow client to get an ipv4 address by default
+uci set network.client.proto='dhcp'
+
+uci commit
