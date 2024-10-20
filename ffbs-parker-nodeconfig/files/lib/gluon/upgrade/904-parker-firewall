@@ -52,11 +52,10 @@ uci set firewall.vpn_parker_mesh='forwarding'
 uci set firewall.vpn_parker_mesh.src='vpn_parker'
 uci set firewall.vpn_parker_mesh.dest='mesh'
 
-# allow respondd to be reached from mesh an vpn_parker
+# allow respondd to be reached from mesh and vpn_parker
 uci set firewall.respondd_mesh_parker=rule
 uci set firewall.respondd_mesh_parker.dest_port='1001'
 uci set firewall.respondd_mesh_parker.name='respondd_mesh_parker'
-uci set firewall.respondd_mesh_parker.src_ip='2001:bf7:381::/64'
 uci set firewall.respondd_mesh_parker.target='ACCEPT'
 uci set firewall.respondd_mesh_parker.proto='udp'
 uci set firewall.respondd_mesh_parker.src='mesh'
@@ -64,7 +63,6 @@ uci set firewall.respondd_mesh_parker.src='mesh'
 uci set firewall.respondd_vpn_parker_mesh=rule
 uci set firewall.respondd_vpn_parker_mesh.dest_port='1001'
 uci set firewall.respondd_vpn_parker_mesh.name='respondd_vpn_parker_mesh'
-uci set firewall.respondd_vpn_parker_mesh.src_ip='2001:bf7:381::/64'
 uci set firewall.respondd_vpn_parker_mesh.target='ACCEPT'
 uci set firewall.respondd_vpn_parker_mesh.proto='udp'
 uci set firewall.respondd_vpn_parker_mesh.src='vpn_parker'
