@@ -1,4 +1,4 @@
-ffbs-parker-nodeconfig
+ffbs-mesh-vpn-parker
 ======================
 
 This is the core package of [gluon-parker](https://github.com/ffbs/gluon-parker),
