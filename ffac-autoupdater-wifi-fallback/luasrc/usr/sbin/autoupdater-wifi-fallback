@@ -5,6 +5,8 @@ local util = require 'gluon.util'
 local bit = require 'bit'
 local fcntl = require 'posix.fcntl'
 local unistd = require 'posix.unistd'
+local ubus = require('ubus').connect()
+local wireless = require 'gluon.wireless'
 
 local configname = 'autoupdater-wifi-fallback'
 local lockfilename = '/var/lock/' .. configname .. '.lock'
@@ -95,30 +97,22 @@ end
 
 local function switch_to_fallback_mode(radio, ssid, bssid)
   autil.log('out', 'connecting to '  .. radio .. ' ' .. ssid .. ' ' .. bssid)
-  uci:delete_all('wireless', 'wifi-iface')
-  uci:section('wireless', 'wifi-iface', 'fallback', {
-    device = radio,
-    network = 'fallback',
-    mode = 'sta',
-    disabled = false,
-    macaddr = util.generate_mac(3, 10),
-    bssid = bssid,
-    ssid = ssid,
-    ifname = 'fallback',
-    encryption = 'none',
-  })
-  uci:set('wireless', radio, 'disabled', false)
-  uci:save('wireless')
-
-  os.execute('wifi')
-  os.execute('sleep 5')
-  uci:revert('wireless')
+  os.execute('sleep 2')
+  ubus:call('network', 'add_dynamic', {name = "fallback", ifname = "fallback", proto = "dhcp", device = "fallback", l3_device = "fallback"})
+  ubus:call('network', 'add_dynamic', {name = "fallback6", ifname = "fallback", proto = "dhcpv6", device = "fallback", l3_device = "fallback"})
+  ubus:call('network.interface.fallback', 'add_device', {name = "fallback"})
+  ubus:call('network.interface.fallback6', 'add_device', {name = "fallback"})
+  ubus:call('network.interface.fallback', 'up', {})
+  ubus:call('network.interface.fallback6', 'up', {})
+  os.execute('sleep 2')
+  os.execute('iw dev fallback connect ' .. ssid .. ' ' .. bssid)
   os.execute('sleep 20')
 end
 
 local function revert_to_standard_mode()
   autil.log('out', 'going back to standard mode')
-  os.execute('/etc/init.d/network restart')
+  os.execute('/etc/init.d/wpad start')
+  os.execute('wifi up')
   os.execute('sleep 30')
 end
 
@@ -142,15 +136,28 @@ if (force or preflight_check()) and not connectivity_check() then
 
   if force or tonumber(unreachable_since) + offset < os.time() then
     autil.log('out', 'going to fallback mode')
+    os.execute('wifi down')
+    os.execute('/etc/init.d/wpad status >/dev/null && /etc/init.d/wpad stop')
     for radio, netlist in pairs(autil.get_available_wifi_networks()) do
+      local radio_config = uci:get_all('wireless', radio)
+      local phy = wireless.find_phy(radio_config)
+      autil.log('out', 'using ' .. phy .. ' to create fallback interface')
+      os.execute('iw phy ' .. phy .. ' interface add fallback type managed')
+      os.execute('ip link set dev fallback up')
       for _, net in ipairs(netlist) do
         switch_to_fallback_mode(radio, net.ssid, net.bssid)
         if run_autoupdater() == 0 then
           break
         end
+        ubus:call('network.interface.fallback', 'down', {})
+        ubus:call('network.interface.fallback', 'remove', {})
+        ubus:call('network.interface.fallback6', 'down', {})
+        ubus:call('network.interface.fallback6', 'remove', {})
+        os.execute('iw dev fallback disconnect')
       end
+      os.execute('iw dev fallback del')
     end
-    -- this is only reached if no updated happened
+    -- this is only reached if no update happened
     revert_to_standard_mode()
   end
 else
