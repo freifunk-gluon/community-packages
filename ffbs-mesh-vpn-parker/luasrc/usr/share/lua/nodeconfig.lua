@@ -5,23 +5,11 @@ local config_file = arg[1]
 local nonce = arg[2]
 local tmpdir = arg[3]
 
-local DHCP_IFACE = "client"
 local PRIVKEY = "/etc/parker/wg-privkey"
 
 util.loggername = "nodeconfig.lua"
 
-local function dump(obj)
-	print(json.stringify(obj))
-end
-
-local function empty(obj)
-	for _, _ in pairs(obj) do
-		return false
-	end
-	return true
-end
-
-function conf_wg_iface(iface, privkey, peers, keepalive)
+local function conf_wg_iface(iface, privkey, peers, keepalive)
 	local cmd = "wg set " .. iface .. " fwmark 1 "
 	if privkey ~= nil then
 		cmd = cmd .. " private-key " .. privkey
@@ -33,7 +21,7 @@ function conf_wg_iface(iface, privkey, peers, keepalive)
 	os.execute(cmd)
 end
 
-function apply_wg(conf)
+local function apply_wg(conf)
 	local current = util.get_wg_info()
 	local target_ifaces = {}
 	for _, conc in pairs(conf.concentrators) do
@@ -131,7 +119,7 @@ function apply_wg(conf)
 	return true
 end
 
-function apply_time(conf)
+local function apply_time(conf)
 	local t = conf.time
 	if math.abs(os.time() - t) > 60 then
 		util.log("System time set to " .. t)
@@ -142,8 +130,7 @@ end
 
 util.log("Starting up")
 
-conf = json.parse(util.read_file(config_file))
--- dump(conf)
+local conf = json.parse(util.read_file(config_file))
 
 if conf.nonce ~= nonce then
 	util.log("nonce does not match")
@@ -152,8 +139,8 @@ end
 
 if conf.id ~= nil then
 	-- we got data, let's do stuff
-	res_time = apply_time(conf)
-	res_wg = apply_wg(conf)
+	apply_time(conf)
+	local res_wg = apply_wg(conf)
 
 	-- the config has been validated.
 	-- do an atomic replace in $tmpdir where noderoute.lua will
