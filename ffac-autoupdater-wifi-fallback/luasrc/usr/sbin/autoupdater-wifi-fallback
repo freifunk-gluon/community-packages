@@ -98,14 +98,12 @@ end
 local function switch_to_fallback_mode(radio, ssid, bssid)
   autil.log('out', 'connecting to '  .. radio .. ' ' .. ssid .. ' ' .. bssid)
   os.execute('sleep 2')
-  ubus:call('network', 'add_dynamic', {name = "fallback", ifname = "fallback", proto = "dhcp", device = "fallback", l3_device = "fallback"})
-  ubus:call('network', 'add_dynamic', {name = "fallback6", ifname = "fallback", proto = "dhcpv6", device = "fallback", l3_device = "fallback"})
-  ubus:call('network.interface.fallback', 'add_device', {name = "fallback"})
-  ubus:call('network.interface.fallback6', 'add_device', {name = "fallback"})
-  ubus:call('network.interface.fallback', 'up', {})
-  ubus:call('network.interface.fallback6', 'up', {})
+  ubus:call('network', 'add_dynamic', {name = "fallback", proto = "dhcp"})
+  ubus:call('network', 'add_dynamic', {name = "fallback6", proto = "dhcpv6"})
+  ubus:call('network.interface.fallback', 'add_device', {name = "fallback_if"})
+  ubus:call('network.interface.fallback6', 'add_device', {name = "fallback_if"})
   os.execute('sleep 2')
-  os.execute('iw dev fallback connect ' .. ssid .. ' ' .. bssid)
+  os.execute('iw dev fallback_if connect ' .. ssid .. ' ' .. bssid)
   os.execute('sleep 20')
 end
 
@@ -141,9 +139,9 @@ if (force or preflight_check()) and not connectivity_check() then
     for radio, netlist in pairs(autil.get_available_wifi_networks()) do
       local radio_config = uci:get_all('wireless', radio)
       local phy = wireless.find_phy(radio_config)
-      autil.log('out', 'using ' .. phy .. ' to create fallback interface')
-      os.execute('iw phy ' .. phy .. ' interface add fallback type managed')
-      os.execute('ip link set dev fallback up')
+      autil.log('out', 'using ' .. phy .. ' to create fallback_if interface')
+      os.execute('iw phy ' .. phy .. ' interface add fallback_if type managed')
+      os.execute('ip link set dev fallback_if up')
       for _, net in ipairs(netlist) do
         switch_to_fallback_mode(radio, net.ssid, net.bssid)
         if run_autoupdater() == 0 then
@@ -153,9 +151,9 @@ if (force or preflight_check()) and not connectivity_check() then
         ubus:call('network.interface.fallback', 'remove', {})
         ubus:call('network.interface.fallback6', 'down', {})
         ubus:call('network.interface.fallback6', 'remove', {})
-        os.execute('iw dev fallback disconnect')
+        os.execute('iw dev fallback_if disconnect')
       end
-      os.execute('iw dev fallback del')
+      os.execute('iw dev fallback_if del')
     end
     -- this is only reached if no update happened
     revert_to_standard_mode()
