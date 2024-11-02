@@ -37,9 +37,6 @@ FIRST="$(uci -q get ssid-changer.settings.first)"
 PREFIX="$(uci -q get ssid-changer.settings.prefix)"
 : "${PREFIX:=FF_Offline_}"
 
-PREFIX_OWE="$(uci -q get ssid-changer.settings.prefix_owe)"
-: "${PREFIX_OWE:=FF_Off_OWE}"
-
 if [ "$(uci -q get ssid-changer.settings.enabled)" = '0' ]; then
 	DISABLED='1'
 else
@@ -69,16 +66,6 @@ else
 fi
 
 OFFLINE_SSID="$PREFIX$SUFFIX"
-OFFLINE_SSID_OWE="$PREFIX_OWE$SUFFIX"
-
-ONLINE_SSID_OWE="$(uci -q get wireless.owe_radio0.ssid)"
-[ -n "$ONLINE_SSID_OWE" ] && OWE=true || OWE=false
-
-# get all SSIDs (replace \' with TICX and back to keep a possible tic in an SSID)
-# can not grep for "\.ssid" due to owe_transition_ssid
-ONLINE_SSIDs="$(uci show | grep "wireless.client_radio[0-9]\." | grep ssid  | awk -F '='  '{print $2}' | sed "s/\\\'/TICX/g" | tr \' \~ | sed "s/TICX/\\\'/g" ) "
-# if for whatever reason ONLINE_SSIDs is NULL:
-: "${ONLINE_SSIDs:=~FREIFUNK~}"
 
 # temp file to count the offline incidents during switch_timeframe
 TMP=/tmp/ssid-changer-count
@@ -127,47 +114,12 @@ fi
 UP=$((UT / 60))
 M=$((UP % MINUTES))
 
-HUP_NEEDED=0
 if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
-	log_debug "node is online"
-	LOOP=1
-	# check status for all physical devices
-	for HOSTAPD in /var/run/hostapd-*.conf; do
-		[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
-		grep "^bridge=br-client" "$HOSTAPD" > /dev/null || continue # handle case of private wifi
-		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
-		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
-		LOOP=$((LOOP+1))
-		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
-			log_debug "SSID $CURRENT_SSID is correct, nothing to do"
-			continue
-		fi
-		CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-		if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
-			# set online
-			logger -s -t "ffac-ssid-changer" -p 5 "$MSG""SSID is $CURRENT_SSID, change to $ONLINE_SSID"
-			sed -i "s~^ssid=$CURRENT_SSID~ssid=$ONLINE_SSID~" "$HOSTAPD"
-			# HUP here would be to early for dualband devices
-			HUP_NEEDED=1
-		else
-			logger -s -t "ffac-ssid-changer" -p 5 "could not set to online state: did neither find SSID '$ONLINE_SSID' nor '$OFFLINE_SSID'. Please reboot"
-		fi
-		if [ "$OWE" = true ]; then
-			CURRENT_SSID_OWE="$(grep "^ssid=$OFFLINE_SSID_OWE" "$HOSTAPD" | cut -d"=" -f2)"
-			if [ "$CURRENT_SSID_OWE" = "$OFFLINE_SSID_OWE" ]; then
-				# set online
-				logger -s -t "ffac-ssid-changer" -p 5 "$MSG""OWE SSID is $CURRENT_SSID_OWE, change to $ONLINE_SSID_OWE"
-				sed -i "s~^ssid=$CURRENT_SSID_OWE~ssid=$ONLINE_SSID_OWE~" "$HOSTAPD"
-				# HUP here would be to early for dualband devices
-				HUP_NEEDED=1
-			else
-				logger -s -t "ffac-ssid-changer" -p 5 "could not set to online state: did neither find OWE SSID '$ONLINE_SSID_OWE' nor '$OFFLINE_SSID_OWE'. Please reboot"
-			fi
-		fi
-	done
+	log_debug "$MSG node is online"
+	uci revert wireless
+	wifi reconf
 elif [ "$CHECK" -eq 0 ]; then
-	log_debug "node is considered offline"
+	log_debug "$MSG node is considered offline"
 	if [ $UP -lt "$FIRST" ] || [ $M -eq 0 ]; then
 		# set SSID offline, only if uptime is less than FIRST or exactly a multiplicative of switch_timeframe
 		if [ $UP -lt "$FIRST" ]; then
@@ -178,57 +130,22 @@ elif [ "$CHECK" -eq 0 ]; then
 		#echo minute $M, check if $OFF_COUNT is more than half of $T
 		if [ "$OFF_COUNT" -ge $((T / 2)) ]; then
 			# node was offline more times than half of switch_timeframe (or than $FIRST)
-			LOOP=1
-			for HOSTAPD in /var/run/hostapd-*.conf; do
-				[ -e "$HOSTAPD" ] || break  # handle the case of no hostapd-* files
-				grep "^bridge=br-client" "$HOSTAPD" || continue # handle case of private wifi
-				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
-				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
-				LOOP=$((LOOP+1))
-				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
-					log_debug "SSID $CURRENT_SSID is correct, nothing to do"
-					continue
-				fi
-				CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-				if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
-					# set offline
-					logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $CURRENT_SSID, change to $OFFLINE_SSID"
-					sed -i "s~^ssid=$ONLINE_SSID~ssid=$OFFLINE_SSID~" "$HOSTAPD"
-					HUP_NEEDED=1
-				else
-					logger -s -t "ffac-ssid-changer" -p 5 "could not set to offline state: did neither find SSID '$ONLINE_SSID' nor '$OFFLINE_SSID'. Please reboot"
-				fi
-				if [ "$OWE" = true ]; then
-					CURRENT_SSID_OWE="$(grep "^ssid=$ONLINE_SSID_OWE" "$HOSTAPD" | cut -d"=" -f2)"
-					if [ "$CURRENT_SSID_OWE" = "$ONLINE_SSID_OWE" ]; then
-						# set offline
-						logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $CURRENT_SSID_OWE, change to $OFFLINE_SSID_OWE"
-						sed -i "s~^ssid=$ONLINE_SSID_OWE~ssid=$OFFLINE_SSID_OWE~" "$HOSTAPD"
-						HUP_NEEDED=1
-					else
-						logger -s -t "ffac-ssid-changer" -p 5 "could not set to offline state: did neither find SSID '$ONLINE_SSID_OWE' nor '$OFFLINE_SSID_OWE'. Please reboot"
-					fi
-				fi
-			done
+			OWE0="$(uci -q get wireless.owe_radio0.ssid)"
+			[ -n "$OWE0" ] && uci set wireless.owe_radio1.enabled=0
+			OWE1="$(uci -q get wireless.owe_radio1.ssid)"
+			[ -n "$OWE1" ] && uci set wireless.owe_radio1.enabled=0
+			CLIENT0="$(uci -q get wireless.client_radio0.ssid)"
+			[ -n "$CLIENT0" ] && uci set wireless.client_radio0.ssid="$OFFLINE_SSID"
+			CLIENT1="$(uci -q get wireless.client_radio1.ssid)"
+			[ -n "$CLIENT1" ] && uci set wireless.client_radio1.ssid="$OFFLINE_SSID"
+			CLIENT2="$(uci -q get wireless.client_radio2.ssid)"
+			[ -n "$CLIENT2" ] && uci set wireless.client_radio2.ssid="$OFFLINE_SSID"
+
+			wifi reconf
 		fi
 		#else echo minute $M, just count $OFF_COUNT
 	fi
 	echo "$((OFF_COUNT + 1))">$TMP
-fi
-
-if [ $HUP_NEEDED = 1 ]; then
-	# HUP does not work with openwrt-23.05 somehow, use ubus reload
-	# to load the new SSID
-	ubus call hostapd reload
-	## check for nonmatching hostapd-pidfiles
-	if [ -f /lib/gluon/eulenfunk-hotfix/check_hostapd.sh ] ; then
-	   sleep 2 # settle down
-	   # shellcheck disable=SC2009
-	   ps|grep hostapd|grep .pid|xargs -n 10 /lib/gluon/eulenfunk-hotfix/check_hostapd.sh
-	fi
-	HUP_NEEDED=0
-	log_debug "Sent HUP to all hostapd to load the new SSID"
 fi
 
 if [ $M -eq 0 ]; then
