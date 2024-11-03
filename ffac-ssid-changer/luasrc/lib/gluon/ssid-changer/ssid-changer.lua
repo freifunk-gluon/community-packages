@@ -108,15 +108,26 @@ local function calculate_tq_limit()
     gateway_tq = tonumber(handle:read("*a"))
     handle:close()
 
-    if gateway_tq then
-        if gateway_tq >= tq_limit_max then
-            return 'online'
-        elseif gateway_tq < tq_limit_min then
-            return 'offline'
-        end
+    if not gateway_tq then
+        safety_exit('tq_limit can not be calculated without gateway')
+    end
+    local is_online
+
+    if gateway_tq >= tq_limit_max then
+        is_online = true
+    elseif gateway_tq < tq_limit_min then
+        is_online = false
+    else
+        -- in the middle part we consider us offline if there was at least one offline incidents
+        -- or we were offline before the current monitor interval
+        is_online = off_count > 0
     end
 
-    return nil
+    if is_online then
+        return 'online'
+    else
+        return 'offline'
+    end
 end
 
 local function has_default_gw4()
@@ -132,9 +143,9 @@ local status
 if has_default_gw4() then
     local tq_limit_enabled = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_enabled') or 0)
 
-if tq_limit_enabled == 1 then
-    status = calculate_tq_limit()
-else
+    if tq_limit_enabled == 1 then
+        status = calculate_tq_limit()
+    else
         status = 'online'
     end
 else
@@ -143,7 +154,13 @@ end
 
 if status == 'online' then
     log_debug("node is online")
-    os.execute('uci revert wireless && wifi reconf')
+    -- only revert and reconf if we were offline in the current monitoring timeframe or before
+    -- to reduce impact
+    if off_count > 0 then
+        log_debug("did revert and apply wireless config")
+        uci:revert('wireless')
+        os.execute('wifi reconf')
+    end
 elseif status == 'offline' then
     log_debug("node is considered offline")
     local first = tonumber(uci:get('ssid-changer', 'settings', 'first') or 5)
@@ -165,9 +182,11 @@ elseif status == 'offline' then
                 if owe_ssid then
                     uci:set('wireless', 'owe_radio' .. i, 'enabled', 0)
                 end
+                -- save does not commit
                 uci:save('wireless')
             end
             os.execute('wifi reconf')
+            log_debug("did reconf wifi to offline ssid")
         end
     end
     off_count = off_count + 1
@@ -178,6 +197,10 @@ end
 
 if is_switch_time == 0 then
     file = io.open(tmp, 'w')
-    file:write("0")
+    if status == 'offline' then
+        file:write("1")
+    else
+        file:write("0")
+    end
     file:close()
 end
