@@ -14,7 +14,6 @@ uci:section('autoupdater-wifi-fallback', 'autoupdater-wifi-fallback', 'settings'
   enabled = enabled,
 })
 
-uci:delete('wireless', 'fallback')
 uci:delete('network', 'fallback')
 uci:delete('network', 'fallback6')
 
@@ -32,7 +31,6 @@ uci:section('network', 'interface', 'fallback6',{
 
 uci:save('autoupdater-wifi-fallback')
 uci:save('network')
-uci:save('wireless')
 
 local file = io.open('/usr/lib/micron.d/autoupdater', 'r')
 local content = file:read "*a"
