@@ -52,11 +52,5 @@ while true; do
         sleep 30
     done;
 
-    # sanity check: every ipv6 address should have a route
-    for subnet in $(ip -6 a s dev br-client | grep -Eo "2001:bf7:381:[^:]+"); do
-        if ! ip -6 r s dev br-client | grep -q "${subnet}::/64"; then
-            $LOGGER "ERROR: Missing route for ${subnet}::/64 (Node is $(batctl gw | cut -d " " -f 0).)"
-        fi
-    done
     sleep 20
 done
