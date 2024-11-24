@@ -104,7 +104,7 @@ local function calculate_tq_limit()
     local tq_limit_min = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_min') or 35)
     local gateway_tq
 
-    local handle = io.popen('batctl gwl -H | grep -e "^\\*" | awk -F"[()]" "{print $2}" | tr -d " "')
+    local handle = io.popen('batctl gwl -H | grep -e "^\\*" | awk -F"[()]" \'{print $2}\' | tr -d " "')
     gateway_tq = tonumber(handle:read("*a"))
     handle:close()
 
