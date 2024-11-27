@@ -4,14 +4,11 @@ local site = require 'gluon.site'
 local uci = require('simple-uci').cursor()
 
 local site_config_server = site.parker.config_server()
+local site_config_pubkey = site.parker.config_pubkey()
 uci:section('parker', 'nodeconfig', 'nodeconfig',
-    { config_server = site_config_server }
+	{
+		config_server = site_config_server,
+		config_pubkey = site_config_pubkey,
+	}
 )
 uci:save('parker')
-
-local site_config_pubkey = site.parker.config_pubkey()
-os.execute("mkdir -p /etc/parker/")
-local pub_fh = io.open("/etc/parker/node-config-pub.key", "w")
-pub_fh:write("untrusted comment: signify public key\n")
-pub_fh:write(site_config_pubkey)
-pub_fh:close()

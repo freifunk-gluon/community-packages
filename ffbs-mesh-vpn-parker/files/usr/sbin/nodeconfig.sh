@@ -3,7 +3,7 @@
 # THIS SCRIPT MUST HAVE GID 800 (gluon-mesh-vpn)
 # USE `gluon-wan nodeconfig.sh`
 # !!!!!!
-SIGN_PUB_KEY=/etc/parker/node-config-pub.key
+SIGN_PUB_KEY=/tmp/ff-Ohb0ba0u/nodeconfig-pub.key
 DEFAULT_SLEEP=20
 export LIBPACKETMARK_MARK=1
 
@@ -36,6 +36,11 @@ if [ ! -s /etc/parker/wg-pubkey ]; then
 fi
 
 pubkey=$(sed 's/+/%2B/g' /etc/parker/wg-pubkey)
+
+if ! { echo "untrusted comment: signify public key" && uci -q get parker.nodeconfig.config_pubkey; } > "${SIGN_PUB_KEY}"; then
+    $LOGGER unable to read pubkey from uci or write it to "${SIGN_PUB_KEY}"
+    exit 1
+fi
 
 while true; do
     vpn_enabled=$(uci get gluon.mesh_vpn.enabled)
