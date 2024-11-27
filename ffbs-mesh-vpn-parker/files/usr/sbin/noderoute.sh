@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/busybox sh
 # simple script to loop noderoute lua script
 
 tmpdir=/tmp/ff-Ohb0ba0u/
@@ -8,20 +8,18 @@ $LOGGER Starting up.
 
 check_batman() {
     # check if we have a functional batman-setup
-    if ip l | grep -q "bat0:"; then
-	# we have a bat0-interface. let's do some checks
-
-        if ip l | grep "bat0:" | grep -q DOWN; then
-            $LOGGER ERROR: BATMAN-interface is not up
-            return 1
-        fi
-
-        if ! ip l | grep "bat0:" | grep -q br-client; then
-            $LOGGER ERROR: bat0 not part of br-client
-            return 1
-        fi
-    else
+    if ! ip l | grep -q "bat0:"; then
         $LOGGER ERROR: No BATMAN-interface found
+        return 1
+    fi
+
+    if ip l | grep "bat0:" | grep -q DOWN; then
+        $LOGGER ERROR: BATMAN-interface is not up
+        return 1
+    fi
+
+    if ! ip l | grep "bat0:" | grep -q br-client; then
+        $LOGGER ERROR: bat0 not part of br-client
         return 1
     fi
     return 0
@@ -39,12 +37,12 @@ while true; do
         # sanity check: is uradvd running?
         if ! pidof uradvd > /dev/null; then
             $LOGGER ERROR: NO URADVD RUNNING.
-	    fi
+        fi
 
         # sanity check: does dnsmasq have a valid config?
         if ! grep -qF "dhcp-range=set:client" /var/etc/dnsmasq.conf.cfg*; then
             $LOGGER ERROR: NO DHCP-RANGE IN dnsmasq.conf.
-	    fi
+        fi
     fi
 
     while (! check_batman); do
