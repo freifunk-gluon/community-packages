@@ -30,4 +30,7 @@ uci:section('network', 'route6', 'client6_unreachable', {
 	metric = 65535,
 })
 
+-- place ipv4 wan routes into table 1
+uci:set('network', 'wan', 'ip4table', 1)
+
 uci:save('network')
