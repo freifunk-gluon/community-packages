@@ -48,7 +48,11 @@ while true; do
         continue;
     fi
 
-    config_server=$(uci get parker.nodeconfig.config_server)
+    if ! config_server=$(uci get parker.nodeconfig.config_server); then
+        $LOGGER unable to get config_server from uci
+        exit 1
+    fi
+
     LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}" -O "${tmpdir}response" -q
     RET=$?
     if [ $RET -gt 0 ]; then
