@@ -1,0 +1,33 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+uci:section('network', 'rule', 'wan_lookup', {
+	mark = '0x01/0x01',
+	lookup = 1,
+})
+uci:section('network', 'route', 'wan_unreachable', {
+	type = 'unreachable',
+	interface = 'loopback',
+	target = '0.0.0.0',
+	netmask = '0',
+	table = 1,
+	metric = 65535,
+})
+
+uci:section('network', 'route', 'client_unreachable', {
+	type = 'unreachable',
+	interface = 'loopback',
+	target = '0.0.0.0',
+	netmask = '0',
+	metric = 65535,
+})
+uci:section('network', 'route6', 'client6_unreachable', {
+	type = 'unreachable',
+	interface = 'loopback',
+	target = '::/0',
+	gateway = '::',
+	metric = 65535,
+})
+
+uci:save('network')
