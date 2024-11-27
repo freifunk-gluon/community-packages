@@ -16,16 +16,23 @@ LOGGER="logger -s -t nodeconfig.sh"
 $LOGGER "Starting up. I am running ${version}"
 
 if [ ! -s /etc/parker/wg-privkey ]; then
-    $LOGGER No Wireguard keys found, generating...
+    $LOGGER No Wireguard private key found, generating...
     mkdir -p /etc/parker
     rm -f /etc/parker/wg-pubkey
     wg genkey > /etc/parker/wg-privkey.tmp
-    wg pubkey < /etc/parker/wg-privkey.tmp > /etc/parker/wg-pubkey
     sync
     mv /etc/parker/wg-privkey.tmp /etc/parker/wg-privkey
-    $LOGGER Wireguard keys generated
+    $LOGGER Wireguard private key generated
 else
-    $LOGGER Wireguard keys found, proceeding
+    $LOGGER Wireguard private key found, proceeding
+fi
+
+if [ ! -s /etc/parker/wg-pubkey ]; then
+    $LOGGER No Wireguard public key found, generating...
+    rm -f /etc/parker/wg-pubkey
+    wg pubkey < /etc/parker/wg-privkey > /etc/parker/wg-pubkey
+    sync
+    $LOGGER Wireguard public key generated
 fi
 
 pubkey=$(sed 's/+/%2B/g' /etc/parker/wg-pubkey)
