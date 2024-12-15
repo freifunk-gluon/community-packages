@@ -10,7 +10,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffbs-parker-nodeconfig-respondd
   TITLE:=respondd module for nexthop and gateway info on parker gateway nodes
-  DEPENDS:=+ffbs-mesh-vpn-parker +respondd +kmod-nlmon
+  DEPENDS:=+respondd +kmod-nlmon
 endef
 
 define Package/ffbs-parker-nodeconfig-respondd/description
