@@ -12,7 +12,6 @@ include $(INCLUDE_DIR)/package.mk
 
 define Package/ffbs-parker-nextnode
   TITLE:=gluon-nextnode config for parker
-  DEPENDS:=+ffbs-parker-nodeconfig
 endef
 
 define Package/ffbs-parker-nextnode/description
