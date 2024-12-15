@@ -4,7 +4,9 @@ if [ "$(uci get gluon.mesh_vpn.enabled)" = "true" ] || [ "$(uci get gluon.mesh_v
 	# check if registration has been done since last boot
 	if [ ! -f /tmp/WG_REGISTRATION_SUCCESSFUL ]; then
 		# Push public key to broker, test for https and use if supported
-		wget -q "https://[::1]"
+		wget -q "https://[::1]" 2>/dev/null
+		# returns Network Failure =4 if https exists
+		# and Generic Error =1 if no ssl lib available
 		if [ $? -eq 1 ]; then
 			PROTO=http
 		else
