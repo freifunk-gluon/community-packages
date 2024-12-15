@@ -1,0 +1,16 @@
+#!/bin/sh
+
+uci set firewall.@defaults[0].input='ACCEPT'
+uci set firewall.@defaults[0].output='ACCEPT'
+uci set firewall.@defaults[0].forward='ACCEPT'
+uci set firewall.@zone[0].input='ACCEPT'
+uci set firewall.@zone[0].output='ACCEPT'
+uci set firewall.@zone[0].forward='ACCEPT'
+uci set firewall.@zone[1].input='REJECT'
+uci set firewall.@zone[1].output='ACCEPT'
+uci set firewall.@zone[1].forward='ACCEPT'
+uci set firewall.loc_client.input='ACCEPT'
+uci set firewall.loc_client.forward='ACCEPT'
+uci set firewall.loc_client.output='ACCEPT'
+
+uci commit firewall

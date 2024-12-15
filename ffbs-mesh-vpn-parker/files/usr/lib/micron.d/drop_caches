@@ -1,0 +1,1 @@
+0 3 * * * /usr/sbin/drop_caches.sh
