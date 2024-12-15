@@ -1,5 +1,5 @@
-ffbs-parker-nodeconfig-respondd
-===============================
+ffbs-parker-respondd
+====================
 
 This is a package of [gluon-parker](https://github.com/ffbs/gluon-parker),
 a Gluon fork that uses routing between the nodes
