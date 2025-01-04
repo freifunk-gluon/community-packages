@@ -1,0 +1,20 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Username"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "VLAN-ID"
+msgstr ""
+
+msgid "DSL"
+msgstr ""
+
+msgid "ffac-web-dsl:description"
+msgstr ""
