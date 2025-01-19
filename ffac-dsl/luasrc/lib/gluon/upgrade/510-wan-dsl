@@ -1,0 +1,34 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+local enabled = uci:get_bool('gluon', 'dsl', 'enabled', false)
+local vlanid = uci:get('gluon', 'dsl', 'vlanid')
+local username = uci:get('gluon', 'dsl', 'username')
+local password = uci:get('gluon', 'dsl', 'password')
+
+if enabled == true then
+    -- add interface for DSL
+    uci:section('network','interface','wdsl',{
+        device = 'dsl0.' .. tostring(vlanid),
+        proto='pppoe',
+        username=username,
+        password=password,
+        ipv6='auto',
+    })
+
+    uci:section('firewall','rule','wdsl_dhcpv6',{
+        name = 'DSL DHCPv6',
+        src = 'wdsl',
+        family = 'ipv6',
+        dest_port = '546',
+        proto = 'udp',
+        target = 'ACCEPT',
+    })
+else
+    uci:delete('network', 'wdsl')
+    uci:delete('network', 'wdsl6')
+    uci:delete('firewall', 'wdsl_dhcpv6')
+end
+
+uci:commit('network')

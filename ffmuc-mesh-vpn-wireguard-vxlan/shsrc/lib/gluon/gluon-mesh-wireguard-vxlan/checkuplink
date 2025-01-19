@@ -18,6 +18,12 @@ else
 	exit
 fi
 
+# Some legacy code seem to have used "true" instead of the canonical "1".
+# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
+if [[ "${mesh_vpn_enabled}" != "1" ]]; then
+	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
+fi
+
 get_site_string() {
 	local path="$1"
 
@@ -228,12 +234,6 @@ is_connected() {
 
 # start main logic
 
-# Some legacy code seem to have used "true" instead of the canonical "1".
-# This should be overwritten by a gluon-reconfigure (see 400-mesh-vpn-wireguard)
-if [[ "${mesh_vpn_enabled}" != "1" ]]; then
-	logger -p warn -t checkuplink "Invalid value for wireguard.mesh_vpn.enabled detected: '${mesh_vpn_enabled}'. Assuming enabled."
-fi
-
 # Do we already have a private-key? If not generate one
 if ! uci -q get wireguard.mesh_vpn.privatekey > /dev/null
 then
@@ -277,7 +277,7 @@ SEGMENT=$(uci get gluon.core.domain)
 
 # Push public key to broker and receive gateway data, test for https and use if supported
 ret=0
-wget -q "https://[::1]" || ret=$?
+wget -q "https://[::1]" 2>/dev/null || ret=$?
 # returns Network Failure =4 if https exists
 # and Generic Error =1 if no ssl lib available
 if [ "$ret" -eq 1 ]; then
