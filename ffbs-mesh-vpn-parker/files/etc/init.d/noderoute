@@ -1,4 +1,7 @@
 #!/bin/sh /etc/rc.common
+# SC2034,SC2154: /etc/rc.common imports this script and uses variables defined here
+# shellcheck disable=SC2034,SC2154
+# shellcheck shell="busybox sh"
 
 START=99
 
