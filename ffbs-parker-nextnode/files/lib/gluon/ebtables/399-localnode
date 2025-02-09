@@ -1,0 +1,12 @@
+local client_bridge = require 'gluon.client_bridge'
+local site = require 'gluon.site'
+local next_node = site.next_node({})
+local macaddr = client_bridge.next_node_macaddr()
+
+if next_node.ip4 then
+        rule('PREROUTING -p IPv4 -d ! ' .. macaddr .. ' --ip-dst ' .. site.next_node.ip4() .. ' -j dnat --to-dst ' .. macaddr .. ' --dnat-target ACCEPT', 'nat')
+end
+
+if next_node.ip6 then
+	rule('PREROUTING -p IPv6 -d ! ' .. macaddr .. ' --ip6-dst ' .. site.next_node.ip6() .. ' -j dnat --to-dst ' .. macaddr .. ' --dnat-target ACCEPT', 'nat')
+end
