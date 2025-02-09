@@ -1,16 +1,18 @@
 #!/bin/sh
+# shellcheck shell="busybox sh"
 
 tmpdir=/tmp/ff-Ohb0ba0u/
 
 brief_interface() {
-	echo `ip a show dev $1 | grep state | awk '{print $9}'` `ip a show dev $1 | grep inet | awk '{ print $2}'`
+	# shellcheck disable=SC2046
+	echo $(ip a show dev "$1" | grep state | awk '{print $9}') $(ip a show dev "$1" | grep inet | awk '{ print $2}')
 }
 
 echo -n 'gluon model:         '; cat /tmp/sysinfo/model
 echo -n 'gluon release:       '; cat /lib/gluon/release
 echo -n 'uname:               '; uname -a
 echo -n 'autoupdater:         '
-if [ $(uci get autoupdater.settings.enabled) == "1" ]; then echo "enabled ($(uci get autoupdater.settings.branch))"; else echo "disabled"; fi
+if [ "$(uci get autoupdater.settings.enabled)" = "1" ]; then echo "enabled ($(uci get autoupdater.settings.branch))"; else echo "disabled"; fi
 echo -n 'uptime:             '; uptime
 echo -n 'available memory:    '; awk '( $1 == "MemAvailable:" ) { printf("%.1f MiB\n", $2/1024) }' /proc/meminfo
 echo -n 'available flash:     '; df -h / | awk '( $6 == "/" ) { print $4 " " $5 }'
