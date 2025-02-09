@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# shellcheck source=/dev/null
+. /lib/gluon/autoupdater/lib.sh
+ 
+ip link del dev wg_c1
+ip link del dev wg_c2
+ip link del dev wg_c3

@@ -1,0 +1,20 @@
+#!/bin/sh /etc/rc.common
+# SC2034,SC2154: /etc/rc.common imports this script and uses variables defined here
+# shellcheck disable=SC2034,SC2154
+# shellcheck shell="busybox sh"
+
+START=99
+
+USE_PROCD=1
+
+start_service() {
+	sleep 30
+	logger -t noderoute:init.d Starting Service
+        procd_open_instance
+        procd_set_param command /usr/sbin/noderoute.sh
+        procd_set_param respawn
+        procd_set_param stderr 0
+        #procd_set_param stdout 1
+        procd_set_param pidfile /var/run/noderoute.pid
+        procd_close_instance
+}

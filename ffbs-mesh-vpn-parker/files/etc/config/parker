@@ -1,0 +1,3 @@
+
+config nodeconfig 'nodeconfig'
+	option config_server 'config.community.example'

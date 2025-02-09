@@ -1,0 +1,13 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+-- The mesh_respondd_siteprefix and mesh_respondd_extraprefix[0-9]+ rules
+-- do not make sense in the context of parker as there are no prefix4
+-- and prefix6 attributes anymore.
+uci:delete('firewall', 'rule', 'mesh_respondd_siteprefix')
+uci:delete_all('firewall', 'rule', function(rule)
+	return rule['.name']:find('^mesh_respondd_extraprefix')
+end)
+
+uci:save('firewall')
