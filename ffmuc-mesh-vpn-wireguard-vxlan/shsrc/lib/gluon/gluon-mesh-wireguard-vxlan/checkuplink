@@ -147,14 +147,26 @@ customwget() {
 	target=$(echo "$wget_infos" | sed -n 6p)
 	fw_release=$(echo "$wget_infos" | sed -n 7p)
 
-	force_wan_connection wget -q -U "$user_agent" \
-	--header="X-Gluon-Version: $gluon_version" \
-	--header="X-Board-Name: $board_name" \
-	--header="X-Openwrt-Version: $openwrt_version" \
-	--header="X-Kernel-Version: $kernel" \
-	--header="X-Target-Name: $target" \
-	--header="X-Firmware-Version: $fw_release" \
-	-O- "$@"
+
+	# This header check is only required for OpenWrt versions <= 23.05, 
+	# as headers are first available in OpenWrt 24.10.
+	headerret=0
+	wget -q "http://[::1]" --header="X: X" 2>/dev/null || headerret=$?
+	# returns Network Failure =4 if headers for wget are available,
+	# and Generic Error =1 if no headers for wget are available.
+	if [ "$headerret" -eq 1 ]; then
+		force_wan_connection wget -q -U "$user_agent" -O- "$@"
+
+	else
+		force_wan_connection wget -q -U "$user_agent" \
+		--header="X-Gluon-Version: $gluon_version" \
+		--header="X-Board-Name: $board_name" \
+		--header="X-Openwrt-Version: $openwrt_version" \
+		--header="X-Kernel-Version: $kernel" \
+		--header="X-Target-Name: $target" \
+		--header="X-Firmware-Version: $fw_release" \
+		-O- "$@"
+	fi
 }
 
 get_wgkex_data() {
