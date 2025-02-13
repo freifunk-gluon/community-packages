@@ -24,18 +24,4 @@ define Package/$(PKG_NAME)/description
   most.
 endef
 
-
-define Build/Compile
-	$(call Gluon/Build/Compile)
-	./gluonShellDiet.sh shsrc/ssid-changer.sh > $(PKG_BUILD_DIR)/ssid-changer.sh
-endef
-
-define Package/$(PKG_NAME)/install
-	$(Gluon/Build/Install)
-
-	$(INSTALL_DIR) $(1)/lib/gluon/ssid-changer
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ssid-changer.sh $(1)/lib/gluon/ssid-changer/
-endef
-
-
 $(eval $(call BuildPackageGluon,$(PKG_NAME)))
