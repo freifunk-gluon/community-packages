@@ -9,6 +9,10 @@ local function log_debug(...)
     end
 end
 
+local function log(...)
+    os.execute('logger -t "ffac-ssid-changer" "' .. table.concat({...}, ' ') .. '"')
+end
+
 local function safety_exit(message)
     log_debug(message .. ", exiting with error code 2")
     os.exit(2)
@@ -87,8 +91,21 @@ local offline_ssid = calculate_offline_ssid()
 
 -- Count offline incidents
 local tmp = '/tmp/ssid-changer-count'
+local tmp_state = '/tmp/ssid-changer-offline'
 local off_count = 0
 local file = io.open(tmp, 'r')
+
+local is_offline = 0
+local state_file = io.open(tmp_state, 'r')
+
+if state_file then
+    is_offline = tonumber(state_file:read("*a")) or 0
+    state_file:close()
+else
+    state_file = io.open(tmp_state, 'w')
+    state_file:write("0")
+    state_file:close()
+end
 
 if file then
     off_count = tonumber(file:read("*a")) or 0
@@ -157,7 +174,7 @@ if status == 'online' then
     -- only revert and reconf if we were offline in the current monitoring timeframe or before
     -- to reduce impact
     if off_count > 0 then
-        log_debug("did revert and apply wireless config")
+        log("reverting offline ssid back to default wireless config")
         uci:revert('wireless')
         os.execute('wifi reconf')
     end
@@ -168,7 +185,7 @@ elseif status == 'offline' then
     if uptime_minutes < first or is_switch_time == 0 then
 
         -- check if off_count is more than half of the monitor duration
-        if off_count >= math.floor(monitor_duration / 2) then
+        if not is_offline and off_count >= math.floor(monitor_duration / 2) then
             -- if has been offline for at least half checks in monitor duration
             -- set the SSID to the offline SSID
             -- and disable owe client radios
@@ -185,8 +202,8 @@ elseif status == 'offline' then
                 -- save does not commit
                 uci:save('wireless')
             end
+            log("reconfiguring wifi to offline ssid")
             os.execute('wifi reconf')
-            log_debug("did reconf wifi to offline ssid")
         end
     end
     off_count = off_count + 1
@@ -197,10 +214,14 @@ end
 
 if is_switch_time == 0 then
     file = io.open(tmp, 'w')
+    state_file = io.open(tmp_state, 'w')
+
     if status == 'offline' then
         file:write("1")
+        state_file:write("1")
     else
         file:write("0")
+        state_file:write("0")
     end
     file:close()
 end
