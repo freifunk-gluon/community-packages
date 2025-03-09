@@ -71,7 +71,7 @@ fi
 OFFLINE_SSID="$PREFIX$SUFFIX"
 OFFLINE_SSID_OWE="$PREFIX_OWE$SUFFIX"
 
-ONLINE_SSID_OWE="$(uci -q get wireless.owe_radio0.ssid)"
+ONLINE_SSID_OWE="$(uci -q get wireless.owe_radio0.ssid || uci -q get wireless.owe_radio1.ssid)"
 [ -n "$ONLINE_SSID_OWE" ] && OWE=true || OWE=false
 
 # get all SSIDs (replace \' with TICX and back to keep a possible tic in an SSID)
@@ -138,31 +138,27 @@ if [ "$CHECK" -gt 0 ] || [ "$DISABLED" = '1' ]; then
 		# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 		ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 		LOOP=$((LOOP+1))
-		CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-		if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
-			log_debug "SSID $CURRENT_SSID is correct, nothing to do"
+
+		if grep -q "^ssid=$ONLINE_SSID$" "$HOSTAPD"; then
+			log_debug "SSID $ONLINE_SSID is correct, nothing to do"
 			continue
 		fi
-		CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-		if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
+
+		if grep -q "^ssid=$OFFLINE_SSID$" "$HOSTAPD"; then
 			# set online
-			logger -s -t "ffac-ssid-changer" -p 5 "$MSG""SSID is $CURRENT_SSID, change to $ONLINE_SSID"
-			sed -i "s~^ssid=$CURRENT_SSID~ssid=$ONLINE_SSID~" "$HOSTAPD"
+			logger -s -t "ffac-ssid-changer" -p 5 "$MSG""SSID is $OFFLINE_SSID, change to $ONLINE_SSID" 
+			sed -i "s~^ssid=$OFFLINE_SSID$~ssid=$ONLINE_SSID~" "$HOSTAPD"
 			# HUP here would be to early for dualband devices
 			HUP_NEEDED=1
-		else
-			logger -s -t "ffac-ssid-changer" -p 5 "could not set to online state: did neither find SSID '$ONLINE_SSID' nor '$OFFLINE_SSID'. Please reboot"
 		fi
+
 		if [ "$OWE" = true ]; then
-			CURRENT_SSID_OWE="$(grep "^ssid=$OFFLINE_SSID_OWE" "$HOSTAPD" | cut -d"=" -f2)"
-			if [ "$CURRENT_SSID_OWE" = "$OFFLINE_SSID_OWE" ]; then
+			if grep -q "^ssid=$OFFLINE_SSID_OWE$" "$HOSTAPD"; then
 				# set online
-				logger -s -t "ffac-ssid-changer" -p 5 "$MSG""OWE SSID is $CURRENT_SSID_OWE, change to $ONLINE_SSID_OWE"
-				sed -i "s~^ssid=$CURRENT_SSID_OWE~ssid=$ONLINE_SSID_OWE~" "$HOSTAPD"
+				logger -s -t "ffac-ssid-changer" -p 5 "$MSG""OWE SSID is $OFFLINE_SSID_OWE, change to $ONLINE_SSID_OWE"
+				sed -i "s~^ssid=$OFFLINE_SSID_OWE$~ssid=$ONLINE_SSID_OWE~" "$HOSTAPD"
 				# HUP here would be to early for dualband devices
 				HUP_NEEDED=1
-			else
-				logger -s -t "ffac-ssid-changer" -p 5 "could not set to online state: did neither find OWE SSID '$ONLINE_SSID_OWE' nor '$OFFLINE_SSID_OWE'. Please reboot"
 			fi
 		fi
 	done
@@ -185,29 +181,24 @@ elif [ "$CHECK" -eq 0 ]; then
 				# shellcheck disable=SC2086 # ONLINE_SSIDs has multiple lines
 				ONLINE_SSID="$(echo $ONLINE_SSIDs | awk -F '~' -v l=$((LOOP*2)) '{print $l}')"
 				LOOP=$((LOOP+1))
-				CURRENT_SSID="$(grep "^ssid=$OFFLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-				if [ "$CURRENT_SSID" = "$OFFLINE_SSID" ]; then
-					log_debug "SSID $CURRENT_SSID is correct, nothing to do"
+				if grep -q "^ssid=$OFFLINE_SSID$" "$HOSTAPD"; then
+					log_debug "SSID $OFFLINE_SSID is correct, nothing to do"
 					continue
 				fi
-				CURRENT_SSID="$(grep "^ssid=$ONLINE_SSID" "$HOSTAPD" | cut -d"=" -f2)"
-				if [ "$CURRENT_SSID" = "$ONLINE_SSID" ]; then
+
+				if grep -q "^ssid=$ONLINE_SSID$" "$HOSTAPD"; then
 					# set offline
-					logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $CURRENT_SSID, change to $OFFLINE_SSID"
-					sed -i "s~^ssid=$ONLINE_SSID~ssid=$OFFLINE_SSID~" "$HOSTAPD"
+					logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $ONLINE_SSID, change to $OFFLINE_SSID"
+					sed -i "s~^ssid=$ONLINE_SSID$~ssid=$OFFLINE_SSID~" "$HOSTAPD"
 					HUP_NEEDED=1
-				else
-					logger -s -t "ffac-ssid-changer" -p 5 "could not set to offline state: did neither find SSID '$ONLINE_SSID' nor '$OFFLINE_SSID'. Please reboot"
 				fi
+
 				if [ "$OWE" = true ]; then
-					CURRENT_SSID_OWE="$(grep "^ssid=$ONLINE_SSID_OWE" "$HOSTAPD" | cut -d"=" -f2)"
-					if [ "$CURRENT_SSID_OWE" = "$ONLINE_SSID_OWE" ]; then
+					if grep -q "^ssid=$ONLINE_SSID_OWE$" "$HOSTAPD"; then
 						# set offline
-						logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $CURRENT_SSID_OWE, change to $OFFLINE_SSID_OWE"
-						sed -i "s~^ssid=$ONLINE_SSID_OWE~ssid=$OFFLINE_SSID_OWE~" "$HOSTAPD"
+						logger -s -t "ffac-ssid-changer" -p 5 "$MSG""$OFF_COUNT times offline, SSID is $ONLINE_SSID_OWE, change to $OFFLINE_SSID_OWE"
+						sed -i "s~^ssid=$ONLINE_SSID_OWE$~ssid=$OFFLINE_SSID_OWE~" "$HOSTAPD"
 						HUP_NEEDED=1
-					else
-						logger -s -t "ffac-ssid-changer" -p 5 "could not set to offline state: did neither find SSID '$ONLINE_SSID_OWE' nor '$OFFLINE_SSID_OWE'. Please reboot"
 					fi
 				fi
 			done
