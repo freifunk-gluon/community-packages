@@ -57,10 +57,15 @@ brmldproxy_start() {
 	[ "${family}" = "ipv4" ] && procd_append_param command -4
 	[ "${family}" = "ipv6" ] && procd_append_param command -6
 	procd_append_param command -b "$bridge"
+	# shellcheck disable=SC2086
 	[ -n "$excludedports" ] && procd_append_param command $excludedports
+	# shellcheck disable=SC2086
 	[ -n "$includedports" ] && procd_append_param command $includedports
+	# shellcheck disable=SC2086
 	[ -n "$proxiedports" ] && procd_append_param command $proxiedports
+	# shellcheck disable=SC2086
 	[ -n "$includefilters" ] && procd_append_param command $includefilters
+	# shellcheck disable=SC2086
 	[ -n "$excludefilters" ] && procd_append_param command $excludefilters
 
 	procd_set_param respawn "${respawn_threshold:-3600}" "${respawn_timeout:-5}" "${respawn_retry:-5}"
