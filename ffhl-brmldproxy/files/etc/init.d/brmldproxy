@@ -84,6 +84,7 @@ start_service() {
 	# no procd boot startup, via hotplug or manual only
 	[ $PPID -eq 1 ] && return 0
 
+	# shellcheck disable=SC2317
 	config_cb() {
 		local type="$1"
 		local name="$2"
