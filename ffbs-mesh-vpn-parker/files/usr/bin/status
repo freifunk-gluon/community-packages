@@ -33,7 +33,7 @@ else
 	awk '{ printf("  %-32s  %s  %-16s  %ds left\n", $4, $2, $3, $1-systime()) }' /tmp/dhcp.leases | sort
 	echo 'wireguard handshakes:'
 	wg show all latest-handshakes | awk '{ printf("  %-8s  %8ds ago\n", $1, systime()-$3) }'
-	if [ ! -e ${tmpdir}/nodeconfig-successful ]; then echo !!! nodeconfig-serice did not yet run. Give the node some more time to start up.; fi
-	if [ ! -e ${tmpdir}/noderoute-successful ]; then echo !!! noderoute-serice did not yet run. Give the node some more time to start up.; fi
+	if [ ! -e ${tmpdir}/nodeconfig-successful ]; then echo !!! nodeconfig-service did not yet run. Give the node some more time to start up.; fi
+	if [ ! -e ${tmpdir}/noderoute-successful ]; then echo !!! noderoute-service did not yet run. Give the node some more time to start up.; fi
 fi
 
