@@ -1,0 +1,3 @@
+shell=sh
+# should be a copy of the excludes in scripts/lint-sh.sh
+disable=SC3043,SC3037,SC3057
