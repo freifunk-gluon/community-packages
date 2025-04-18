@@ -1,0 +1,17 @@
+#!/usr/bin/lua
+local uci = require('simple-uci').cursor()
+local eraseblock = io.popen("dmesg|grep \"Bad eraseblock\""):read('*a')
+local hostname = uci:get_first('system', 'system', 'hostname')
+if (eraseblock ~= '') then
+  io.write('has badblocks, disabling autoupdater...\n')
+  uci:set('autoupdater', 'settings', 'enabled', '0')
+  uci:save('autoupdater')
+  if hostname:find('BADBLOCKS') then
+    io.write('already prefixed\n')
+  else
+    io.write('changing hostname to "#BADBLOCKS '..hostname..'"...\n')
+    io.popen('pretty-hostname "#BADBLOCKS '..hostname..'"')
+  end
+else
+  io.write('no badblocks\n')
+end
