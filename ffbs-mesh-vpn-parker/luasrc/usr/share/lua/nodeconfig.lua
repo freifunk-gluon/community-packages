@@ -10,6 +10,7 @@ local PRIVKEY = "/etc/parker/wg-privkey"
 util.loggername = "nodeconfig.lua"
 
 local function conf_wg_iface(iface, privkey, peers, keepalive)
+	-- Configure Wireguard parameters on an existing wg-interface
 	local cmd = "wg set " .. iface .. " fwmark 1 "
 	if privkey ~= nil then
 		cmd = cmd .. " private-key " .. privkey
@@ -22,8 +23,17 @@ local function conf_wg_iface(iface, privkey, peers, keepalive)
 end
 
 local function apply_wg(conf)
+	-- Make sure the Wireguard interfaces on this system match
+	-- the configuration we've got from the config service.
+	--
+	-- Arguments:
+	-- * conf: The configuration received from the config service.
+
 	local current = util.get_wg_info()
 	local target_ifaces = {}
+
+	-- Create wg-interfaces defined in the configuration, if they
+	-- do not exist yet.
 	for _, conc in pairs(conf.concentrators) do
 		local iface = "wg_c" .. conc.id
 		target_ifaces[iface] = conc
@@ -39,14 +49,21 @@ local function apply_wg(conf)
 			os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
 		end
 	end
+
 	for iface, wg_conf in pairs(current) do
 		if target_ifaces[iface] == nil then
+			-- Remove interfaces that are not part of the configuration anymore.
+			-- This can happen if the config service has decided that we should
+			-- connect to other concentrators from now on.
 			util.log("Removing wg-interface " .. iface)
 			os.execute("ip link del " .. iface)
 		else
+			-- Update configuration on existing interfaces to what the config
+			-- service has told us to use.
 			if util.tablelength(wg_conf.peers) <= 1 then
 				local target = target_ifaces[iface]
 				local do_it = false
+				-- Check all the configurations of the interface.
 				if util.tablelength(wg_conf.peers) == 0 then
 					util.log("wg-iface " .. iface .. ": Creating peer " .. target.pubkey)
 					do_it = true
@@ -93,13 +110,20 @@ local function apply_wg(conf)
 					end
 				end
 				if do_it then
+					-- The active configuration differs from the received configuration.
+					-- Let's update it.
 					conf_wg_iface(iface, PRIVKEY, { target }, conf.wg_keepalive)
 				end
 			else
-				util.log("wg-iface " .. iface .. ": Has more than one peer configured. Not reconfiguring wireguard.")
+				-- Our Wireguard interfaces should always only have one peer.
+				-- If they have more than one the user has tinkered with the configuation.
+				-- Let's keep our hands this system, but still warn the user.
+				util.log("wg-iface " .. iface .. ": Has more than one peer configured. Not reconfiguring this interface.")
+				util.log("wg-iface " .. iface .. ": This is an error in the local configuration!")
 			end
 		end
 	end
+
 	-- check ip addresses
 	for iface, conc in pairs(target_ifaces) do
 		local state = util.check_output("ip addr show dev " .. iface)
@@ -120,6 +144,11 @@ local function apply_wg(conf)
 end
 
 local function apply_time(conf)
+	-- Make sure the system time is within 60 s of the time
+	-- communicated in the configuration.
+	-- (A somewhat correct system time is needed for Wireguard
+	-- to work. But we do not want to get in the way if the system
+	-- already has a time source.)
 	local t = conf.time
 	if math.abs(os.time() - t) > 60 then
 		util.log("System time set to " .. t)
