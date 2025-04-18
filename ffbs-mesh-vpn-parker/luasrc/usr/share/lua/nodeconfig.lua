@@ -1,5 +1,6 @@
 local json = require("jsonc")
 local util = require("util")
+local uci = require('simple-uci').cursor()
 
 local config_file = arg[1]
 local nonce = arg[2]
@@ -20,6 +21,30 @@ local function conf_wg_iface(iface, privkey, peers, keepalive)
 		cmd = cmd .. " persistent-keepalive " .. keepalive .. " allowed-ips 0.0.0.0/0,::/0"
 	end
 	os.execute(cmd)
+end
+
+local function conf_tc_iface(iface)
+	-- Sets traffic limits on this interface.
+	-- The traffic limits are defined by the user in config-mode.
+	-- So for this script we can assume that these values will not change.
+	-- That means it is sufficient to call set these values once
+	-- when creating the interface.
+	--
+	-- Arguments:
+	-- * iface: The name of the interface to set the traffic limits on.
+
+	local enabled = uci:get_first("gluon", "mesh_vpn", "limit_enabled")
+	local ingress = uci:get_first("gluon", "mesh_vpn", "limit_ingress")
+	local egress = uci:get_first("gluon", "mesh_vpn", "limit_egress")
+
+	if enabled == "1" then
+		util.log("Enabling traffic shaping for " .. iface .. " with ingress " .. ingress .. " and egress " .. egress)
+		os.execute("simple-tc " .. iface .. " " .. ingress .. " " .. egress)
+	else
+		-- Since the system boots without traffic limits in place there is no
+		-- need for us to reset these values, if limit is not enabled.
+		util.log("No traffic shaping configured. Skipping setup for " .. iface)
+	end
 end
 
 local function apply_wg(conf)
@@ -44,6 +69,7 @@ local function apply_wg(conf)
 			conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive)
 			util.log("Setting wg-interface " .. iface .. " up")
 			os.execute("ip link set up " .. iface)
+			conf_tc_iface(iface)
 		else
 			util.log("Updating MTU on wg-interface " .. iface .. " to " .. conf.mtu)
 			os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
