@@ -77,7 +77,7 @@ local function apply_wg(conf)
 							)
 							do_it = true
 						end
-						if cur_conf.keepalive ~= target.keepalive then
+						if cur_conf.keepalive ~= conf.wg_keepalive then
 							util.log(
 								"wg-iface "
 									.. iface
@@ -86,7 +86,7 @@ local function apply_wg(conf)
 									.. ". Keepalive has changed from "
 									.. cur_conf.keepalive
 									.. " to "
-									.. target.keepalive
+									.. conf.wg_keepalive
 							)
 							do_it = true
 						end
