@@ -185,7 +185,7 @@ elseif status == 'offline' then
     if uptime_minutes < first or is_switch_time == 0 then
 
         -- check if off_count is more than half of the monitor duration
-        if not is_offline and off_count >= math.floor(monitor_duration / 2) then
+        if is_offline == 0 and off_count >= math.floor(monitor_duration / 2) then
             -- if has been offline for at least half checks in monitor duration
             -- set the SSID to the offline SSID
             -- and disable owe client radios
