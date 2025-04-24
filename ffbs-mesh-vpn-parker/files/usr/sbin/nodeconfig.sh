@@ -42,6 +42,17 @@ if ! { echo "untrusted comment: signify public key" && uci -q get parker.nodecon
 	exit 1
 fi
 
+# Prepare reporting of tc
+# These values can (by definition) only change in config-mode.
+# So it is sufficient to prepare these values outside of the main loop.
+tc_info=""
+tc_enabled=$(uci get gluon.mesh_vpn.limit_enabled)
+if [ "$tc_enabled" == 1 ]; then
+	tc_ingress=$(uci get gluon.mesh_vpn.limit_ingress | tr -cd 0123456789)
+	tc_egress=$(uci get gluon.mesh_vpn.limit_egress | tr -cd 0123456789)
+	tc_info="&tc_ingress=${tc_ingress}&tc_egress=${tc_egress}"
+fi
+
 while true; do
 	vpn_enabled=$(uci get gluon.mesh_vpn.enabled)
 	if [ "$vpn_enabled" == 0 ]; then
@@ -65,7 +76,7 @@ while true; do
 		exit 1
 	fi
 
-	LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}" -O "${tmpdir}response" -q
+	LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."
