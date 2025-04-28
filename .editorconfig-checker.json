@@ -1,0 +1,7 @@
+{
+  "SpacesAfterTabs": true,
+  "Exclude": [
+    "README.md",
+    "LICENSE"
+  ]
+}
