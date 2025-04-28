@@ -1,0 +1,5 @@
+# Top-most EditorConfig file
+root = false
+
+[files/etc/banner.gluon]
+indent_style = unset

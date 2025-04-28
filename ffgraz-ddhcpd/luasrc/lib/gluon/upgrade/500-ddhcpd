@@ -3,37 +3,37 @@ local site = require('gluon.site')
 local uci = require('simple-uci').cursor()
 
 if site.ddhcpd then
-  local enabled = site.ddhcpd.enabled(true)
+	local enabled = site.ddhcpd.enabled(true)
 
-  uci:section('ddhcpd', 'settings', 'settings', {
-    enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
-    block_network = site.ddhcpd.range(site.prefix4()),
-    block_size_pow = site.ddhcpd.block_size(2),
-    block_timeout = site.ddhcpd.block_timeout(300),
-    dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
-    spare_leases = site.ddhcpd.spare_leases(2),
-    tentative_timeout = site.ddhcpd.tentative_timeout(15),
-  })
+	uci:section('ddhcpd', 'settings', 'settings', {
+		enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
+		block_network = site.ddhcpd.range(site.prefix4()),
+		block_size_pow = site.ddhcpd.block_size(2),
+		block_timeout = site.ddhcpd.block_timeout(300),
+		dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
+		spare_leases = site.ddhcpd.spare_leases(2),
+		tentative_timeout = site.ddhcpd.tentative_timeout(15),
+	})
 
-  uci:section('ddhcpd','dhcp_option','server_identify',{
-    code = 54,
-    len = 4,
-    payload = site.next_node.ip4()
-  })
+	uci:section('ddhcpd','dhcp_option','server_identify',{
+		code = 54,
+		len = 4,
+		payload = site.next_node.ip4()
+	})
 
-  uci:delete('ddhcpd','broadcast')
+	uci:delete('ddhcpd','broadcast')
 
-  local cidr = tonumber(string.gsub(site:prefix4(),"[%w.]+/(%d+)","%1"),10)
-  local netmask = {}
-  for _ = 1, 4 do
-    table.insert(netmask, 256-2^math.max(0,8-cidr))
-    cidr = math.max(0,cidr-8)
-  end
-  netmask = table.concat(netmask,".")
-  uci:section('ddhcpd','dhcp_option','netmask',{
-    code = 1,
-    len = 4,
-    payload = netmask,
-  })
-  uci:save('ddhcpd')
+	local cidr = tonumber(string.gsub(site:prefix4(),"[%w.]+/(%d+)","%1"),10)
+	local netmask = {}
+	for _ = 1, 4 do
+		table.insert(netmask, 256-2^math.max(0,8-cidr))
+		cidr = math.max(0,cidr-8)
+	end
+	netmask = table.concat(netmask,".")
+	uci:section('ddhcpd','dhcp_option','netmask',{
+		code = 1,
+		len = 4,
+		payload = netmask,
+	})
+	uci:save('ddhcpd')
 end

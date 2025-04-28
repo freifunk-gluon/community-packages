@@ -5,7 +5,7 @@ local data = assert(json.parse(input), "Malformed JSON response, wrong JSON form
 
 -- v1
 if data.Message == "OK" then
-        return
+	return
 end
 
 -- v2

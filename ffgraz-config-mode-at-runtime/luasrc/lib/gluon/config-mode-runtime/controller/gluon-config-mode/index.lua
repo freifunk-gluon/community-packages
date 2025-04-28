@@ -12,9 +12,9 @@ function Form:handle()
 		end
 		self:write(self.data)
 
-    uci:set('gluon', 'core', 'reconfigure', true)
-    uci:save('gluon')
-    os.execute('uci commit')
+		uci:set('gluon', 'core', 'reconfigure', true)
+		uci:save('gluon')
+		os.execute('uci commit')
 	end
 end
 

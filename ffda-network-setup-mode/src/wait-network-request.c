@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Exceeded maximum number of supported interfaces of %d\n", MAX_INTERFACES);
 		return 1;
 	}
-	
+
 	num_interfaces = 0;
 	for (i = 1; i < argc; i++) {
 		ifindex[num_interfaces] = if_nametoindex(argv[i]);

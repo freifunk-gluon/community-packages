@@ -5,10 +5,10 @@
 <p><%:This is the same interface as config-mode, except changes get saved immediately and can be applied at any point in time%></p>
 
 <% for _, v in ipairs(self.authinfo) do %>
-  <p><%= v %></p>
+	<p><%= v %></p>
 <% end %>
 
 <div class="gluon-page-actions">
-  <a class="gluon-button gluon-button-submit" href="<%= url({'admin'}) %>"><%:Admin Configuration%></a>
-  <a class="gluon-button gluon-button-submit" href="<%= url({'wizard'}) %>"><%:Wizard Page%></a>
+	<a class="gluon-button gluon-button-submit" href="<%= url({'admin'}) %>"><%:Admin Configuration%></a>
+	<a class="gluon-button gluon-button-submit" href="<%= url({'wizard'}) %>"><%:Wizard Page%></a>
 </div>
