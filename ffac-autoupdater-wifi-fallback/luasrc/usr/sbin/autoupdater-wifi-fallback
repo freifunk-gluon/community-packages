@@ -16,150 +16,150 @@ local branch_name = uci:get('autoupdater', 'settings', 'branch')
 
 local lockfd, err = fcntl.open(lockfilename, bit.bor(fcntl.O_WRONLY, fcntl.O_CREAT), 384) -- mode 0600
 if not lockfd then
-  autil.log('err', err)
-  local err_verbose = string.format("Unable to get file descriptor for lock file %s .", lockfilename)
-  autil.log('err', err_verbose)
-  os.exit(1)
+	autil.log('err', err)
+	local err_verbose = string.format("Unable to get file descriptor for lock file %s .", lockfilename)
+	autil.log('err', err_verbose)
+	os.exit(1)
 end
 
 local ok, _ = fcntl.fcntl(lockfd, fcntl.F_SETLK, {
-  l_start = 0,
-  l_len = 0,
-  l_type = fcntl.F_WRLCK,
-  l_whence = unistd.SEEK_SET,
+	l_start = 0,
+	l_len = 0,
+	l_type = fcntl.F_WRLCK,
+	l_whence = unistd.SEEK_SET,
 })
 if not ok then
-  local err_msg = string.format("Unable to lock file %s. ", lockfilename) ..
-    "Make sure there is no other instance of this script running."
-  autil.log('err', err_msg)
-  os.exit(1)
+	local err_msg = string.format("Unable to lock file %s. ", lockfilename) ..
+		"Make sure there is no other instance of this script running."
+	autil.log('err', err_msg)
+	os.exit(1)
 end
 
 local function parse_args()
 local i = 1
-  while arg[i] do
-    if arg[i] == '-f' then
-      force = true
-    elseif arg[i] == '-b' then
-      i=i+1
+	while arg[i] do
+		if arg[i] == '-f' then
+			force = true
+		elseif arg[i] == '-b' then
+			i=i+1
 
-      if not arg[i] then
-        autil.log('err', 'Error parsing command line: expected branch name')
-        os.exit(1)
-      end
+			if not arg[i] then
+				autil.log('err', 'Error parsing command line: expected branch name')
+				os.exit(1)
+			end
 
-      branch_name = arg[i]
-    else
-      autil.log('err', "Error parsing command line: unexpected argument: '" .. arg[i] .. "'")
-      os.exit(1)
-    end
-    i = i+1
-  end
+			branch_name = arg[i]
+		else
+			autil.log('err', "Error parsing command line: unexpected argument: '" .. arg[i] .. "'")
+			os.exit(1)
+		end
+		i = i+1
+	end
 end
 
 local function preflight_check()
-  if not uci:get_bool(configname, 'settings', 'enabled') then
-    return false
-  end
-  if not uci:get_bool('autoupdater', 'settings', 'enabled') then
-    return false
-  end
-  if tonumber(util.readfile('/proc/uptime'):match('^([^ ]+) ')) < min_uptime_secs then
-    return false
-  end
+	if not uci:get_bool(configname, 'settings', 'enabled') then
+		return false
+	end
+	if not uci:get_bool('autoupdater', 'settings', 'enabled') then
+		return false
+	end
+	if tonumber(util.readfile('/proc/uptime'):match('^([^ ]+) ')) < min_uptime_secs then
+		return false
+	end
 
-  return true
+	return true
 end
 
 local function connectivity_check()
-  -- check if default gateway is set
-  local f = io.open('/var/gluon/state/has_default_gw4', 'r')
-  if f then
-    f:close()
-    return true
-  end
+	-- check if default gateway is set
+	local f = io.open('/var/gluon/state/has_default_gw4', 'r')
+	if f then
+		f:close()
+		return true
+	end
 
-  -- connectivity check against updateserver
-  for _, host in ipairs(autil.get_update_hosts(branch_name)) do
-    if os.execute('ping -w2 -c1 ' .. host .. ' > /dev/null 2>&1') == 0 then
-      return true
-    end
-  end
+	-- connectivity check against updateserver
+	for _, host in ipairs(autil.get_update_hosts(branch_name)) do
+		if os.execute('ping -w2 -c1 ' .. host .. ' > /dev/null 2>&1') == 0 then
+			return true
+		end
+	end
 
-  autil.log('out', 'connectivity check failed')
-  return false
+	autil.log('out', 'connectivity check failed')
+	return false
 end
 
 local function run_autoupdater()
-  autil.log('out', 'executing the autoupdater...')
-  os.execute('/usr/sbin/autoupdater -f -b ' .. branch_name)
+	autil.log('out', 'executing the autoupdater...')
+	os.execute('/usr/sbin/autoupdater -f -b ' .. branch_name)
 end
 
 local function switch_to_fallback_mode(radio, ssid, bssid)
-  autil.log('out', 'connecting to '  .. radio .. ' ' .. ssid .. ' ' .. bssid)
-  os.execute('sleep 2')
-  ubus:call('network', 'add_dynamic', {name = "fallback", proto = "dhcp"})
-  ubus:call('network', 'add_dynamic', {name = "fallback6", proto = "dhcpv6"})
-  ubus:call('network.interface.fallback', 'add_device', {name = "fallback_if"})
-  ubus:call('network.interface.fallback6', 'add_device', {name = "fallback_if"})
-  os.execute('sleep 2')
-  os.execute('iw dev fallback_if connect ' .. ssid .. ' ' .. bssid)
-  os.execute('sleep 20')
+	autil.log('out', 'connecting to '	.. radio .. ' ' .. ssid .. ' ' .. bssid)
+	os.execute('sleep 2')
+	ubus:call('network', 'add_dynamic', {name = "fallback", proto = "dhcp"})
+	ubus:call('network', 'add_dynamic', {name = "fallback6", proto = "dhcpv6"})
+	ubus:call('network.interface.fallback', 'add_device', {name = "fallback_if"})
+	ubus:call('network.interface.fallback6', 'add_device', {name = "fallback_if"})
+	os.execute('sleep 2')
+	os.execute('iw dev fallback_if connect ' .. ssid .. ' ' .. bssid)
+	os.execute('sleep 20')
 end
 
 local function revert_to_standard_mode()
-  autil.log('out', 'going back to standard mode')
-  os.execute('/etc/init.d/wpad start')
-  os.execute('wifi up')
-  os.execute('sleep 30')
+	autil.log('out', 'going back to standard mode')
+	os.execute('/etc/init.d/wpad start')
+	os.execute('wifi up')
+	os.execute('sleep 30')
 end
 
 parse_args()
 
 if not uci:get('autoupdater', branch_name) then
-  autil.log('err', 'Cant find configuration for branch: ' .. branch_name)
-  os.exit(1)
+	autil.log('err', 'Cant find configuration for branch: ' .. branch_name)
+	os.exit(1)
 end
 
 if (force or preflight_check()) and not connectivity_check() then
-  local offset = 2 * 3600
-  local unreachable_since = os.time()
-  if not uci:get('autoupdater-wifi-fallback', 'settings', 'unreachable_since') then
-    uci:set(configname, 'settings', 'unreachable_since', unreachable_since)
-  else
-    uci:set(configname, 'settings', 'last_run', unreachable_since)
-    unreachable_since = uci:get(configname, 'settings', 'unreachable_since')
-  end
-  uci:save(configname)
+	local offset = 2 * 3600
+	local unreachable_since = os.time()
+	if not uci:get('autoupdater-wifi-fallback', 'settings', 'unreachable_since') then
+		uci:set(configname, 'settings', 'unreachable_since', unreachable_since)
+	else
+		uci:set(configname, 'settings', 'last_run', unreachable_since)
+		unreachable_since = uci:get(configname, 'settings', 'unreachable_since')
+	end
+	uci:save(configname)
 
-  if force or tonumber(unreachable_since) + offset < os.time() then
-    autil.log('out', 'going to fallback mode')
-    os.execute('wifi down')
-    os.execute('/etc/init.d/wpad status >/dev/null && /etc/init.d/wpad stop')
-    for radio, netlist in pairs(autil.get_available_wifi_networks()) do
-      local radio_config = uci:get_all('wireless', radio)
-      local phy = wireless.find_phy(radio_config)
-      autil.log('out', 'using ' .. phy .. ' to create fallback_if interface')
-      os.execute('iw phy ' .. phy .. ' interface add fallback_if type managed')
-      os.execute('ip link set dev fallback_if up')
-      for _, net in ipairs(netlist) do
-        switch_to_fallback_mode(radio, net.ssid, net.bssid)
-        if run_autoupdater() == 0 then
-          break
-        end
-        ubus:call('network.interface.fallback', 'down', {})
-        ubus:call('network.interface.fallback', 'remove', {})
-        ubus:call('network.interface.fallback6', 'down', {})
-        ubus:call('network.interface.fallback6', 'remove', {})
-        os.execute('iw dev fallback_if disconnect')
-      end
-      os.execute('iw dev fallback_if del')
-    end
-    -- this is only reached if no update happened
-    revert_to_standard_mode()
-  end
+	if force or tonumber(unreachable_since) + offset < os.time() then
+		autil.log('out', 'going to fallback mode')
+		os.execute('wifi down')
+		os.execute('/etc/init.d/wpad status >/dev/null && /etc/init.d/wpad stop')
+		for radio, netlist in pairs(autil.get_available_wifi_networks()) do
+			local radio_config = uci:get_all('wireless', radio)
+			local phy = wireless.find_phy(radio_config)
+			autil.log('out', 'using ' .. phy .. ' to create fallback_if interface')
+			os.execute('iw phy ' .. phy .. ' interface add fallback_if type managed')
+			os.execute('ip link set dev fallback_if up')
+			for _, net in ipairs(netlist) do
+				switch_to_fallback_mode(radio, net.ssid, net.bssid)
+				if run_autoupdater() == 0 then
+					break
+				end
+				ubus:call('network.interface.fallback', 'down', {})
+				ubus:call('network.interface.fallback', 'remove', {})
+				ubus:call('network.interface.fallback6', 'down', {})
+				ubus:call('network.interface.fallback6', 'remove', {})
+				os.execute('iw dev fallback_if disconnect')
+			end
+			os.execute('iw dev fallback_if del')
+		end
+		-- this is only reached if no update happened
+		revert_to_standard_mode()
+	end
 else
-  uci:delete(configname, 'settings', 'unreachable_since')
-  uci:delete(configname, 'settings', 'last_run')
-  uci:save(configname)
+	uci:delete(configname, 'settings', 'unreachable_since')
+	uci:delete(configname, 'settings', 'last_run')
+	uci:save(configname)
 end

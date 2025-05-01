@@ -35,8 +35,8 @@ $red:       $feuer_red;
 '
 
 for f in files i18n sass; do
-  rm -rf "$f"
-  cp -vrp "$gluon/package/gluon-config-mode-theme/$f" .
+	rm -rf "$f"
+	cp -vrp "$gluon/package/gluon-config-mode-theme/$f" .
 done
 
 THEME=$(cat sass/gluon.scss)

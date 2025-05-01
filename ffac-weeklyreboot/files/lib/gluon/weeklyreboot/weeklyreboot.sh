@@ -7,7 +7,7 @@ sleep 5
 # Autoupdate?
 upgrade_started='/tmp/autoupdate.lock'
 if [ -f $upgrade_started ] ; then
-  logger -s -t "ffac-weeklyreboot" -p 5 "Autoupdate running! Aborting"
-  exit 2
- fi
+	logger -s -t "ffac-weeklyreboot" -p 5 "Autoupdate running! Aborting"
+	exit 2
+fi
 reboot

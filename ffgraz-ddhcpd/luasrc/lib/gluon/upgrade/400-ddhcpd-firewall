@@ -3,39 +3,39 @@
 local uci = require('simple-uci').cursor()
 
 uci:section('firewall','rule','mesh_ddhcpd',{
-  name = 'mesh_ddhcpd',
-  src = 'mesh',
-  family = 'ipv6',
-  dest_port = '1234',
-  proto = 'udp',
-  target = 'ACCEPT',
+	name = 'mesh_ddhcpd',
+	src = 'mesh',
+	family = 'ipv6',
+	dest_port = '1234',
+	proto = 'udp',
+	target = 'ACCEPT',
 })
 
 uci:section('firewall','rule','mesh_d2d',{
-  name = 'mesh_d2d',
-  src = 'mesh',
-  family = 'ipv6',
-  dest_port = '1235',
-  proto = 'udp',
-  target = 'ACCEPT',
+	name = 'mesh_d2d',
+	src = 'mesh',
+	family = 'ipv6',
+	dest_port = '1235',
+	proto = 'udp',
+	target = 'ACCEPT',
 })
 
 uci:section('firewall','rule','mmfd_ddhcpd',{
-  name = 'mmfd_ddhcpd',
-  src = 'mmfd',
-  family = 'ipv6',
-  dest_port = '1234',
-  proto = 'udp',
-  target = 'ACCEPT',
+	name = 'mmfd_ddhcpd',
+	src = 'mmfd',
+	family = 'ipv6',
+	dest_port = '1234',
+	proto = 'udp',
+	target = 'ACCEPT',
 })
 
 uci:section('firewall','rule','client_dhcp',{
-  name = 'client_dhcp',
-  src = 'loc_client',
-  family = 'ipv4',
-  dest_port = '67',
-  proto = 'udp',
-  target = 'ACCEPT',
+	name = 'client_dhcp',
+	src = 'loc_client',
+	family = 'ipv4',
+	dest_port = '67',
+	proto = 'udp',
+	target = 'ACCEPT',
 })
 
 uci:save('firewall')

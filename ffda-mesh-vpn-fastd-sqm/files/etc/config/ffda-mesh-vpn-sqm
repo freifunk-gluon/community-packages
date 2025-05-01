@@ -1,2 +1,2 @@
 config settings settings
-    option enabled '0'
+	option enabled '0'

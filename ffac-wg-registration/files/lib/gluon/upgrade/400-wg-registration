@@ -2,8 +2,8 @@
 local uci = require('simple-uci').cursor()
 
 function file_exists(name)
-   local f=io.open(name,"r")
-   if f~=nil then io.close(f) return true else return false end
+	local f=io.open(name,"r")
+	if f~=nil then io.close(f) return true else return false end
 end
 
 os.remove('/etc/config/wireguard')
@@ -15,11 +15,11 @@ file:close()
 local domain = uci:get('gluon', 'core', 'domain')
 local datei
 if domain and file_exists('/lib/gluon/domains/' .. domain .. '.json') then
-  datei = '/lib/gluon/domains/' .. domain .. '.json'
+	datei = '/lib/gluon/domains/' .. domain .. '.json'
 else
-  datei = '/lib/gluon/site.json'
+	datei = '/lib/gluon/site.json'
 end
 uci:section('wireguard', 'wireguard', 'mesh_vpn', {
-  broker = io.popen('jsonfilter -i ' .. datei .. ' -e "$.mesh_vpn.wireguard.broker"'):read("*l")
+	broker = io.popen('jsonfilter -i ' .. datei .. ' -e "$.mesh_vpn.wireguard.broker"'):read("*l")
 })
 uci:commit('wireguard')

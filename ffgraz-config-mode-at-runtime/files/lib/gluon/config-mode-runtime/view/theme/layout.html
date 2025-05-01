@@ -137,17 +137,17 @@ SPDX-FileCopyrightText: 2008-2010 Jo-Philipp Wich <xm@subsignal.org>
 				</div>
 			</noscript>
 
-      <% if uci:get_bool('gluon', 'core', 'reconfigure') and (real_category ~= 'apply') then %>
-        <div style="margin: 1em 2em;" class="gluon-section">
-          <div class="gluon-section-descr" style="display: flex; justify-content: space-between; align-items: center;">
-            <div><%:Pending changes - Changes will be applied automatically on next reboot%></div>
+			<% if uci:get_bool('gluon', 'core', 'reconfigure') and (real_category ~= 'apply') then %>
+				<div style="margin: 1em 2em;" class="gluon-section">
+					<div class="gluon-section-descr" style="display: flex; justify-content: space-between; align-items: center;">
+						<div><%:Pending changes - Changes will be applied automatically on next reboot%></div>
 
-            <div>
-              <a href="/cgi-bin/config/apply"><div class="gluon-button gluon-button-submit"><%:Apply now...%></div></a>
-            </div>
-          </div>
-        </div>
-      <% end %>
+						<div>
+							<a href="/cgi-bin/config/apply"><div class="gluon-button gluon-button-submit"><%:Apply now...%></div></a>
+						</div>
+					</div>
+				</div>
+			<% end %>
 
 			<%
 				ok, err = pcall(renderer.render, content, scope, pkg)

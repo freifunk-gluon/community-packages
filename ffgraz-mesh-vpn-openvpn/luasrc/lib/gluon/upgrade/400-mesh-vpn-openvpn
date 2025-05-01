@@ -71,10 +71,10 @@ end
 
 uci:section('firewall', 'rule', 'openvpn_mark', {
 	name = 'Mark packets to/from VPN clients',
-        target = 'MARK',
-        proto = 'udp',
-        dest_port = '1194',
-        set_mark = '0x01/0x01'
+	target = 'MARK',
+	proto = 'udp',
+	dest_port = '1194',
+	set_mark = '0x01/0x01'
 })
 
 uci:save('openvpn')

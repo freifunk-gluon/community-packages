@@ -50,21 +50,21 @@ clean_port() {
 }
 
 extract_port() {
-    echo "$1" | awk -F: '{print $NF}'
+	echo "$1" | awk -F: '{print $NF}'
 }
 
 combine_ip_port() {
-    local ip="$1"
-    local port="$2"
+	local ip="$1"
+	local port="$2"
 
-    # Add brackets in case the IP is an IPv6
-    case $ip in
-        *":"*)
-            ip="[${ip}]"
-            ;;
-    esac
+	# Add brackets in case the IP is an IPv6
+	case $ip in
+	*":"*)
+		ip="[${ip}]"
+		;;
+	esac
 
-    echo "$ip:$port"
+	echo "$ip:$port"
 }
 
 resolve_host() {

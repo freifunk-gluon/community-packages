@@ -2,7 +2,7 @@
 
 # shellcheck source=/dev/null
 . /lib/gluon/autoupdater/lib.sh
- 
+
 echo "Removing Parker Wireguard interfaces:"
 for iface in $(ip l | grep "wg_" | cut -d" " -f 2 | cut -d":" -f 0)
 do
