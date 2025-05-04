@@ -27,7 +27,7 @@ check_batman() {
 
 while true; do
 	$LOGGER Cycling
-	if ! lua /usr/share/lua/noderoute.lua $tmpdir | $LOGGER; then
+	if ! lua /usr/share/lua/noderoute.lua $tmpdir ; then
 		$LOGGER noderoute.lua returned non-zero
 	fi
 	touch ${tmpdir}/noderoute-successful

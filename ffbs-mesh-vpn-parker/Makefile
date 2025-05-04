@@ -12,7 +12,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffbs-mesh-vpn-parker
   TITLE:=Automatic node configuration for parker networks
-  DEPENDS:=+gluon-core +libgluonutil +gluon-mesh-vpn-core +kmod-wireguard +wireguard-tools +luaposix +usign +gluon-radv-filterd +gluon-ebtables-filter-ra-dhcp +ffbs-parker-nextnode +ffbs-parker-respondd
+  DEPENDS:=+gluon-core +libgluonutil +gluon-mesh-vpn-core +kmod-wireguard +wireguard-tools +luaposix +usign +gluon-radv-filterd +gluon-ebtables-filter-ra-dhcp +ffbs-parker-nextnode +ffbs-parker-respondd +simple-tc
   PROVIDES:=ffbs-parker-nodeconfig
 endef
 

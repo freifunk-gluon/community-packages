@@ -75,7 +75,7 @@ function util.get_wg_info()
 			peer["latest_handshake"] = tonumber(line[6])
 			peer["transfer_rx"] = tonumber(line[7])
 			peer["transfer_tx"] = tonumber(line[8])
-			peer["persistent_keepalive"] = tonumber(line[8])
+			peer["persistent_keepalive"] = tonumber(line[9])
 			results[line[1]]["peers"][line[2]] = peer
 		end
 	end
