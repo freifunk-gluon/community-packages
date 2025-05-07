@@ -78,3 +78,17 @@ Clients require to maintain `band_steering.min_snr` for `band_steering.interval`
 ## Site configuration
 
 The site configuration provides the site-wide default configuration for usteer.
+
+## Example
+
+To fully leverage the capabilities of the `ffda-gluon-usteer` package in your Gluon firmware, you can add the following usteer configuration block to your `site.conf` file:
+
+    usteer = {
+      max_signal_diff = 10,
+      min_signal = -75,
+      roam_trigger = -70,
+      signal_avg_weight = 0.5,
+      load_balancing = true,
+    }
+
+This configuration enables decentralized client steering, allowing clients to be automatically directed to the most suitable access point based on signal strength and load balancing considerations.
