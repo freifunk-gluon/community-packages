@@ -2,6 +2,10 @@
 
 This package provides a Gluon-specific integration, the OpenWrt WiFi roaming & steering daemon.
 
+## Usefullness
+
+this is especially useful, if...
+
 
 ## Configuration
 
