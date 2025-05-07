@@ -92,3 +92,33 @@ To fully leverage the capabilities of the `ffda-gluon-usteer` package in your Gl
     }
 
 This configuration enables decentralized client steering, allowing clients to be automatically directed to the most suitable access point based on signal strength and load balancing considerations.
+
+If we want to maximize the functionality of **ffda-gluon-usteer**, we should consider the following options:
+
+- **Client Steering** based on signal strength and load balancing  
+- **Band Steering** between 2.4 GHz and 5 GHz  
+- **Network Monitoring and Updates**  
+
+```lua
+usteer = {
+  network = {
+    enabled = true,
+    wireless = true,
+    wired = true,
+    update_interval = 5000,
+    update_timeout = 12,
+  },
+  band_steering = {
+    enabled = true,
+    min_snr = -60,
+    interval = 20000,
+  },
+  client_steering = {
+    max_signal_diff = 10,
+    min_signal = -75,
+    roam_trigger = -70,
+    signal_avg_weight = 0.5,
+    load_balancing = true,
+  }
+}
+
