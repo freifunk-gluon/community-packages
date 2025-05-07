@@ -4,7 +4,12 @@ This package provides a Gluon-specific integration, the OpenWrt WiFi roaming & s
 
 ## Usefullness
 
-this is especially useful, if...
+this is especially useful, if
+
+- a Freifunk network needs to provide a consistent client experience by automatically steering clients to stronger access points based on signal strength and bandwidth.
+- mesh networks consisting of multiple nodes need to be optimized to prevent congestion and maximize throughput.
+- seamless roaming between 2.4 GHz and 5 GHz networks is desired without connection interruptions.
+- an overview of the network structure and topology is required to identify bottlenecks and weak connections.
 
 
 ## Configuration
