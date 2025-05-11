@@ -56,6 +56,7 @@ fi
 while true; do
 	vpn_enabled=$(uci get gluon.mesh_vpn.enabled)
 	if [ "$vpn_enabled" == 0 ]; then
+		touch ${tmpdir}/nodeconfig-successful
 		sleep $DEFAULT_SLEEP
 		continue
 	fi
