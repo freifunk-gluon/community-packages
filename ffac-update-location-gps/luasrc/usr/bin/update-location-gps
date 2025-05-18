@@ -52,7 +52,7 @@ while line_count < max_lines do
 
 	local nc = this_line:match("^([^,]+)")
 
-	if nc == '$GPRMC' then
+	if nc == '$GPRMC' or nc == '$GNRMC' then
 		local fields = {}
 		for field in this_line:gmatch("([^,]+)") do
 			table.insert(fields, field)
