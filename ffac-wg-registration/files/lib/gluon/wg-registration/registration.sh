@@ -16,7 +16,7 @@ if [ "$(uci get gluon.mesh_vpn.enabled)" = "true" ] || [ "$(uci get gluon.mesh_v
 		NODENAME=$(uci get system.@system[0].hostname)
 		BROKER=$(uci get wireguard.mesh_vpn.broker)
 		logger -t wg-registration "Post $NODENAME and $PUBLICKEY to $PROTO://$BROKER"
-		if gluon-wan wget -q  -O- --post-data='{"node_name": "'"$NODENAME"'","public_key": "'"$PUBLICKEY"'"}' $PROTO://"$BROKER"
+		if gluon-wan-dns wget -q  -O- --post-data='{"node_name": "'"$NODENAME"'","public_key": "'"$PUBLICKEY"'"}' $PROTO://"$BROKER"
 		then
 			touch /tmp/WG_REGISTRATION_SUCCESSFUL
 			logger -t wg-registration "successfully registered wg publickey"
