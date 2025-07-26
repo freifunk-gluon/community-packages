@@ -21,6 +21,14 @@ If you leave out the `PACKAGES_COMMUNITY_BRANCH`, the repository default branch 
 
 You should always test and check changes before using a new commit of the community-packages in your modules, as many people of the community have commit rights and there is currently no test or release process defined.
 
+### Branches
+
+There are 3 branches of this repository:
+
+* main - follows development of [gluon](https://github.com/freifunk-gluon/gluon/) main branch
+* v2023.2.x - for firmware releases based on [v2023.2.x](https://github.com/freifunk-gluon/gluon/tree/v2023.2.x)
+* v2023.1.x - legacy branch for firmware up to [v2023.1.x](https://github.com/freifunk-gluon/gluon/tree/v2023.1.x)
+
 ## Contribution guidelines
 
 In general, everybody is invited to open a pull request (PR), upstream useful packages and contribute to existing ones.
