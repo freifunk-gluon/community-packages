@@ -96,6 +96,10 @@ local function uci_commit(config)
 	end
 end
 
+local function sections_changed()
+	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
+end
+
 local function apply_network(conf, target_state)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
@@ -153,14 +157,12 @@ local function apply_network(conf, target_state)
 		os.execute("ebtables-tiny -F PARKER_RADV")
 	end
 
-	local changes = uci.changes()
-	local changed = false
+	local changed = sections_changed()
 
-	if not empty(changes) then
-		dump(changes)
+	if changed then
+		dump(uci.changes())
 		uci_commit("dhcp")
 		uci_commit("network")
-		uci_commit("batman-adv")
 		util.log("Reconfiguring network...")
 		util.log("HACK: stopping gluon-radvd")
 		os.execute("/etc/init.d/gluon-radvd stop")
@@ -205,7 +207,7 @@ end
 
 local function update(report)
 	-- if there already are changes in uci, abort
-	if not empty(uci.changes()) then
+	if sections_changed() then
 		util.log("UCI is dirty. Refusing to reconfigure node.")
 		report:write("dirty")
 		return
