@@ -71,7 +71,7 @@ resolve_host() {
 	local host_to_resolve="$1"
 
 	# older versions of nslookup use "Address 1:" with increasing numbers, newer just use "Address:"
-	if ! all_ips="$(gluon-wan nslookup "$host_to_resolve" | grep '^Address \?[0-9]*:\? ' | sed 's/^Address \?[0-9]*:\? //')"; then
+	if ! all_ips="$(gluon-wan-dns nslookup "$host_to_resolve" | grep '^Address \?[0-9]*:\? ' | sed 's/^Address \?[0-9]*:\? //')"; then
 		logger -p err -t checkuplink "nslookup failed. Unable to get addresses of $host_to_resolve."
 		return 5
 	fi
@@ -103,7 +103,7 @@ resolve_host() {
 }
 
 force_wan_connection() {
-	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan "$@"
+	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan-dns "$@"
 }
 
 is_loadbalancing_enabled() {
@@ -324,7 +324,7 @@ LINKLOCAL="$(interface_linklocal)"
 
 # Add link-address and Peer
 ip address add "${LINKLOCAL}"/64 dev "$MESH_VPN_IFACE"
-gluon-wan wg set "$MESH_VPN_IFACE" peer "$PEER_PUBLICKEY" persistent-keepalive 25 allowed-ips "$PEER_LINKADDRESS/128" endpoint "$PEER_ENDPOINT"
+gluon-wan-dns wg set "$MESH_VPN_IFACE" peer "$PEER_PUBLICKEY" persistent-keepalive 25 allowed-ips "$PEER_LINKADDRESS/128" endpoint "$PEER_ENDPOINT"
 
 # We need to allow incoming vxlan traffic on mesh iface
 sleep 10

@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 # !!!!!!
 # THIS SCRIPT MUST HAVE GID 800 (gluon-mesh-vpn)
-# USE `gluon-wan nodeconfig.sh`
+# USE `gluon-wan-dns nodeconfig.sh`
 # !!!!!!
 SIGN_PUB_KEY=/tmp/ff-Ohb0ba0u/nodeconfig-pub.key
 DEFAULT_SLEEP=20
