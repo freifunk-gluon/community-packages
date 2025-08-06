@@ -154,6 +154,7 @@ local function apply_network(conf, target_state, address4)
 	end
 
 	local radvd_config_deleted = false
+	local xlat_config_deleted = false
 	local first_time_active_since_boot = false
 
 	if target_state == true then
@@ -186,6 +187,10 @@ local function apply_network(conf, target_state, address4)
 		util.log(DHCP_IFACE .. " ipaddr: " .. address4 .. "/" .. prefix_len)
 		uci_set("network", DHCP_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
 		util.log(DHCP_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
+		if conf.xlat_range6 then
+			uci_set("network", DHCP_IFACE, "xlat_range6", conf.xlat_range6)
+			util.log(DHCP_IFACE .. " xlat_range6: " .. conf.xlat_range6)
+		end
 		uci_set("network", "client6", "proto", "static")
 		uci_set("network", "gluon_bat0", "gw_mode", "server")
 		if not util.check_output("ebtables-tiny -L PARKER_RADV"):find("DROP") then
@@ -204,6 +209,7 @@ local function apply_network(conf, target_state, address4)
 
 		uci_delete("network", DHCP_IFACE, "ipaddr")
 		uci_delete("network", DHCP_IFACE, "ip6addr")
+		uci_delete("network", DHCP_IFACE, "xlat_range6")
 		uci_set("network", "client6", "proto", "dhcpv6")
 
 		uci_set("network", "gluon_bat0", "gw_mode", "client")
@@ -212,6 +218,10 @@ local function apply_network(conf, target_state, address4)
 			os.execute("rm /tmp/range6 -f")
 			os.execute("rm /tmp/addr6 -f")
 			radvd_config_deleted = true
+		end
+		if util.read_file("/tmp/xlat_range6") ~= nil then
+			os.execute("rm /tmp/xlat_range6 -f")
+			xlat_config_deleted = true
 		end
 
 		os.execute("ebtables-tiny -F PARKER_RADV")
@@ -268,6 +278,19 @@ local function apply_network(conf, target_state, address4)
 			-- away and procd stops respawning it after a few attempts,
 			-- so an explicit stop is both quieter and equivalent.
 			os.execute("/etc/init.d/gluon-radvd stop")
+		end
+		changed = true
+	end
+
+	local xlat_range6 = util.read_file("/tmp/xlat_range6")
+	if (target_state and xlat_range6 ~= conf.xlat_range6) or xlat_config_deleted then
+		if conf.xlat_range6 ~= nil and target_state then
+			local f = io.open("/tmp/xlat_range6", "w")
+			f:write(conf.xlat_range6)
+			f:close()
+			os.execute("/etc/init.d/ebpf-clat start")
+		else
+			os.execute("/etc/init.d/ebpf-clat stop")
 		end
 		changed = true
 	end

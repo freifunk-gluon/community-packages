@@ -335,6 +335,14 @@ local function apply_wg(conf)
 			os.execute("ip -6 addr replace " .. conf.address6 .. "/128 peer " .. conc.address6 .. " dev " .. iface)
 		end
 	end
+
+	-- reload ebpf-clat, but only when it is already running.
+	-- this ensures that clat is also active for any newly added interfaces
+	if util.read_file("/etc/init.d/ebpf-clat") ~= nil then
+		util.log("Reloading ebpf-clat")
+		os.execute("/etc/init.d/ebpf-clat running && /etc/init.d/ebpf-clat reload")
+	end
+
 	return true
 end
 
