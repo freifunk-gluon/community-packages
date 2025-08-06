@@ -201,6 +201,7 @@ local function apply_network(conf, target_state, mtu)
 	end
 
 	local radvd_config_deleted = false
+	local xlat_config_deleted = false
 	local first_time_active_since_boot = false
 	local dhcp_options_changed = false
 
@@ -225,6 +226,10 @@ local function apply_network(conf, target_state, mtu)
 		util.log(DHCP_IFACE .. " ipaddr: " .. conf.address4 .. "/" .. prefix_len)
 		uci_set("network", DHCP_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
 		util.log(DHCP_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
+		if conf.xlat_range6 then
+			uci_set("network", DHCP_IFACE, "xlat_range6", conf.xlat_range6)
+			util.log(DHCP_IFACE .. " xlat_range6: " .. conf.xlat_range6)
+		end
 		uci_set("network", "client6", "proto", "static")
 		uci_set("network", "gluon_bat0", "gw_mode", "server")
 		if not util.check_output("ebtables-tiny -L PARKER_RADV"):find("DROP") then
@@ -243,6 +248,7 @@ local function apply_network(conf, target_state, mtu)
 
 		uci_delete("network", DHCP_IFACE, "ipaddr")
 		uci_delete("network", DHCP_IFACE, "ip6addr")
+		uci_delete("network", DHCP_IFACE, "xlat_range6")
 		uci_set("network", "client6", "proto", "dhcpv6")
 
 		uci_set("network", "gluon_bat0", "gw_mode", "client")
@@ -251,6 +257,10 @@ local function apply_network(conf, target_state, mtu)
 			os.execute("rm /tmp/range6 -f")
 			os.execute("rm /tmp/addr6 -f")
 			radvd_config_deleted = true
+		end
+		if util.read_file("/tmp/xlat_range6") ~= nil then
+			os.execute("rm /tmp/xlat_range6 -f")
+			xlat_config_deleted = true
 		end
 
 		os.execute("ebtables-tiny -F PARKER_RADV")
@@ -337,6 +347,25 @@ local function apply_network(conf, target_state, mtu)
 		else
 			util.log("No longer announcing an IPv4 MTU to our clients")
 		end
+	end
+
+	local xlat = target_state and conf ~= nil and conf.xlat_range6 or nil
+	local xlat_range6 = util.read_file("/tmp/xlat_range6")
+	if xlat ~= nil then
+		if xlat_range6 ~= xlat then
+			util.write_file("/tmp/xlat_range6", xlat)
+			os.execute("/etc/init.d/ebpf-clat start")
+			util.log("Started ebpf-clat")
+			changed = true
+		end
+	elseif xlat_range6 ~= nil or xlat_config_deleted then
+		os.execute("/etc/init.d/ebpf-clat stop")
+		-- The init script does not remove the file. With the file in place
+		-- an active node would stop ebpf-clat in every cycle and would not
+		-- start it again when the same prefix comes back.
+		os.remove("/tmp/xlat_range6")
+		util.log("Stopped ebpf-clat")
+		changed = true
 	end
 
 	if dhcp_options_changed then
