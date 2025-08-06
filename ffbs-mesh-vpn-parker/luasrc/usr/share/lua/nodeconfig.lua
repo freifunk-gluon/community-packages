@@ -249,6 +249,14 @@ local function apply_wg(conf)
 			os.execute("ip -6 addr replace " .. conf.address6 .. "/128 peer " .. conc.address6 .. " dev " .. iface)
 		end
 	end
+
+	-- ebpf-clat runs one instance per wg-interface, so reload a running
+	-- ebpf-clat to translate on newly added interfaces as well.
+	if util.read_file("/etc/init.d/ebpf-clat") ~= nil then
+		util.log("Reloading ebpf-clat")
+		os.execute("/etc/init.d/ebpf-clat running && /etc/init.d/ebpf-clat reload")
+	end
+
 	return true
 end
 
