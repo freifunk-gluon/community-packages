@@ -16,15 +16,15 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 }
 
 int main(int argc, char **argv) {
-	if (argc < 5) {
-		fprintf(stderr, "Usage: %s <downstream ifindex> <upstream ifindex> <clat addr> <plat addr>\n", argv[0]);
+	if (argc < 4) {
+		fprintf(stderr, "Usage: %s <ifindex> <clat addr> <plat addr>\n", argv[0]);
 		return -1;
 	}
 
-	const int downstream_iface = atoi(argv[1]), upstream_iface = atoi(argv[2]);
+	const int iface = atoi(argv[1]);
 	struct clat_bpf *skel;
 	int err;
-	bool downstream_hooked = false, upstream_hooked = false;
+	bool ingress_hooked = false, egress_hooked = false;
 
 	libbpf_set_print(libbpf_print_fn);
 
@@ -34,38 +34,39 @@ int main(int argc, char **argv) {
 		return -2;
 	}
 
-	inet_pton(AF_INET6, argv[3], &skel->bss->CLAT_PREFIX);
-	inet_pton(AF_INET6, argv[4], &skel->bss->PLAT_PREFIX);
+	// TODO: Handle size suffix correctly
+	inet_pton(AF_INET6, argv[2], &skel->bss->CLAT_PREFIX);
+	inet_pton(AF_INET6, argv[3], &skel->bss->PLAT_PREFIX);
 
-	LIBBPF_OPTS(bpf_tc_hook, downstream_hook, .ifindex = downstream_iface, .attach_point = BPF_TC_INGRESS);
-	err = bpf_tc_hook_create(&downstream_hook);
+	LIBBPF_OPTS(bpf_tc_hook, ingress_hook, .ifindex = iface, .attach_point = BPF_TC_INGRESS);
+	err = bpf_tc_hook_create(&ingress_hook);
 	if (err && err != -EEXIST) {
-		fprintf(stderr, "Failed to create TC hook: %d\n", err);
+		fprintf(stderr, "Failed to create ingress hook: %d\n", err);
 		goto cleanup;
 	}
-	downstream_hooked = true;
+	ingress_hooked = true;
 
-	LIBBPF_OPTS(bpf_tc_opts, downstream_tc_opts, .handle = 1, .priority = 1);
-	downstream_tc_opts.prog_fd = bpf_program__fd(skel->progs.clat_downstream);
-	err = bpf_tc_attach(&downstream_hook, &downstream_tc_opts);
+	LIBBPF_OPTS(bpf_tc_opts, ingress_tc_opts, .handle = 1, .priority = 1);
+	ingress_tc_opts.prog_fd = bpf_program__fd(skel->progs.clat_ingress_6to4);
+	err = bpf_tc_attach(&ingress_hook, &ingress_tc_opts);
 	if (err) {
-		fprintf(stderr, "Failed to attach TC: %d\n", err);
+		fprintf(stderr, "Failed to attach ingress hook: %d\n", err);
 		goto cleanup;
 	}
 
-	LIBBPF_OPTS(bpf_tc_hook, upstream_hook, .ifindex = upstream_iface, .attach_point = BPF_TC_INGRESS);
-	err = bpf_tc_hook_create(&upstream_hook);
+	LIBBPF_OPTS(bpf_tc_hook, egress_hook, .ifindex = iface, .attach_point = BPF_TC_EGRESS);
+	err = bpf_tc_hook_create(&egress_hook);
 	if (err && err != -EEXIST) {
-		fprintf(stderr, "Failed to create TC hook: %d\n", err);
+		fprintf(stderr, "Failed to create egress hook: %d\n", err);
 		goto cleanup;
 	}
-	upstream_hooked = true;
+	egress_hooked = true;
 
-	LIBBPF_OPTS(bpf_tc_opts, upstream_tc_opts, .handle = 1, .priority = 1);
-	upstream_tc_opts.prog_fd = bpf_program__fd(skel->progs.clat_upstream);
-	err = bpf_tc_attach(&upstream_hook, &upstream_tc_opts);
+	LIBBPF_OPTS(bpf_tc_opts, egress_tc_opts, .handle = 1, .priority = 1);
+	egress_tc_opts.prog_fd = bpf_program__fd(skel->progs.clat_egress_4to6);
+	err = bpf_tc_attach(&egress_hook, &egress_tc_opts);
 	if (err) {
-		fprintf(stderr, "Failed to attach TC: %d\n", err);
+		fprintf(stderr, "Failed to attach egress hook: %d\n", err);
 		goto cleanup;
 	}
 
@@ -83,25 +84,25 @@ int main(int argc, char **argv) {
 		sleep(1);
 	}
 
-	downstream_tc_opts.flags = downstream_tc_opts.prog_fd = downstream_tc_opts.prog_id = 0;
-	err = bpf_tc_detach(&downstream_hook, &downstream_tc_opts);
+	ingress_tc_opts.flags = ingress_tc_opts.prog_fd = ingress_tc_opts.prog_id = 0;
+	err = bpf_tc_detach(&ingress_hook, &ingress_tc_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
 
-	upstream_tc_opts.flags = upstream_tc_opts.prog_fd = upstream_tc_opts.prog_id = 0;
-	err = bpf_tc_detach(&upstream_hook, &upstream_tc_opts);
+	egress_tc_opts.flags = egress_tc_opts.prog_fd = egress_tc_opts.prog_id = 0;
+	err = bpf_tc_detach(&egress_hook, &egress_tc_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
 
 cleanup:
-	if (downstream_hooked)
-		bpf_tc_hook_destroy(&downstream_hook);
-	if (upstream_hooked)
-		bpf_tc_hook_destroy(&upstream_hook);
+	if (ingress_hooked)
+		bpf_tc_hook_destroy(&ingress_hook);
+	if (egress_hooked)
+		bpf_tc_hook_destroy(&egress_hook);
 	clat_bpf__destroy(skel);
 	return -err;
 }
