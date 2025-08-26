@@ -1,9 +1,63 @@
 #!/usr/bin/lua
 
 local site = require 'gluon.site'
-local ntp_server = site.ntp_servers()[1]
+local uci = require('simple-uci').cursor()
 
-local uci = require('uci')
-local x = uci.cursor()
-x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,' .. ntp_server})
-x:commit('dhcp')
+-- The dnsmasq section serving our clients, see noderoute.lua.
+local DHCP_SECTION = 'client'
+-- dnsmasq's name for DHCPv4 option 42 (RFC 2132).
+local NTP_OPTION = 'option:ntp-server'
+
+local function is_ipv4(addr)
+	local octets = { addr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$') }
+	if #octets ~= 4 then
+		return false
+	end
+	for _, octet in ipairs(octets) do
+		if tonumber(octet) > 255 then
+			return false
+		end
+	end
+	return true
+end
+
+local function is_ntp_option(option)
+	return option == NTP_OPTION or option:sub(1, #NTP_OPTION + 1) == NTP_OPTION .. ','
+end
+
+-- Option 42 carries IPv4 addresses only. dnsmasq refuses to start on an
+-- option it cannot parse, so handing it anything else would take down
+-- DHCP and DNS for our clients.
+local servers = {}
+local ntp_server = site.ntp_servers({})[1]
+if ntp_server and is_ipv4(ntp_server) then
+	table.insert(servers, ntp_server)
+end
+
+if #servers == 0 and uci:get('dhcp', DHCP_SECTION) == nil then
+	return
+end
+
+-- Replace our own entry only: noderoute adds option:ipv6-only,0 to the
+-- same list at runtime.
+local options = {}
+for _, option in ipairs(uci:get_list('dhcp', DHCP_SECTION, 'dhcp_option')) do
+	if not is_ntp_option(option) then
+		table.insert(options, option)
+	end
+end
+
+if #servers > 0 then
+	table.insert(options, NTP_OPTION .. ',' .. table.concat(servers, ','))
+
+	if uci:get('dhcp', DHCP_SECTION) == nil then
+		-- noderoute creates the section when it configures the client
+		-- network, but the option needs a place to live until then.
+		uci:section('dhcp', 'dhcp', DHCP_SECTION)
+	end
+end
+
+-- An empty list removes the option, cleaning up after a site that has
+-- stopped providing a usable address.
+uci:set('dhcp', DHCP_SECTION, 'dhcp_option', options)
+uci:commit('dhcp')
