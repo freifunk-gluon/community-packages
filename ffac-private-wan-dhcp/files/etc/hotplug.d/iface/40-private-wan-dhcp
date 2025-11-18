@@ -1,0 +1,11 @@
+ENABLED=$(uci get private-wan-dhcp.settings.enabled)
+
+[ "${ENABLED}" != "1" ] && exit 0
+
+if [ "$INTERFACE" = 'cellular_4' ] || [ "$INTERFACE" = 'cellular' ]; then
+	if [ "${ACTION}" == "ifup" ]; then
+		/lib/gluon/private-wan-dhcp-nat/update.lua up
+	elif [ "${ACTION}" == "ifdown" ]; then
+		/lib/gluon/private-wan-dhcp-nat/update.lua down
+	fi
+fi
