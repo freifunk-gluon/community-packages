@@ -1,0 +1,11 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Private WAN DHCP"
+msgstr ""
+
+msgid "ffac-web-private-wan-dhcp:description"
+msgstr ""
