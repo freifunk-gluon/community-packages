@@ -35,5 +35,10 @@ function M.set_limit(ingress_limit, egress_limit) -- luacheck: ignore
 	-- raising exceptions.
 end
 
+function M.pubkey_privacy()
+	-- pubkey_privacy is not needed as parker uses wireguard
+	return false
+end
+
 
 return M
