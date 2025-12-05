@@ -51,8 +51,10 @@ while line_count < max_lines do
 	line_count = line_count + 1  -- Increment the line counter
 
 	local nc = this_line:match("^([^,]+)")
+	local nc_suffix = nc:sub(-3) -- Get the last 3 characters
 
-	if nc == '$GPRMC' then
+	-- support all systems with RMC message
+	if nc_suffix == 'RMC' and nc:sub(1, 1) == '$' then
 		local fields = {}
 		for field in this_line:gmatch("([^,]+)") do
 			table.insert(fields, field)
