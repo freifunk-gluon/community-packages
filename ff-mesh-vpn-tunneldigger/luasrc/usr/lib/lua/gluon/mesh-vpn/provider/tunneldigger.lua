@@ -43,4 +43,9 @@ function M.mtu()
 	return site.mesh_vpn.tunneldigger.mtu()
 end
 
+function M.pubkey_privacy()
+	-- pubkey_privacy is not needed as no key exists
+	return false
+end
+
 return M

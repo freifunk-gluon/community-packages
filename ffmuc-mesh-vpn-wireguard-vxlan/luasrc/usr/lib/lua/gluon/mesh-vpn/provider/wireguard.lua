@@ -43,4 +43,9 @@ function M.mtu()
 	return site.mesh_vpn.wireguard.mtu()
 end
 
+function M.pubkey_privacy()
+	-- wireguard does not need pubkey_privacy
+	return false
+end
+
 return M
