@@ -10,6 +10,10 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
+-- that it may do without IPv4 altogether.
+local IPV6_ONLY_OPTION = "option:ipv6-only"
+
 -- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the MTU a client may
 -- use on the network it has just been given an address on.
 local MTU_OPTION = "option:mtu"
@@ -361,18 +365,41 @@ local function apply_network(conf, target_state, mtu)
 		end
 	end
 
-	local xlat_range6 = util.read_file("/tmp/xlat_range6")
-	if (target_state and xlat_range6 ~= conf.xlat_range6) or xlat_config_deleted then
-		if conf.xlat_range6 ~= nil and target_state then
-			util.write_file("/tmp/xlat_range6", conf.xlat_range6)
-			os.execute("/etc/init.d/ebpf-clat start")
+	-- A client of a node that translates IPv4 may do without an address of
+	-- its own (RFC 8925). Like the MTU above this follows the state we
+	-- want rather than the marker file the CLAT leaves behind: that file
+	-- lives in /tmp and is gone after a reboot, while the option we have
+	-- committed is still in uci, so a node that comes up without tunnels
+	-- would go on announcing it to clients it cannot translate for.
+	local xlat = target_state and conf ~= nil and conf.xlat_range6 or nil
+	if set_client_option(IPV6_ONLY_OPTION, { xlat and "0" }) then
+		dhcp_options_changed = true
+		if xlat ~= nil then
+			util.log("Announcing IPv6-only Preferred to our clients")
 		else
-			os.execute("/etc/init.d/ebpf-clat stop")
+			util.log("No longer announcing IPv6-only Preferred to our clients")
 		end
+	end
+
+	-- The CLAT that does the translating. Our clients are told about it by
+	-- the DHCPv4 option above; this is only about the service, which is as
+	-- gone as its marker file after a reboot.
+	local xlat_range6 = util.read_file("/tmp/xlat_range6")
+	if xlat ~= nil then
+		if xlat_range6 ~= xlat then
+			util.write_file("/tmp/xlat_range6", xlat)
+			os.execute("/etc/init.d/ebpf-clat start")
+			util.log("Started ebpf-clat")
+			changed = true
+		end
+	elseif xlat_range6 ~= nil or xlat_config_deleted then
+		os.execute("/etc/init.d/ebpf-clat stop")
+		util.log("Stopped ebpf-clat")
 		changed = true
 	end
 
 	if dhcp_options_changed then
+		-- One reload, however many of the options above have changed.
 		util.log("Reloading dnsmasq to serve our clients the options they now get")
 		os.execute("/etc/init.d/dnsmasq reload")
 		changed = true
