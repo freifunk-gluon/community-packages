@@ -1,4 +1,5 @@
 local clientaddr = require("clientaddr")
+local dhcp = require("parker.dhcp")
 local json = require("jsonc")
 local util = require("util")
 local uci = require("uci")
@@ -9,6 +10,10 @@ local tmpdir = arg[1]
 
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
+
+-- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
+-- that it may do without IPv4 altogether.
+local IPV6_ONLY_OPTION = "option:ipv6-only"
 
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the services serving our clients to catch
@@ -103,6 +108,21 @@ local function uci_commit(config)
 	end
 end
 
+local function set_client_option(name, values)
+	-- Announce one DHCPv4 option to our clients, or stop announcing it
+	-- when there are no values. The list it lives in is shared with the
+	-- upgrade scripts, so only our own entry may be touched. Returns
+	-- whether uci has been changed, i.e. whether dnsmasq has to be told.
+
+	local options = dhcp.merge_option(uci.get("dhcp", DHCP_IFACE, "dhcp_option"), name, values)
+	if options == nil then
+		return false
+	end
+	uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	uci_commit("dhcp")
+	return true
+end
+
 local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
@@ -156,6 +176,7 @@ local function apply_network(conf, target_state, address4)
 	local radvd_config_deleted = false
 	local xlat_config_deleted = false
 	local first_time_active_since_boot = false
+	local dhcp_options_changed = false
 
 	if target_state == true then
 		util.log("network: routing state: active")
@@ -282,16 +303,45 @@ local function apply_network(conf, target_state, address4)
 		changed = true
 	end
 
+	-- A client of a node that translates IPv4 may do without an address of
+	-- its own (RFC 8925). This follows the state we want rather than the
+	-- marker file the CLAT leaves behind: that file lives in /tmp and is
+	-- gone after a reboot, while the option we have committed is still in
+	-- uci, so a node that comes up without tunnels would go on announcing
+	-- it to clients it cannot translate for.
+	local xlat = target_state and conf ~= nil and conf.xlat_range6 or nil
+	if set_client_option(IPV6_ONLY_OPTION, { xlat and "0" }) then
+		dhcp_options_changed = true
+		if xlat ~= nil then
+			util.log("Announcing IPv6-only Preferred to our clients")
+		else
+			util.log("No longer announcing IPv6-only Preferred to our clients")
+		end
+	end
+
+	-- The CLAT that does the translating. Our clients are told about it by
+	-- the DHCPv4 option above; this is only about the service, which is as
+	-- gone as its marker file after a reboot.
 	local xlat_range6 = util.read_file("/tmp/xlat_range6")
-	if (target_state and xlat_range6 ~= conf.xlat_range6) or xlat_config_deleted then
-		if conf.xlat_range6 ~= nil and target_state then
+	if xlat ~= nil then
+		if xlat_range6 ~= xlat then
 			local f = io.open("/tmp/xlat_range6", "w")
-			f:write(conf.xlat_range6)
+			f:write(xlat)
 			f:close()
 			os.execute("/etc/init.d/ebpf-clat start")
-		else
-			os.execute("/etc/init.d/ebpf-clat stop")
+			util.log("Started ebpf-clat")
+			changed = true
 		end
+	elseif xlat_range6 ~= nil or xlat_config_deleted then
+		os.execute("/etc/init.d/ebpf-clat stop")
+		util.log("Stopped ebpf-clat")
+		changed = true
+	end
+
+	if dhcp_options_changed then
+		-- One reload, however many of the options above have changed.
+		util.log("Reloading dnsmasq to serve our clients the options they now get")
+		os.execute("/etc/init.d/dnsmasq reload")
 		changed = true
 	end
 
