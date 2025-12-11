@@ -10,6 +10,10 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
+-- that it may do without IPv4 altogether.
+local IPV6_ONLY_OPTION = "option:ipv6-only"
+
 -- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the interface MTU.
 local MTU_OPTION = "option:mtu"
 
@@ -349,7 +353,23 @@ local function apply_network(conf, target_state, mtu)
 		end
 	end
 
+	-- Tell our clients that they can do without IPv4 while we translate it
+	-- for them (RFC 8925). Like the MTU above, the option follows the
+	-- target state and not /tmp/xlat_range6, because a reboot removes the
+	-- file but not the option, which would then stay announced.
 	local xlat = target_state and conf ~= nil and conf.xlat_range6 or nil
+	if set_client_option(IPV6_ONLY_OPTION, { xlat and "0" }) then
+		dhcp_options_changed = true
+		if xlat ~= nil then
+			util.log("Announcing IPv6-only Preferred to our clients")
+		else
+			util.log("No longer announcing IPv6-only Preferred to our clients")
+		end
+	end
+
+	-- The CLAT that does the translating. Our clients are told about it by
+	-- the DHCPv4 option above; this is only about the service, which is as
+	-- gone as its marker file after a reboot.
 	local xlat_range6 = util.read_file("/tmp/xlat_range6")
 	if xlat ~= nil then
 		if xlat_range6 ~= xlat then
