@@ -5,9 +5,9 @@ connection to any gateway. This Offline-SSID can be generated from the
 first and last part of the node\'s name or from the MAC address allowing
 observers to recognize which node does not have a connection to a
 gateway. This script is called once every minute by `micrond`. It will
-change the SSID to the Offline-SSID after the node had no
-gateway-connectivity for several consecutive checks. As soon as the
-gateway-connectivity is back it toggles back to the original SSID.
+change the SSID to the Offline-SSID once the node accumulated enough
+checks without gateway-connectivity (see the counter below). As soon as
+the gateway-connectivity is back it toggles back to the original SSID.
 
 You can enable/disable it in the config mode.
 
@@ -15,21 +15,27 @@ It checks if a gateway is reachable in an interval. Different algorithms
 can be selected to determine whether a gateway is assumed reachable:
 
 -   `tq_limit_enabled=true`: (not working with BATMAN_V) define an upper
-    and lower bound to toggle the SSID. As long as the TQ stays
-    in-between those bounds the SSID will not be changed.
+    and lower bound to toggle the SSID. While the TQ stays in-between
+    those bounds, both the SSID and the counter below keep the value
+    they had after the last check with the TQ outside the bounds.
 
 -   `tq_limit_enabled=false`: there will be only checked, if the gateway
     is reachable with:
 
         batctl gwl -H
 
-The SSID is always changed back to normal every minute as soon as the
-gateway-connectivity is back.
+As soon as the gateway is reachable again, the SSID is changed back to
+the regular SSID at the next check, i.e. within one minute. With
+`tq_limit_enabled` this requires the TQ to reach `tq_limit_max` first.
 
-The parameter `switch_timeframe` defines how long it will record the
-gateway-connectivity. **Only** if the gateway is not reachable during at
-least half the checks within `switch_timeframe` minutes, the SSID will
-be changed to \"FF_Offline\_\$node_hostname\" (or \_\$node_mac)
+The parameter `switch_timeframe` sets the threshold at which the SSID is
+changed. It is not a sliding window: a counter is raised by one for every
+minute the gateway is unreachable and lowered by one for every minute it
+is reachable, but not below zero. **Only** once that counter reaches
+`switch_timeframe / 2` (rounded down), the SSID will be changed to
+\"FF_Offline\_\$node_hostname\" (or \_\$node_mac). The counter is reset to
+zero when the SSID is changed back, so another `switch_timeframe / 2`
+offline minutes are needed before the Offline-SSID is set again.
 
 The parameter `first` defines a learning phase after reboot (in minutes)
 during which the SSID may be changed to the Offline-SSID **every
@@ -41,8 +47,9 @@ Adapt and add this block to your `site.conf`:
 
     ssid_changer = {
       enabled = true,
-      switch_timeframe = 30,    -- only once every timeframe (in minutes) the SSID will change to the Offline-SSID
-                                -- set to 1440 to change once a day
+      switch_timeframe = 30,    -- after half a timeframe (in minutes, rounded down) offline the SSID
+                                -- will change to the Offline-SSID
+                                -- set to 1440 to change after half a day offline
                                 -- set to 1 minute to change every time the router gets offline
       first = 5,                -- the first few minutes directly after reboot within which an Offline-SSID may be
                                 -- activated every minute (must be <= switch_timeframe)
@@ -70,9 +77,9 @@ example disable it with:
 
     uci set ssid-changer.settings.enabled='0'
 
-Or set the timeframe to every three minutes with
+Or change to the Offline-SSID after five offline minutes with
 
-    uci set ssid-changer.settings.switch_timeframe='3'
+    uci set ssid-changer.settings.switch_timeframe='10'
     uci set ssid-changer.settings.first='3'
 
 Or enable the debug logs, which are written to the syslog with the tag
