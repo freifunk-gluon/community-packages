@@ -72,7 +72,7 @@ static __always_inline __wsum l4_pseudo_csum_6to4() {
 	return bpf_csum_diff(PLAT_PREFIX.in6_u.u6_addr32, 12, NULL, 0, csum_diff);
 }
 
-int update_tcp_4to6(struct __sk_buff *skb, __u32 offset) {
+static int update_tcp_4to6(struct __sk_buff *skb, __u32 offset) {
 	if (bpf_l4_csum_replace(skb, offset + offsetof(struct tcphdr, check), 0, l4_pseudo_csum_4to6(),
 	                        BPF_F_PSEUDO_HDR)) {
 		DEBUG_PRINT("Failed to update L4 checksum");
@@ -81,7 +81,7 @@ int update_tcp_4to6(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-int update_udp_4to6(struct __sk_buff *skb, __u32 offset) {
+static int update_udp_4to6(struct __sk_buff *skb, __u32 offset) {
 	/* Technically we're supposed to drop UDP packets with a checksum of zero here since IPv6
 	 * has no checksum of its own, but with WireGuard there's no risk of packet corruption so
 	 * we can just let it through and convert back on the other end. */
@@ -93,7 +93,7 @@ int update_udp_4to6(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-int update_icmp_4to6(struct __sk_buff *skb, __u16 offset, struct ipv6hdr *ip6) {
+static int update_icmp_4to6(struct __sk_buff *skb, __u16 offset, struct ipv6hdr *ip6) {
 	if (!ip6) {
 		return TC_ACT_SHOT;
 	}
@@ -220,7 +220,7 @@ int update_icmp_4to6(struct __sk_buff *skb, __u16 offset, struct ipv6hdr *ip6) {
 	return TC_ACT_OK;
 }
 
-int update_l4_4to6(struct __sk_buff *skb, __u32 offset, struct ipv6hdr *ip6) {
+static int update_l4_4to6(struct __sk_buff *skb, __u32 offset, struct ipv6hdr *ip6) {
 	if (!ip6) {
 		return TC_ACT_SHOT;
 	}
@@ -322,7 +322,7 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 	return TC_ACT_OK;
 }
 
-int update_tcp_6to4(struct __sk_buff *skb, __u32 offset) {
+static int update_tcp_6to4(struct __sk_buff *skb, __u32 offset) {
 	if (bpf_l4_csum_replace(skb, offset + offsetof(struct tcphdr, check), 0, l4_pseudo_csum_6to4(),
 	                        BPF_F_PSEUDO_HDR)) {
 		DEBUG_PRINT("Failed to update L4 checksum");
@@ -331,7 +331,7 @@ int update_tcp_6to4(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-int update_udp_6to4(struct __sk_buff *skb, __u32 offset) {
+static int update_udp_6to4(struct __sk_buff *skb, __u32 offset) {
 	/* Technically we're supposed to drop UDP packets with a checksum of zero here since IPv6
 	 * has no checksum of its own, but with WireGuard there's no risk of packet corruption so
 	 * we can just let it through and convert back on the other end. */
@@ -343,7 +343,7 @@ int update_udp_6to4(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-int update_icmp_6to4(struct __sk_buff *skb, __u16 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
+static int update_icmp_6to4(struct __sk_buff *skb, __u16 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
 	if (!ip || !ip6) {
 		return TC_ACT_SHOT;
 	}
@@ -458,7 +458,7 @@ int update_icmp_6to4(struct __sk_buff *skb, __u16 offset, struct iphdr *ip, stru
 	return TC_ACT_OK;
 }
 
-int update_l4_6to4(struct __sk_buff *skb, __u32 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
+static int update_l4_6to4(struct __sk_buff *skb, __u32 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
 	if (!ip) {
 		return TC_ACT_SHOT;
 	}
