@@ -53,6 +53,8 @@ char _license[] SEC("license") = "GPL";
 		return TC_ACT_SHOT;                                                                        \
 	}
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 /* This is intended to run on WireGuard tunnels, which don't have Ethernet
  * headers. */
 #define HAS_ETH_HEADER 0
@@ -138,11 +140,17 @@ static int update_icmp_4to6(struct __sk_buff *skb, __u16 offset, struct ipv6hdr 
 			0, 1, 4, 4, 255, 255, 255, 255, 7, 6, 255, 255, 8, 8, 8, 8, 24, 24, 24, 24,
 		};
 		__u8 pointer = icmp.un.reserved[0];
-		if (pointer > 19 || new_ptr[pointer] == 255) {
+		__u32 new_ptr_len = ARRAY_SIZE(new_ptr);
+		if (pointer >= new_ptr_len) {
 			DEBUG_PRINT("Invalid pointer in ICMP parameter problem message");
 			return TC_ACT_SHOT;
 		}
-		icmp6.icmp6_pointer = bpf_htonl(new_ptr[pointer]);
+		__u8 mapped_ptr = new_ptr[pointer];
+		if (mapped_ptr == 255) {
+			DEBUG_PRINT("Invalid pointer in ICMP parameter problem message");
+			return TC_ACT_SHOT;
+		}
+		icmp6.icmp6_pointer = bpf_htonl((__u32)mapped_ptr);
 		break;
 	case ICMP_DEST_UNREACH:
 		icmp6.icmp6_type = ICMPV6_DEST_UNREACH;
@@ -422,11 +430,17 @@ static int update_icmp_6to4(struct __sk_buff *skb, __u16 offset, struct iphdr *i
 			12, 12, 12,  12,  16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
 		};
 		__u32 pointer = bpf_ntohl(icmp6.icmp6_pointer);
-		if (pointer > 39 || new_ptr[pointer] == 255) {
+		__u32 new_ptr_len = ARRAY_SIZE(new_ptr);
+		if (pointer >= new_ptr_len) {
 			DEBUG_PRINT("Invalid pointer in ICMPv6 parameter problem message");
 			return TC_ACT_SHOT;
 		}
-		icmp.un.reserved[0] = new_ptr[pointer];
+		__u8 mapped_ptr = new_ptr[pointer];
+		if (mapped_ptr == 255) {
+			DEBUG_PRINT("Invalid pointer in ICMPv6 parameter problem message");
+			return TC_ACT_SHOT;
+		}
+		icmp.un.reserved[0] = mapped_ptr;
 		break;
 	default:
 		return TC_ACT_SHOT;
