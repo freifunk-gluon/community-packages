@@ -16,17 +16,17 @@ This package implements RFC 6145-compliant IPv4-to-IPv6 translation using eBPF p
 
 ## Configuration
 
-The translator uses two IPv6 prefixes:
-- **Local Prefix**: `2001:db8:ff00:1:0:64::/96` (default)
-- **Remote Prefix**: `64:ff9b::/96` (default, well-known prefix)
+The translator uses two IPv6 prefixes (need to be specified without `/<size>` suffix in the arguments!):
+- **Local Prefix**: e.g. `2001:db8:ff00:1:0:64::/96`
+- **Remote Prefix**: e.g. `64:ff9b::/96` (well-known prefix)
 
 IPv4 addresses are embedded in the last 32 bits of these prefixes.
 
 ## Usage
 
 ```bash
-# Start CLAT on interface with index 2
-ffmuc-ebpf-clat 2
+# Start CLAT on interface with index 2, using local prefix 2001:db8:ed0:6::/96 and remote prefix 64:ff9b::/96
+ffmuc-ebpf-clat 2 2001:db8:ff00:1:: 64:ff9b::
 
 # Monitor translation activity
 sudo cat /sys/kernel/debug/tracing/trace_pipe
@@ -40,7 +40,7 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe
 
 ## Build Requirements
 
-- Clang compiler with BPF target support
+- Clang 20 or higher with BPF target support
 - Linux kernel headers
 - libbpf development packages
 
@@ -49,5 +49,4 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe
 - Currently only handles non-fragmented IPv4 packets
 - Downstream (IPv4-to-IPv6) translation only
 - Requires root privileges for TC operations
-- No ICMP translation yet
 - No handling of packets with local source/destination yet
