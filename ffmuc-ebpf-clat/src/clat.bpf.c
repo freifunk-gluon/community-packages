@@ -99,7 +99,7 @@ static int update_udp_4to6(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-static int update_icmp_4to6(struct __sk_buff *skb, __u16 offset, struct ipv6hdr *ip6) {
+static int update_icmp_4to6(struct __sk_buff *skb, __u32 offset, struct ipv6hdr *ip6) {
 	if (!ip6) {
 		return TC_ACT_SHOT;
 	}
@@ -355,7 +355,7 @@ static int update_udp_6to4(struct __sk_buff *skb, __u32 offset) {
 	return TC_ACT_OK;
 }
 
-static int update_icmp_6to4(struct __sk_buff *skb, __u16 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
+static int update_icmp_6to4(struct __sk_buff *skb, __u32 offset, struct iphdr *ip, struct ipv6hdr *ip6) {
 	if (!ip || !ip6) {
 		return TC_ACT_SHOT;
 	}
