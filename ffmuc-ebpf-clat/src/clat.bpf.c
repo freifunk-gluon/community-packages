@@ -292,8 +292,16 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 		.saddr = CLAT_PREFIX,
 		.daddr = PLAT_PREFIX,
 	};
-	ip6_new.saddr.in6_u.u6_addr32[3] = ip->saddr;
-	ip6_new.daddr.in6_u.u6_addr32[3] = ip->daddr;
+	/* Use bpf_skb_load_bytes for 4-byte packet reads to avoid misaligned
+	 * access on architectures like MIPS that enforce strict alignment. */
+	__u32 l3_off = 0;
+#if HAS_ETH_HEADER
+	l3_off = sizeof(struct ethhdr);
+#endif
+	bpf_skb_load_bytes(skb, l3_off + offsetof(struct iphdr, saddr),
+	                    &ip6_new.saddr.in6_u.u6_addr32[3], sizeof(__u32));
+	bpf_skb_load_bytes(skb, l3_off + offsetof(struct iphdr, daddr),
+	                    &ip6_new.daddr.in6_u.u6_addr32[3], sizeof(__u32));
 
 	/* Update L4 checksum. */
 	__u32 offset = sizeof(struct iphdr);
@@ -328,7 +336,10 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 
 	/* Write IPv6 header. */
 	ENSURE_MEM_VALID(ip6);
-	*ip6 = ip6_new;
+	/* Due to NET_IP_ALIGN the header is usually moved two bytes to the right to adjust for 14-byte ethernet header,
+	 * but thus forcing unaligned access on non-ethernet packets. Let bpf_skb_store_bytes handle this.
+	 * See also https://docs.kernel.org/6.19/core-api/unaligned-memory-access.html#alignment-vs-networking */
+	bpf_skb_store_bytes(skb, l3_off, &ip6_new, sizeof(ip6_new), 0);
 
 	DEBUG_PRINT("Translated egress packet");
 	return TC_ACT_OK;
@@ -512,21 +523,35 @@ int clat_ingress_6to4(struct __sk_buff *skb) {
 #endif
 	ENSURE_MEM_VALID(ip6);
 
+	/* Load IPv6 addresses to stack to avoid misaligned 4-byte packet access
+	 * on architectures like MIPS that enforce strict alignment. */
+	struct in6_addr ip6_saddr, ip6_daddr;
+	__u32 l3_off = 0;
+#if HAS_ETH_HEADER
+	l3_off = sizeof(struct ethhdr);
+#endif
+	if (bpf_skb_load_bytes(skb, l3_off + offsetof(struct ipv6hdr, saddr),
+	                        &ip6_saddr, sizeof(ip6_saddr)) ||
+	    bpf_skb_load_bytes(skb, l3_off + offsetof(struct ipv6hdr, daddr),
+	                        &ip6_daddr, sizeof(ip6_daddr))) {
+		return TC_ACT_SHOT;
+	}
+
 	if (ip6->version != 6) {
 		DEBUG_PRINT("Skipping invalid IPv6 packet");
 		return TC_ACT_OK;
 	}
 
-	if (ip6->saddr.in6_u.u6_addr32[0] != PLAT_PREFIX.in6_u.u6_addr32[0] ||
-	    ip6->saddr.in6_u.u6_addr32[1] != PLAT_PREFIX.in6_u.u6_addr32[1] ||
-	    ip6->saddr.in6_u.u6_addr32[2] != PLAT_PREFIX.in6_u.u6_addr32[2]) {
+	if (ip6_saddr.in6_u.u6_addr32[0] != PLAT_PREFIX.in6_u.u6_addr32[0] ||
+	    ip6_saddr.in6_u.u6_addr32[1] != PLAT_PREFIX.in6_u.u6_addr32[1] ||
+	    ip6_saddr.in6_u.u6_addr32[2] != PLAT_PREFIX.in6_u.u6_addr32[2]) {
 		DEBUG_PRINT("Skipping due to wrong source prefix");
 		return TC_ACT_OK;
 	}
 
-	if (ip6->daddr.in6_u.u6_addr32[0] != CLAT_PREFIX.in6_u.u6_addr32[0] ||
-	    ip6->daddr.in6_u.u6_addr32[1] != CLAT_PREFIX.in6_u.u6_addr32[1] ||
-	    ip6->daddr.in6_u.u6_addr32[2] != CLAT_PREFIX.in6_u.u6_addr32[2]) {
+	if (ip6_daddr.in6_u.u6_addr32[0] != CLAT_PREFIX.in6_u.u6_addr32[0] ||
+	    ip6_daddr.in6_u.u6_addr32[1] != CLAT_PREFIX.in6_u.u6_addr32[1] ||
+	    ip6_daddr.in6_u.u6_addr32[2] != CLAT_PREFIX.in6_u.u6_addr32[2]) {
 		DEBUG_PRINT("Skipping due to wrong destination prefix");
 		return TC_ACT_OK;
 	}
@@ -552,8 +577,8 @@ int clat_ingress_6to4(struct __sk_buff *skb) {
 		.check = 0,
 		.protocol = ip6->nexthdr,
 		.ttl = ip6->hop_limit,
-		.saddr = ip6->saddr.in6_u.u6_addr32[3],
-		.daddr = ip6->daddr.in6_u.u6_addr32[3],
+		.saddr = ip6_saddr.in6_u.u6_addr32[3],
+		.daddr = ip6_daddr.in6_u.u6_addr32[3],
 	};
 
 	/* Update L4 checksum. */
@@ -593,7 +618,10 @@ int clat_ingress_6to4(struct __sk_buff *skb) {
 
 	/* Write IPv4 header. */
 	ENSURE_MEM_VALID(ip);
-	*ip = ip_new;
+	/* Due to NET_IP_ALIGN the header is usually moved two bytes to the right to adjust for 14-byte ethernet header,
+	 * but thus forcing unaligned access on non-ethernet packets. Let bpf_skb_store_bytes handle this.
+	 * See also https://docs.kernel.org/6.19/core-api/unaligned-memory-access.html#alignment-vs-networking */
+	bpf_skb_store_bytes(skb, l3_off, &ip_new, sizeof(ip_new), 0);
 
 	DEBUG_PRINT("Translated ingress packet");
 	return TC_ACT_OK;
