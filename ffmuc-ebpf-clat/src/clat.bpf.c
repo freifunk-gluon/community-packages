@@ -273,11 +273,19 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 		return TC_ACT_SHOT;
 	}
 
-	uint16_t frag_off = ip->frag_off & __bpf_constant_htons(IP_OFFSET_MASK);
-	if ((ip->frag_off & __bpf_constant_htons(IP_MF)) != 0 || frag_off > 0) {
+	uint16_t mf_flag = bpf_ntohs(ip->frag_off) & IP_MF; // More Fragments
+	uint16_t frag_off = bpf_ntohs(ip->frag_off) & IP_OFFSET_MASK; // Fragment Offset
+	if (mf_flag != 0 || frag_off > 0) {
 		/* TODO: We'll want to support this eventually.
 		 * Need to check since IPv6 header is bigger though. */
 		DEBUG_PRINT("Dropping fragmented IPv4 packet");
+		return TC_ACT_SHOT;
+	}
+
+	/* Validate IPv4 IHL.
+	 * TODO: Support IPv4 options and compute L4 offset + payload length based on IHL. */
+	if (ip->ihl != 5) {
+		DEBUG_PRINT("Dropping IPv4 packet with options");
 		return TC_ACT_SHOT;
 	}
 
