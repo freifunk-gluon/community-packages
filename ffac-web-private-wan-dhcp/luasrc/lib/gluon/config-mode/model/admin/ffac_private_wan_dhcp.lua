@@ -16,8 +16,9 @@ netmask.default = uci:get('private-wan-dhcp', 'settings', 'netmask', '255.255.25
 local dns_server = s:option(Value, "dns_server", translate("Static DNS servers") ..  ' ' ..translate("IPv4"))
 dns_server.default = uci:get('private-wan-dhcp', 'settings', 'dns_server', '9.9.9.9')
 
-local uradvd_dns_server = s:option(Value, "dns_server", translate("Static DNS servers") .. ' ' .. translate("IPv6"))
-uradvd_dns_server.default = uci:get('private-wan-dhcp', 'settings', 'uradvd_dns_server', '9.9.9.9')
+local uradvd_dns_server = s:option(Value, "uradvd_dns_server",
+	translate("Static DNS servers") .. ' ' .. translate("IPv6"))
+uradvd_dns_server.default = uci:get('private-wan-dhcp', 'settings', 'uradvd_dns_server', '2620:fe::fe')
 
 function f:write()
 	uci:set('private-wan-dhcp', 'settings', 'enabled', enabled.data)

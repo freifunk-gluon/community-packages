@@ -166,6 +166,21 @@ local function add_dhcp_config()
 
 		-- uradvd reload
 		os.execute("/etc/init.d/uradvd reload")
+
+		-- IPv6-Policy-Routing: Traffic der br-wan-Clients aus dem LTE-/64 ueber
+		-- Tabelle 1 (LTE-Default via wwan0) leiten. Ohne diese Regel faellt der
+		-- Client-Traffic auf Tabelle 'main' zurueck -> dort zeigt die v6-Default-
+		-- Route auf Freifunk (br-client), und die Clients kommen nicht ueber LTE raus.
+		-- Die Section wird mit dem AKTUELLEN Praefix neu gesetzt; da dieses Skript
+		-- bei jedem 'ifup' der LTE-Schnittstelle laeuft, ist die Regel praefix-sicher.
+		uci:delete('network', 'lte_clients')
+		uci:section('network', 'rule6', 'lte_clients', {
+			src = ipv6_prefix,
+			lookup = '1',
+			priority = '9999',
+		})
+		uci:save('network')
+		os.execute("/etc/init.d/network reload")
 	end
 end
 
@@ -177,6 +192,9 @@ local function remove_dhcp_config()
 	uci:set('dhcp', 'wan', 'ignore')
 	uci:save('dhcp')
 
+	-- IPv6-Policy-Routing-Regel wieder entfernen
+	uci:delete('network', 'lte_clients')
+
 	uci:set('network', 'wan', 'proto', 'dhcp')
 	uci:delete('network', 'wan', 'ipaddr')
 	uci:delete('network', 'wan', 'netmask')
@@ -184,6 +202,9 @@ local function remove_dhcp_config()
 	os.execute("/etc/init.d/network reload")
 	os.execute("/etc/init.d/firewall reload")
 	os.execute("/etc/init.d/dnsmasq reload")
+
+	-- evtl. noch live haengende Regel (Prio 9999) sicher abraeumen
+	os.execute("while ip -6 rule del priority 9999 2>/dev/null; do :; done")
 
 	delete_uradvd_section('br-wan')
 	uci:save('uradvd')
