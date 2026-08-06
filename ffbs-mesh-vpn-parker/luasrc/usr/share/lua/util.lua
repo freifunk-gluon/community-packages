@@ -86,6 +86,19 @@ function util.sleep(n)
 	posix.unistd.sleep(n)
 end
 
+function util.wait_for(condition, timeout)
+	-- Wait until condition() returns true.
+	-- Gives up after timeout seconds and returns whether the condition
+	-- has been met.
+	for _ = 1, timeout do
+		if condition() then
+			return true
+		end
+		util.sleep(1)
+	end
+	return condition()
+end
+
 local random_seeded = false
 function util.shuffle(tbl)
 	if not random_seeded then
