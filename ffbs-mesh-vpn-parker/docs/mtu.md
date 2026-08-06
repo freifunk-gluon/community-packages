@@ -11,7 +11,7 @@ the clients must not send packets larger than the MTU of the tunnels.
 * `noderoute.lua` announces the smallest MTU of the tunnels with a live
     handshake, because each of these tunnels can carry the default route
     after the next cycle. It announces the MTU in the router
-    advertisements for IPv6.
+    advertisements for IPv6 and in DHCP option 26 for IPv4.
 
 Router advertisements
 ---------------------

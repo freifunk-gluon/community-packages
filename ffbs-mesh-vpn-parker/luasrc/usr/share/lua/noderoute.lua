@@ -1,3 +1,4 @@
+local dhcp = require("parker.dhcp")
 local json = require("jsonc")
 local util = require("util")
 local uci = require("uci")
@@ -8,6 +9,9 @@ local tmpdir = arg[1]
 
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
+
+-- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the interface MTU.
+local MTU_OPTION = "option:mtu"
 
 -- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
 -- and exits.
@@ -128,6 +132,25 @@ local function uci_commit(config)
 	end
 end
 
+local function set_client_option(name, values)
+	-- Announce one DHCPv4 option to our clients, or stop announcing it
+	-- when there are no values. Returns whether uci has changed, i.e.
+	-- whether dnsmasq has to be reloaded.
+
+	local options = dhcp.merge_option(uci.get("dhcp", DHCP_IFACE, "dhcp_option"), name, values)
+	if options == nil then
+		return false
+	end
+	if #options > 0 then
+		uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	else
+		-- uci cannot hold an empty list.
+		uci_delete("dhcp", DHCP_IFACE, "dhcp_option")
+	end
+	uci_commit("dhcp")
+	return true
+end
+
 local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
@@ -179,6 +202,7 @@ local function apply_network(conf, target_state, mtu)
 
 	local radvd_config_deleted = false
 	local first_time_active_since_boot = false
+	local dhcp_options_changed = false
 
 	if target_state == true then
 		util.log("network: routing state: active")
@@ -263,9 +287,8 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
-	-- Our clients reach everything through the tunnel, so what fits into
-	-- it is what they may put on the wire. Announce it in the router
-	-- advertisements (RFC 4861).
+	-- Our clients reach everything through a tunnel, so announce the
+	-- tunnel MTU, for IPv6 in the router advertisements (RFC 4861).
 	local adv_mtu_changed = false
 	local adv_mtu = util.read_file(ADV_MTU_FILE)
 	local want_adv_mtu = nil
@@ -298,6 +321,27 @@ local function apply_network(conf, target_state, mtu)
 			-- respawning it after a few attempts.
 			os.execute("/etc/init.d/gluon-radvd stop")
 		end
+		changed = true
+	end
+
+	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132).
+	local client_mtu4 = nil
+	if target_state and mtu ~= nil then
+		client_mtu4 = mtu
+	end
+	-- { nil } is the empty list, i.e. no such option.
+	if set_client_option(MTU_OPTION, { client_mtu4 }) then
+		dhcp_options_changed = true
+		if client_mtu4 ~= nil then
+			util.log("Announcing an IPv4 MTU of " .. client_mtu4 .. " to our clients")
+		else
+			util.log("No longer announcing an IPv4 MTU to our clients")
+		end
+	end
+
+	if dhcp_options_changed then
+		util.log("Reloading dnsmasq to serve our clients the options they now get")
+		os.execute("/etc/init.d/dnsmasq reload")
 		changed = true
 	end
 
