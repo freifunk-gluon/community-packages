@@ -23,6 +23,37 @@ They have their corresponding services in `/etc/init.d/` and are usually quite v
 in `logread`.
 This package also takes care of generating the WireGuard Keypair for the node.
 
+MTU
+---
+
+Everything our clients send leaves the node through a WireGuard tunnel,
+so how big their packets may be is decided by what is left of the WAN
+MTU once WireGuard has taken its share.
+
+`nodeconfig.sh` reports the MTU `br-wan` uses for IPv6 to the config
+service, which answers with the MTU of the tunnels in `mtu`.
+`nodeconfig.lua` puts it on every tunnel, and `noderoute.lua` passes it
+on to the clients:
+
+    wg MTU  = conf.mtu
+    RA MTU  = the smallest wg MTU of the tunnels with a live handshake
+    DHCP 26 = RA MTU
+    MSS     = RA MTU - 60             for TCP over IPv6
+            = DHCP 26 - 40            for TCP over IPv4
+
+The tunnels with a live handshake are all candidates for the default
+route, and noderoute may pick another one on any of its cycles without
+the clients noticing, so they are told the smallest of them. No MTU is
+announced in the router advertisements below the 1280 bytes IPv6 needs
+on a link: uradvd rejects one and exits, which would leave the client
+network without router advertisements at all.
+
+Nothing announces an MSS. fw4 clamps it, from `mtu_fix '1'` on the
+`vpn_parker` zone, by way of a `tcp option maxseg size set rt mtu` rule
+in `mangle_forward` and `mangle_postrouting`; the kernel subtracts 40
+bytes of IPv4 or 60 bytes of IPv6 and TCP header from the MTU of the
+route a packet takes.
+
 site.conf
 ---------
 

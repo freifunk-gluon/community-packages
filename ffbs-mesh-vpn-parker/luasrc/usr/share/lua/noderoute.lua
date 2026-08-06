@@ -1,3 +1,4 @@
+local dhcp = require("parker.dhcp")
 local json = require("jsonc")
 local util = require("util")
 local uci = require("uci")
@@ -8,6 +9,19 @@ local tmpdir = arg[1]
 
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
+
+-- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the MTU a client may
+-- use on the network it has just been given an address on.
+local MTU_OPTION = "option:mtu"
+
+-- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
+-- and exits over it, which would leave the whole client network without
+-- router advertisements.
+local MIN_ADV_MTU = 1280
+
+-- Where uradvd picks up the MTU we want it to advertise, see
+-- /lib/gluon/radvd/arguments.
+local ADV_MTU_FILE = "/tmp/adv_mtu"
 
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the services serving our clients to catch
@@ -66,6 +80,27 @@ local function set_wg_route(iface, conc)
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
 end
 
+local function link_mtu(iface)
+	-- The MTU an interface currently has, or nil if there is no such
+	-- interface.
+	return tonumber(util.read_file("/sys/class/net/" .. iface .. "/mtu") or "")
+end
+
+local function tunnel_mtu(ifaces)
+	-- The MTU our clients have to live with. Every cycle may pick another
+	-- one of these tunnels, and the clients keep their addresses and their
+	-- connections across such a switch, so the smallest of them is the
+	-- only answer that holds afterwards. Nil while we know none of them.
+	local result = nil
+	for _, iface in ipairs(ifaces) do
+		local mtu = link_mtu(iface)
+		if mtu ~= nil and (result == nil or mtu < result) then
+			result = mtu
+		end
+	end
+	return result
+end
+
 local function uci_delete(config, section, option)
 	if not uci.delete(config, section, option) then
 		util.log(
@@ -100,6 +135,21 @@ local function uci_commit(config)
 	if not uci.commit(config) then
 		util.log("uci.commit(" .. tostring(config) .. ") failed")
 	end
+end
+
+local function set_client_option(name, values)
+	-- Announce one DHCPv4 option to our clients, or stop announcing it
+	-- when there are no values. The list it lives in is shared with the
+	-- upgrade scripts, so only our own entry may be touched. Returns
+	-- whether uci has been changed, i.e. whether dnsmasq has to be told.
+
+	local options = dhcp.merge_option(uci.get("dhcp", DHCP_IFACE, "dhcp_option"), name, values)
+	if options == nil then
+		return false
+	end
+	uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	uci_commit("dhcp")
+	return true
 end
 
 local function sections_changed()
@@ -147,13 +197,14 @@ local function services_ready()
 	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
 end
 
-local function apply_network(conf, target_state)
+local function apply_network(conf, target_state, mtu)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
 	end
 
 	local radvd_config_deleted = false
 	local first_time_active_since_boot = false
+	local dhcp_options_changed = false
 
 	if target_state == true then
 		util.log("network: routing state: active")
@@ -238,20 +289,38 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
-	-- The stop above is not conditional on anything radvd announces, so it
-	-- has to be paired with a start here even when the announced prefix
-	-- did not change: a network reconfiguration that leaves the prefix
-	-- alone must not leave the clients without router advertisements.
-	local range6 = util.read_file("/tmp/range6")
-	if (target_state and range6 ~= conf.range6) or radvd_config_deleted or radvd_stopped then
-		if target_state and conf.range6 ~= nil then
-			local f = io.open("/tmp/range6", "w")
-			f:write(conf.range6)
-			f:close()
+	-- Our clients reach everything through the tunnel, so what fits into
+	-- it is what they may put on the wire. The IPv6 half of that goes into
+	-- the router advertisements (RFC 4861).
+	local adv_mtu_changed = false
+	local adv_mtu = util.read_file(ADV_MTU_FILE)
+	local want_adv_mtu = nil
+	if target_state and mtu ~= nil and mtu >= MIN_ADV_MTU then
+		want_adv_mtu = tostring(mtu)
+	end
+	if want_adv_mtu ~= nil then
+		if want_adv_mtu ~= adv_mtu then
+			util.write_file(ADV_MTU_FILE, want_adv_mtu)
+			adv_mtu_changed = true
+			util.log("Announcing an MTU of " .. want_adv_mtu .. " to our clients")
+		end
+	elseif adv_mtu ~= nil then
+		os.execute("rm " .. ADV_MTU_FILE .. " -f")
+		adv_mtu_changed = true
+		util.log("No longer announcing an MTU to our clients")
+	end
 
-			f = io.open("/tmp/addr6", "w")
-			f:write(conf.address6)
-			f:close()
+	-- The stop above is not conditional on anything radvd announces, so it
+	-- has to be paired with a start here even when none of the announced
+	-- values changed: a network reconfiguration that touches neither the
+	-- prefix nor the MTU must not leave the clients without router
+	-- advertisements.
+	local range6 = util.read_file("/tmp/range6")
+	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
+			or adv_mtu_changed or radvd_stopped then
+		if target_state and conf.range6 ~= nil then
+			util.write_file("/tmp/range6", conf.range6)
+			util.write_file("/tmp/addr6", conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
 		else
 			-- Nothing to announce: without a prefix uradvd exits right
@@ -259,6 +328,27 @@ local function apply_network(conf, target_state)
 			-- so an explicit stop is both quieter and equivalent.
 			os.execute("/etc/init.d/gluon-radvd stop")
 		end
+		changed = true
+	end
+
+	-- The IPv4 half goes out with the addresses we lease (RFC 2132).
+	local client_mtu4 = nil
+	if target_state and mtu ~= nil then
+		client_mtu4 = mtu
+	end
+	-- { nil } is the empty list, i.e. no such option.
+	if set_client_option(MTU_OPTION, { client_mtu4 }) then
+		dhcp_options_changed = true
+		if client_mtu4 ~= nil then
+			util.log("Announcing an IPv4 MTU of " .. client_mtu4 .. " to our clients")
+		else
+			util.log("No longer announcing an IPv4 MTU to our clients")
+		end
+	end
+
+	if dhcp_options_changed then
+		util.log("Reloading dnsmasq to serve our clients the options they now get")
+		os.execute("/etc/init.d/dnsmasq reload")
 		changed = true
 	end
 
@@ -296,6 +386,9 @@ local function update(report)
 		conf = json.parse(conf_json)
 	end
 
+	-- What our clients may send.
+	local mtu = tunnel_mtu(active)
+
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
 	-- otherwise this function will simply to nothing
@@ -309,7 +402,7 @@ local function update(report)
 			return
 		end
 		util.log(#active .. " active tunnels: Applying network state.")
-		apply_network(conf, true)
+		apply_network(conf, true, mtu)
 	end
 
 	local current = get_wg_routes()
