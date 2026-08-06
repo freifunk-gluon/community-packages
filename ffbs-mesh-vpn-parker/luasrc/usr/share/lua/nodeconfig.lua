@@ -1,4 +1,5 @@
 local json = require("jsonc")
+local posix = require("posix")
 local util = require("util")
 local uci = require('simple-uci').cursor()
 
@@ -10,14 +11,87 @@ local PRIVKEY = "/etc/parker/wg-privkey"
 
 util.loggername = "nodeconfig.lua"
 
+local function prefer_ipv6()
+	-- Check whether the WAN has an IPv6 default route. If it has, we want to
+	-- reach our concentrators over IPv6, otherwise over IPv4.
+	-- This mirrors what checkuplink of ffmuc-mesh-vpn-wireguard-vxlan does.
+
+	for line in string.gmatch(util.check_output("ip -6 route show table 1"), "[^\n]+") do
+		if string.find(line, "^default") then
+			return true
+		end
+	end
+	return false
+end
+
+local function split_endpoint(endpoint)
+	-- Split an endpoint into its host and its port part.
+	-- Understands "host:port" as well as "[v6-address]:port".
+	-- Returns nil if the endpoint is not in one of these formats.
+
+	local host, port = string.match(endpoint, "^%[(.+)%]:(%d+)$")
+	if host == nil then
+		host, port = string.match(endpoint, "^([^:]+):(%d+)$")
+	end
+	return host, port
+end
+
+local function join_endpoint(address, port)
+	-- Build an endpoint from an address and a port.
+	-- Wireguard expects IPv6 addresses to be enclosed in brackets and
+	-- reports them the same way.
+
+	if string.find(address, ":", 1, true) ~= nil then
+		return "[" .. address .. "]:" .. port
+	end
+	return address .. ":" .. port
+end
+
+local function resolve_endpoint(endpoint, ipv6_first)
+	-- Resolve the host part of an endpoint to an IP address.
+	--
+	-- Wireguard resolves an endpoint once, when it is configured, and from
+	-- then on only reports the resolved address. Resolving the endpoint
+	-- ourselves keeps the comparison with the running configuration a
+	-- comparison of two IP addresses.
+	--
+	-- Returns nil if the endpoint can neither be parsed nor resolved.
+	--
+	-- Arguments:
+	-- * endpoint: The endpoint as received from the config service.
+	-- * ipv6_first: Whether to prefer IPv6 over IPv4 addresses.
+
+	local host, port = split_endpoint(endpoint)
+	if host == nil then
+		return nil
+	end
+	if string.find(host, ":", 1, true) ~= nil or string.match(host, "^%d+%.%d+%.%d+%.%d+$") ~= nil then
+		-- The endpoint already contains an IP address. Nothing to resolve.
+		return join_endpoint(host, port)
+	end
+
+	local families = { posix.sys.socket.AF_INET, posix.sys.socket.AF_INET6 }
+	if ipv6_first then
+		families = { posix.sys.socket.AF_INET6, posix.sys.socket.AF_INET }
+	end
+	for _, family in ipairs(families) do
+		local address = util.nslookup(host, family)
+		if address ~= nil then
+			return join_endpoint(address, port)
+		end
+	end
+	return nil
+end
+
 local function conf_wg_iface(iface, privkey, peers, keepalive)
 	-- Configure Wireguard parameters on an existing wg-interface
+	-- Every peer needs a resolved_endpoint, see resolve_endpoint().
 	local cmd = "wg set " .. iface .. " fwmark 1 "
 	if privkey ~= nil then
 		cmd = cmd .. " private-key " .. privkey
 	end
 	for _, peer in pairs(peers) do
-		cmd = cmd .. " peer " .. peer.pubkey .. " endpoint " .. peer.endpoint
+		cmd = cmd .. " peer " .. peer.pubkey .. " endpoint " .. peer.resolved_endpoint
 		cmd = cmd .. " persistent-keepalive " .. keepalive .. " allowed-ips 0.0.0.0/0,::/0"
 	end
 	os.execute(cmd)
@@ -56,23 +130,31 @@ local function apply_wg(conf)
 
 	local current = util.get_wg_info()
 	local target_ifaces = {}
+	local ipv6_first = prefer_ipv6()
 
 	-- Create wg-interfaces defined in the configuration, if they
 	-- do not exist yet.
 	for _, conc in pairs(conf.concentrators) do
 		local iface = "wg_c" .. conc.id
-		target_ifaces[iface] = conc
-		if current[iface] == nil then
-			util.log("Creating wg-interface " .. iface .. " with mtu " .. conf.mtu)
-			os.execute("ip link add " .. iface .. " type wireguard")
-			os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
-			conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive)
-			util.log("Setting wg-interface " .. iface .. " up")
-			os.execute("ip link set up " .. iface)
-			conf_tc_iface(iface)
+		conc.resolved_endpoint = resolve_endpoint(conc.endpoint, ipv6_first)
+		if conc.resolved_endpoint == nil and current[iface] == nil then
+			-- Without an endpoint there is nothing we could configure on a
+			-- new interface. Let's try again on the next run.
+			util.log("Unable to resolve endpoint " .. conc.endpoint .. ". Not creating wg-interface " .. iface)
 		else
-			util.log("Updating MTU on wg-interface " .. iface .. " to " .. conf.mtu)
-			os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+			target_ifaces[iface] = conc
+			if current[iface] == nil then
+				util.log("Creating wg-interface " .. iface .. " with mtu " .. conf.mtu)
+				os.execute("ip link add " .. iface .. " type wireguard")
+				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+				conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive)
+				util.log("Setting wg-interface " .. iface .. " up")
+				os.execute("ip link set up " .. iface)
+				conf_tc_iface(iface)
+			else
+				util.log("Updating MTU on wg-interface " .. iface .. " to " .. conf.mtu)
+				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+			end
 		end
 	end
 
@@ -86,8 +168,13 @@ local function apply_wg(conf)
 		else
 			-- Update configuration on existing interfaces to what the config
 			-- service has told us to use.
-			if util.tablelength(wg_conf.peers) <= 1 then
-				local target = target_ifaces[iface]
+			local target = target_ifaces[iface]
+			if target.resolved_endpoint == nil then
+				-- Never hand an unresolved endpoint to wg. Keep whatever
+				-- Wireguard is using at the moment and try again later.
+				util.log("wg-iface " .. iface .. ": Unable to resolve endpoint " .. target.endpoint)
+				util.log("wg-iface " .. iface .. ": Not reconfiguring this interface.")
+			elseif util.tablelength(wg_conf.peers) <= 1 then
 				local do_it = false
 				-- Check all the configurations of the interface.
 				if util.tablelength(wg_conf.peers) == 0 then
@@ -107,7 +194,7 @@ local function apply_wg(conf)
 						os.execute("wg set " .. iface .. " peer " .. cur_conf.pubkey .. " remove")
 						do_it = true
 					else
-						if cur_conf.endpoint ~= target.endpoint then
+						if cur_conf.endpoint ~= target.resolved_endpoint then
 							util.log(
 								"wg-iface "
 									.. iface
@@ -116,7 +203,7 @@ local function apply_wg(conf)
 									.. ". Endpoint has changed from "
 									.. cur_conf.endpoint
 									.. " to "
-									.. target.endpoint
+									.. target.resolved_endpoint
 							)
 							do_it = true
 						end
