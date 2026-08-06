@@ -9,6 +9,12 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- How long we are willing to wait for netifd to apply a configuration we
+-- have just committed, and for the services serving our clients to catch
+-- up with it afterwards.
+local NETWORK_TIMEOUT = 60
+local SERVICES_TIMEOUT = 20
+
 util.loggername = "noderoute.lua"
 
 local function dump(foo)
@@ -100,6 +106,47 @@ local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
 
+local function iface_status(iface)
+	local output = util.check_output("ubus call network.interface." .. iface .. " status 2>/dev/null")
+	if output == "" then
+		return nil
+	end
+	return json.parse(output)
+end
+
+local function network_applied(conf, target_state)
+	-- Has netifd applied the interface configuration we have committed?
+	-- netifd updates the running protocol as part of processing the
+	-- reload, so as long as we are switching protocols this cannot be
+	-- confused by the state the interface was in before.
+	local status = iface_status(DHCP_IFACE)
+	if status == nil then
+		return false
+	end
+	if not target_state then
+		return status.proto == "dhcp"
+	end
+	if status.proto ~= "static" or status.up ~= true then
+		return false
+	end
+	-- The interface may have been up with a different address before.
+	for _, addr in ipairs(status["ipv4-address"] or {}) do
+		if addr.address == conf.address4 then
+			return true
+		end
+	end
+	return false
+end
+
+local function services_ready()
+	-- Are the services our clients need back up? These are the same
+	-- conditions noderoute.sh complains about when they are missing.
+	if os.execute("pidof uradvd >/dev/null") ~= 0 then
+		return false
+	end
+	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
+end
+
 local function apply_network(conf, target_state)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
@@ -169,9 +216,14 @@ local function apply_network(conf, target_state)
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
 		os.execute("/etc/init.d/network reload")
-		util.log("Network reload finished. Wait another 60s for the config to settle...")
-		util.sleep(60)
-		util.log("...done sleeping for 60s.")
+		util.log("Network reload finished. Waiting for " .. DHCP_IFACE .. " to be reconfigured...")
+		if util.wait_for(function()
+			return network_applied(conf, target_state)
+		end, NETWORK_TIMEOUT) then
+			util.log("..." .. DHCP_IFACE .. " has been reconfigured.")
+		else
+			util.log("..." .. DHCP_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
+		end
 		changed = true
 	end
 
@@ -196,10 +248,13 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
-	if changed then
-		util.log("Some network config has changed. Wait another 20s for everything to sette...")
-		util.sleep(20)
-		util.log("... done sleeping for 20s")
+	if changed and target_state then
+		util.log("Some network config has changed. Waiting for the client services...")
+		if util.wait_for(services_ready, SERVICES_TIMEOUT) then
+			util.log("...client services are up.")
+		else
+			util.log("...client services are not up after " .. SERVICES_TIMEOUT .. "s. Continuing anyway.")
+		end
 	end
 
 	return true
