@@ -15,6 +15,11 @@ local CONFIG_FILE = tmpdir .. "/noderoute.json"
 -- that it may do without IPv4 altogether.
 local IPV6_ONLY_OPTION = "option:ipv6-only"
 
+-- The NAT64 prefix we announce to our clients, in the notation uradvd
+-- expects. Its address part has to stay in sync with the prefix
+-- /etc/init.d/ebpf-clat starts ebpf-clat with.
+local NAT64_PREFIX = "64:ff9b::/96"
+
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the services serving our clients to catch
 -- up with it afterwards.
@@ -279,12 +284,34 @@ local function apply_network(conf, target_state, address4)
 		changed = true
 	end
 
+	-- A node that translates IPv4 for its clients announces the NAT64 prefix
+	-- in its router advertisements (RFC 8781), so clients can translate for
+	-- themselves as well. uradvd only reads /tmp/pref64 when it starts, so
+	-- the file has to be in place before the restart below; the CLAT itself
+	-- is set up further down.
+	local pref64_changed = false
+	local pref64 = util.read_file("/tmp/pref64")
+	if target_state and conf.xlat_range6 ~= nil then
+		if pref64 ~= NAT64_PREFIX then
+			local f = io.open("/tmp/pref64", "w")
+			f:write(NAT64_PREFIX)
+			f:close()
+			pref64_changed = true
+			util.log("Announcing NAT64 prefix " .. NAT64_PREFIX .. " to our clients")
+		end
+	elseif pref64 ~= nil then
+		os.execute("rm /tmp/pref64 -f")
+		pref64_changed = true
+		util.log("No longer announcing a NAT64 prefix to our clients")
+	end
+
 	-- The stop above is not conditional on anything radvd announces, so it
 	-- has to be paired with a start here even when the announced prefix
 	-- did not change: a network reconfiguration that leaves the prefix
 	-- alone must not leave the clients without router advertisements.
 	local range6 = util.read_file("/tmp/range6")
-	if (target_state and range6 ~= conf.range6) or radvd_config_deleted or radvd_stopped then
+	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
+			or pref64_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
 			local f = io.open("/tmp/range6", "w")
 			f:write(conf.range6)
@@ -320,8 +347,9 @@ local function apply_network(conf, target_state, address4)
 	end
 
 	-- The CLAT that does the translating. Our clients are told about it by
-	-- the DHCPv4 option above; this is only about the service, which is as
-	-- gone as its marker file after a reboot.
+	-- the DHCPv4 option above and by the PREF64 option further up; this is
+	-- only about the service, which is as gone as its marker file after a
+	-- reboot.
 	local xlat_range6 = util.read_file("/tmp/xlat_range6")
 	if xlat ~= nil then
 		if xlat_range6 ~= xlat then
