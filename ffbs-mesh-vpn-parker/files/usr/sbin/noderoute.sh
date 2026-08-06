@@ -15,6 +15,10 @@ CYCLE_SLEEP=10
 IDLE_SLEEP=20
 # How often we look for something to happen while idling.
 POLL_SLEEP=5
+# How long we give the network to bring bat0 up on its own before we
+# restart it, and how often we look while doing so.
+BATMAN_GRACE=30
+BATMAN_POLL_SLEEP=10
 
 LOGGER="logger -s -t noderoute.sh"
 $LOGGER Starting up.
@@ -39,6 +43,22 @@ check_batman() {
 		return 1
 	fi
 	return 0
+}
+
+recover_batman() {
+	# Wait for a functional batman-setup. bat0 may not exist yet after boot
+	# or a gw_mode change, so restart the network only when the check
+	# still fails after BATMAN_GRACE seconds.
+	local waited=0
+	while ! check_batman; do
+		if [ "$waited" -ge "$BATMAN_GRACE" ]; then
+			$LOGGER Restarting network to get a working BATMAN-interface
+			/etc/init.d/network restart
+			waited=0
+		fi
+		sleep "$BATMAN_POLL_SLEEP"
+		waited=$((waited + BATMAN_POLL_SLEEP))
+	done
 }
 
 active_tunnels() {
@@ -98,10 +118,7 @@ while true; do
 		fi
 	fi
 
-	while (! check_batman); do
-		/etc/init.d/network restart
-		sleep 30
-	done;
+	recover_batman
 
 	wait_for_change "$IDLE_SLEEP" "$POLL_SLEEP"
 done
