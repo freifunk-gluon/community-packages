@@ -9,6 +9,14 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
+-- and exits.
+local MIN_ADV_MTU = 1280
+
+-- Where uradvd picks up the MTU we want it to advertise, see
+-- /lib/gluon/radvd/arguments.
+local ADV_MTU_FILE = "/tmp/adv_mtu"
+
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the client services afterwards.
 local NETWORK_TIMEOUT = 60
@@ -63,6 +71,25 @@ local function set_wg_route(iface, conc)
 		os.execute("ip -4 r replace default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO)
 	return res
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+end
+
+local function link_mtu(iface)
+	-- The MTU an interface currently has, or nil if there is no such
+	-- interface.
+	return tonumber(util.read_file("/sys/class/net/" .. iface .. "/mtu") or "")
+end
+
+local function tunnel_mtu(ifaces)
+	-- The smallest MTU of the given tunnels, or nil if none is known. Any
+	-- of them may carry the default route after the next cycle.
+	local result = nil
+	for _, iface in ipairs(ifaces) do
+		local mtu = link_mtu(iface)
+		if mtu ~= nil and (result == nil or mtu < result) then
+			result = mtu
+		end
+	end
+	return result
 end
 
 local function uci_delete(config, section, option)
@@ -145,7 +172,7 @@ local function services_ready()
 	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
 end
 
-local function apply_network(conf, target_state)
+local function apply_network(conf, target_state, mtu)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
 	end
@@ -236,12 +263,32 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
-	-- The stop above is not conditional on anything radvd announces, so it
-	-- has to be paired with a start here even when the announced prefix
-	-- did not change: a network reconfiguration that leaves the prefix
-	-- alone must not leave the clients without router advertisements.
+	-- Our clients reach everything through the tunnel, so what fits into
+	-- it is what they may put on the wire. Announce it in the router
+	-- advertisements (RFC 4861).
+	local adv_mtu_changed = false
+	local adv_mtu = util.read_file(ADV_MTU_FILE)
+	local want_adv_mtu = nil
+	if target_state and mtu ~= nil and mtu >= MIN_ADV_MTU then
+		want_adv_mtu = tostring(mtu)
+	end
+	if want_adv_mtu ~= nil then
+		if want_adv_mtu ~= adv_mtu then
+			util.write_file(ADV_MTU_FILE, want_adv_mtu)
+			adv_mtu_changed = true
+			util.log("Announcing an MTU of " .. want_adv_mtu .. " to our clients")
+		end
+	elseif adv_mtu ~= nil then
+		os.execute("rm " .. ADV_MTU_FILE .. " -f")
+		adv_mtu_changed = true
+		util.log("No longer announcing an MTU to our clients")
+	end
+
+	-- Start radvd again after the stop above, also when neither the prefix
+	-- nor the MTU has changed.
 	local range6 = util.read_file("/tmp/range6")
-	if (target_state and range6 ~= conf.range6) or radvd_config_deleted or radvd_stopped then
+	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
+			or adv_mtu_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
@@ -288,6 +335,8 @@ local function update(report)
 		conf = json.parse(conf_json)
 	end
 
+	local mtu = tunnel_mtu(active)
+
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
 	-- otherwise this function will simply to nothing
@@ -301,7 +350,7 @@ local function update(report)
 			return
 		end
 		util.log(#active .. " active tunnels: Applying network state.")
-		apply_network(conf, true)
+		apply_network(conf, true, mtu)
 	end
 
 	local current = get_wg_routes()
