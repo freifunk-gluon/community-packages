@@ -43,5 +43,16 @@ This package relies on the following parameters in your `site.conf`:
 parker = {
         config_server = "config.yourcommunity.net",
         config_pubkey = "<Your usign config signing pubkey>",
+
+        -- optional
+        client_ntp_servers4 = { "198.51.100.123" },
 },
 ```
+
+`client_ntp_servers4` lists the NTP servers announced to clients via
+DHCPv4 option 42. That option carries IPv4 addresses only, so hostnames
+and IPv6 addresses cannot be used here — unlike in `ntp_servers`, which
+configures the node's own clock.
+
+When it is unset, a single IPv4 address in `ntp_servers` is passed on to
+clients instead.

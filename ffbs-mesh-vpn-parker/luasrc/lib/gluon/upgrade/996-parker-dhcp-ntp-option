@@ -28,11 +28,30 @@ end
 -- Option 42 carries IPv4 addresses only. dnsmasq refuses to start on an
 -- option it cannot parse, so handing it anything else would take down
 -- DHCP and DNS for our clients.
-local servers = {}
-local ntp_server = site.ntp_servers({})[1]
-if ntp_server and is_ipv4(ntp_server) then
-	table.insert(servers, ntp_server)
+local function client_ntp_servers()
+	local servers = {}
+
+	for _, addr in ipairs(site.parker.client_ntp_servers4({})) do
+		if is_ipv4(addr) then
+			table.insert(servers, addr)
+		end
+	end
+	if #servers > 0 then
+		return servers
+	end
+
+	-- ntp_servers configures the node's own clock and may well be a
+	-- hostname, but sites that have put an IPv4 address there have been
+	-- relying on us passing it on.
+	local ntp_server = site.ntp_servers({})[1]
+	if ntp_server and is_ipv4(ntp_server) then
+		table.insert(servers, ntp_server)
+	end
+
+	return servers
 end
+
+local servers = client_ntp_servers()
 
 if #servers == 0 and uci:get('dhcp', DHCP_SECTION) == nil then
 	return
