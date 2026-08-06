@@ -1,9 +1,12 @@
 #!/usr/bin/lua
 
 local site = require 'gluon.site'
+local dhcp = require 'parker.dhcp'
+local uci = require('simple-uci').cursor()
+
+-- dnsmasq's name for DHCPv4 option 42 (RFC 2132).
+local NTP_OPTION = 'option:ntp-server'
+
 local ntp_server = site.ntp_servers()[1]
 
-local uci = require('uci')
-local x = uci.cursor()
-x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,' .. ntp_server})
-x:commit('dhcp')
+dhcp.set_client_option(uci, NTP_OPTION, { ntp_server })
