@@ -10,6 +10,10 @@ DEFAULT_SLEEP=20
 # retrying quickly at first gets us our configuration a lot earlier. Every
 # further attempt that fails doubles the delay, up to DEFAULT_SLEEP.
 INITIAL_SLEEP=2
+# Give up on a config request that stalls. Without a timeout a connection
+# that is never answered keeps this script from making any progress at
+# all, which is exactly what we do not want while a node is starting up.
+FETCH_TIMEOUT=20
 export LIBPACKETMARK_MARK=1
 
 tmpdir=/tmp/ff-Ohb0ba0u/
@@ -96,7 +100,7 @@ while true; do
 		exit 1
 	fi
 
-	LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
+	LD_PRELOAD=libpacketmark.so wget -T "$FETCH_TIMEOUT" "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."
