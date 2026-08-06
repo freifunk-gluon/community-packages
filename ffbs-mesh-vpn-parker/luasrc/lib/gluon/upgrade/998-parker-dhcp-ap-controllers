@@ -1,0 +1,36 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local dhcp = require 'parker.dhcp'
+local uci = require('simple-uci').cursor()
+
+-- UniFi access points look for their controller in suboption 1 of the
+-- vendor-specific option 43. dnsmasq builds that encapsulation from the
+-- vendor: prefix and only hands it to clients whose vendor class
+-- (option 60) contains "ubnt", so it stays invisible to everyone else.
+local UNIFI_SECTION = 'parker_unifi'
+local UNIFI_VENDORCLASS = 'ubnt'
+local UNIFI_OPTION = 'vendor:' .. UNIFI_VENDORCLASS .. ',1'
+
+-- Omada access points read their controller from option 138, the CAPWAP
+-- access controller list of RFC 5417. dnsmasq has no name for it.
+local OMADA_OPTION = '138'
+
+local unifi_controller = site.parker.unifi_controller4('')
+
+if dhcp.is_ipv4(unifi_controller) then
+	-- Our own section, so removing it takes the option with it.
+	uci:section('dhcp', 'vendorclass', UNIFI_SECTION, {
+		networkid = UNIFI_SECTION,
+		vendorclass = UNIFI_VENDORCLASS,
+		dhcp_option = { UNIFI_OPTION .. ',' .. unifi_controller },
+	})
+	uci:commit('dhcp')
+elseif uci:get('dhcp', UNIFI_SECTION) ~= nil then
+	uci:delete('dhcp', UNIFI_SECTION)
+	uci:commit('dhcp')
+end
+
+local omada_controllers = dhcp.ipv4_addresses(site.parker.omada_controllers4({}))
+
+dhcp.set_client_option(uci, OMADA_OPTION, omada_controllers)

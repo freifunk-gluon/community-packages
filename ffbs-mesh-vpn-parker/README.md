@@ -46,6 +46,8 @@ parker = {
 
         -- optional
         client_ntp_servers4 = { "198.51.100.123" },
+        unifi_controller4 = "198.51.100.10",
+        omada_controllers4 = { "198.51.100.11" },
 },
 ```
 
@@ -56,3 +58,18 @@ configures the node's own clock.
 
 When it is unset, a single IPv4 address in `ntp_servers` is passed on to
 clients instead.
+
+`unifi_controller4` and `omada_controllers4` tell the access points an
+operator hangs off the client network where to find their controller, so
+that they can be adopted without the controller sharing their broadcast
+domain. Both take IPv4 addresses only.
+
+A UniFi access point learns `unifi_controller4` from suboption 1 of the
+vendor-specific DHCPv4 option 43. Only clients whose vendor class says
+`ubnt` are sent that option, so the address stays invisible to everyone
+else on the client network.
+
+Omada access points learn `omada_controllers4` from DHCPv4 option 138,
+the CAPWAP access controller list of RFC 5417, which takes more than one
+address. Nothing identifies an Omada access point before it is adopted,
+so this one is handed to every client that asks for option 138.
