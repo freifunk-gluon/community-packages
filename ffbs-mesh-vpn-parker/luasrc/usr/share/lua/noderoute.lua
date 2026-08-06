@@ -27,6 +27,11 @@ local MIN_ADV_MTU = 1280
 -- /lib/gluon/radvd/arguments.
 local ADV_MTU_FILE = "/tmp/adv_mtu"
 
+-- The NAT64 prefix we announce to our clients, in the notation uradvd
+-- expects. Its address part has to stay in sync with the prefix
+-- /etc/init.d/ebpf-clat starts ebpf-clat with.
+local NAT64_PREFIX = "64:ff9b::/96"
+
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the services serving our clients to catch
 -- up with it afterwards.
@@ -308,6 +313,25 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
+	-- A node that translates IPv4 for its clients announces the NAT64 prefix
+	-- in its router advertisements (RFC 8781), so clients can translate for
+	-- themselves as well. uradvd only reads /tmp/pref64 when it starts, so
+	-- the file has to be in place before the restart below; the CLAT itself
+	-- is set up further down.
+	local pref64_changed = false
+	local pref64 = util.read_file("/tmp/pref64")
+	if target_state and conf.xlat_range6 ~= nil then
+		if pref64 ~= NAT64_PREFIX then
+			util.write_file("/tmp/pref64", NAT64_PREFIX)
+			pref64_changed = true
+			util.log("Announcing NAT64 prefix " .. NAT64_PREFIX .. " to our clients")
+		end
+	elseif pref64 ~= nil then
+		os.execute("rm /tmp/pref64 -f")
+		pref64_changed = true
+		util.log("No longer announcing a NAT64 prefix to our clients")
+	end
+
 	-- Our clients reach everything through the tunnel, so what fits into
 	-- it is what they may put on the wire. The IPv6 half of that goes into
 	-- the router advertisements (RFC 4861).
@@ -336,7 +360,7 @@ local function apply_network(conf, target_state, mtu)
 	-- advertisements.
 	local range6 = util.read_file("/tmp/range6")
 	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
-			or adv_mtu_changed or radvd_stopped then
+			or pref64_changed or adv_mtu_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
@@ -382,8 +406,9 @@ local function apply_network(conf, target_state, mtu)
 	end
 
 	-- The CLAT that does the translating. Our clients are told about it by
-	-- the DHCPv4 option above; this is only about the service, which is as
-	-- gone as its marker file after a reboot.
+	-- the DHCPv4 option above and by the PREF64 option further up; this is
+	-- only about the service, which is as gone as its marker file after a
+	-- reboot.
 	local xlat_range6 = util.read_file("/tmp/xlat_range6")
 	if xlat ~= nil then
 		if xlat_range6 ~= xlat then
