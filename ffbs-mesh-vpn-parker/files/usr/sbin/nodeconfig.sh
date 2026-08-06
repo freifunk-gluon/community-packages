@@ -9,6 +9,9 @@ DEFAULT_SLEEP=20
 # to DEFAULT_SLEEP, so that a node gets its configuration soon after the
 # WAN is up.
 INITIAL_SLEEP=2
+# Timeout of the config request. uclient-fetch has none by default, so a
+# server that never answers would block this script forever.
+FETCH_TIMEOUT=20
 export LIBPACKETMARK_MARK=1
 
 tmpdir=/tmp/ff-Ohb0ba0u/
@@ -92,7 +95,7 @@ while true; do
 		exit 1
 	fi
 
-	LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
+	LD_PRELOAD=libpacketmark.so wget -T "$FETCH_TIMEOUT" "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."
