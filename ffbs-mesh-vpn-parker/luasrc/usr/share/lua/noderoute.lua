@@ -25,6 +25,11 @@ local MIN_ADV_MTU = 1280
 -- /lib/gluon/radvd/arguments.
 local ADV_MTU_FILE = "/tmp/adv_mtu"
 
+-- The NAT64 prefix we announce to our clients, in the notation uradvd
+-- expects. Its address part has to stay in sync with the prefix
+-- /etc/init.d/ebpf-clat starts ebpf-clat with.
+local NAT64_PREFIX = "64:ff9b::/96"
+
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the client services afterwards.
 local NETWORK_TIMEOUT = 60
@@ -301,6 +306,24 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
+	-- A node that translates IPv4 for its clients announces the NAT64 prefix
+	-- in its router advertisements (RFC 8781), so clients can translate for
+	-- themselves as well. uradvd only reads /tmp/pref64 when it starts, so
+	-- the file has to be in place before the restart below.
+	local pref64_changed = false
+	local pref64 = util.read_file("/tmp/pref64")
+	if target_state and conf.xlat_range6 ~= nil then
+		if pref64 ~= NAT64_PREFIX then
+			util.write_file("/tmp/pref64", NAT64_PREFIX)
+			pref64_changed = true
+			util.log("Announcing NAT64 prefix " .. NAT64_PREFIX .. " to our clients")
+		end
+	elseif pref64 ~= nil then
+		os.execute("rm /tmp/pref64 -f")
+		pref64_changed = true
+		util.log("No longer announcing a NAT64 prefix to our clients")
+	end
+
 	-- Our clients reach everything through a tunnel, so announce the
 	-- tunnel MTU, for IPv6 in the router advertisements (RFC 4861).
 	local adv_mtu_changed = false
@@ -325,7 +348,7 @@ local function apply_network(conf, target_state, mtu)
 	-- nor the MTU has changed.
 	local range6 = util.read_file("/tmp/range6")
 	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
-			or adv_mtu_changed or radvd_stopped then
+			or pref64_changed or adv_mtu_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
@@ -367,9 +390,9 @@ local function apply_network(conf, target_state, mtu)
 		end
 	end
 
-	-- The CLAT that does the translating. Our clients are told about it by
-	-- the DHCPv4 option above; this is only about the service, which is as
-	-- gone as its marker file after a reboot.
+	-- Start or stop ebpf-clat. Unlike the DHCPv4 option above, this follows
+	-- /tmp/xlat_range6, because the service, like the file, does not
+	-- survive a reboot.
 	local xlat_range6 = util.read_file("/tmp/xlat_range6")
 	if xlat ~= nil then
 		if xlat_range6 ~= xlat then
