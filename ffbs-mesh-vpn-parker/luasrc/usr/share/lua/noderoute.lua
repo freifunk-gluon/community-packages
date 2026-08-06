@@ -243,13 +243,8 @@ local function apply_network(conf, target_state)
 	local range6 = util.read_file("/tmp/range6")
 	if (target_state and range6 ~= conf.range6) or radvd_config_deleted or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
-			local f = io.open("/tmp/range6", "w")
-			f:write(conf.range6)
-			f:close()
-
-			f = io.open("/tmp/addr6", "w")
-			f:write(conf.address6)
-			f:close()
+			util.write_file("/tmp/range6", conf.range6)
+			util.write_file("/tmp/addr6", conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
 		else
 			-- Without a prefix uradvd exits at once, and procd stops
