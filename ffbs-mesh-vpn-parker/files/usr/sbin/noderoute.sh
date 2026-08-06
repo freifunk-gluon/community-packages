@@ -15,6 +15,10 @@ CYCLE_SLEEP=10
 IDLE_SLEEP=20
 # How often we look for something to happen while idling.
 POLL_SLEEP=5
+# How long we wait for the first tunnel after startup before we configure
+# this node as a client of some other node.
+STARTUP_TIMEOUT=60
+STARTUP_POLL_SLEEP=2
 # How long we give the network to bring bat0 up on its own before we
 # restart it, and how often we look while doing so.
 BATMAN_GRACE=30
@@ -70,8 +74,8 @@ active_tunnels() {
 
 new_config() {
 	# Has nodeconfig.sh installed a configuration since our last cycle
-	# started?
-	[ -f "$config_file" ] && [ "$config_file" -nt "$cycle_stamp" ]
+	# started? Always false before the first cycle.
+	[ -f "$cycle_stamp" ] && [ -f "$config_file" ] && [ "$config_file" -nt "$cycle_stamp" ]
 }
 
 wait_for_change() {
@@ -95,6 +99,16 @@ wait_for_change() {
 		waited=$((waited + $2))
 	done
 }
+
+# Give nodeconfig.sh time to bring up the first tunnel. Otherwise the first
+# cycle switches the node to client mode and a later cycle switches it
+# back, which reloads the network, dnsmasq and radvd each time.
+if [ "$(uci -q get gluon.mesh_vpn.enabled)" = 1 ]; then
+	$LOGGER "Waiting up to ${STARTUP_TIMEOUT}s for the first tunnel"
+	if ! wait_for_change "$STARTUP_TIMEOUT" "$STARTUP_POLL_SLEEP"; then
+		$LOGGER No tunnel came up. Continuing without one.
+	fi
+fi
 
 while true; do
 	$LOGGER Cycling
