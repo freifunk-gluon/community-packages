@@ -10,6 +10,11 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- The IPv4 default route that set_wg_route() has set last, in the notation
+-- of ip route. The busybox ip on our nodes prints no route metrics, so
+-- this record is the only source of the MTU of that route.
+local ROUTE4_FILE = tmpdir .. "/noderoute-route4"
+
 -- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
 -- that it may do without IPv4 altogether.
 local IPV6_ONLY_OPTION = "option:ipv6-only"
@@ -67,7 +72,22 @@ local function get_handshake_ages()
 	return result
 end
 
+local function recorded_mtu4(line)
+	-- The MTU that set_wg_route() has recorded for an IPv4 default route
+	-- that ip has printed without an MTU. Returns nil if set_wg_route() has
+	-- put no MTU on the route, or false if there is no record of the route.
+	local route = string.match(line, "default via %S+ dev %S+")
+	local recorded = util.read_file(ROUTE4_FILE) or ""
+	if route == nil or string.match(recorded, "default via %S+ dev %S+") ~= route then
+		return false
+	end
+	return tonumber(string.match(recorded, "mtu (%d+)"))
+end
+
 local function get_wg_routes()
+	-- The IPv4 default routes we have installed, as { iface, mtu } pairs.
+	-- busybox ip prints no route metrics, so the MTU of a route printed
+	-- without one comes from recorded_mtu4().
 	local result = {}
 	local output = util.check_output("ip r show proto " .. RT_PROTO)
 	util.log("Checking for wg routes")
@@ -77,7 +97,11 @@ local function get_wg_routes()
 			if not string.find(line, "broadcast") then
 				for iface in string.gmatch(line, "dev [a-z0-9-_]+") do
 					util.log("Route found")
-					table.insert(result, iface:sub(5))
+					local mtu = tonumber(string.match(line, "mtu (%d+)"))
+					if mtu == nil then
+						mtu = recorded_mtu4(line)
+					end
+					table.insert(result, { iface = iface:sub(5), mtu = mtu })
 				end
 			end
 		end
@@ -85,9 +109,22 @@ local function get_wg_routes()
 	return result
 end
 
-local function set_wg_route(iface, conc)
-	local res =
-		os.execute("ip -4 r replace default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+local function set_wg_route(iface, conc, mtu4)
+	-- Route our clients through a tunnel. mtu4 is set on the IPv4 route
+	-- rather than on the interface, because the interface carries IPv6 as
+	-- well and only IPv4 packets grow in the CLAT.
+	local route4 = "default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO
+	if mtu4 ~= nil then
+		route4 = route4 .. " mtu " .. mtu4
+	end
+	-- Remove the record before changing the route and write it only after
+	-- ip has succeeded, so that it never describes a route the kernel does
+	-- not have.
+	os.remove(ROUTE4_FILE)
+	local res = os.execute("ip -4 r replace " .. route4)
+	if res == 0 then
+		util.write_file(ROUTE4_FILE, route4)
+	end
 	return res
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
 end
@@ -481,6 +518,7 @@ local function update(report)
 	end
 
 	local mtu = tunnel_mtu(active)
+	local route_mtu4 = clat_mtu(conf, mtu)
 
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
@@ -502,12 +540,21 @@ local function update(report)
 	assert(#current <= 1, "too many current routes")
 	current = current[1]
 	if current then
-		util.log("Currently " .. current .. " is the selected tunnel")
+		util.log("Currently " .. current.iface .. " is the selected tunnel")
 	end
 	util.log("There are " .. #active .. " active tunnels")
-	if current and util.has_value(active, current) then
+	if current and util.has_value(active, current.iface) then
+		if current.mtu ~= route_mtu4 then
+			-- The tunnel MTU has changed, or the MTU of the route is
+			-- unknown (false, see recorded_mtu4()), so set the route again.
+			local conc = find_concentrator(conf, current.iface)
+			if conc ~= nil then
+				util.log("Setting the IPv4 MTU of the route via " .. current.iface .. " to " .. tostring(route_mtu4))
+				set_wg_route(current.iface, conc, route_mtu4)
+			end
+		end
 		util.log("current route still active. Doing nothing.")
-		report:write("active (idle) via " .. current)
+		report:write("active (idle) via " .. current.iface)
 		return
 	end
 	if current then
@@ -516,6 +563,7 @@ local function update(report)
 
 	if #active == 0 then
 		util.log("No active tunnels. Removing default routes via wg_x.")
+		os.remove(ROUTE4_FILE)
 		local ip4route = util.check_output("ip -4 r show")
 		for line in string.gmatch(ip4route, "[^\n]+") do
 			if string.find(line, "default via") then
@@ -546,7 +594,7 @@ local function update(report)
 		util.log("activating route for " .. act)
 		local conc = find_concentrator(conf, act)
 		if conc ~= nil then
-			if set_wg_route(act, conc) == 0 then
+			if set_wg_route(act, conc, route_mtu4) == 0 then
 				configured = true
 			else
 				util.log("Failed to activate route. Trying next...")
