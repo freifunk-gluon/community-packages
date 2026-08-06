@@ -5,6 +5,10 @@
 # !!!!!!
 SIGN_PUB_KEY=/tmp/ff-Ohb0ba0u/nodeconfig-pub.key
 DEFAULT_SLEEP=20
+# Delay before the first retry. It doubles with every failed attempt, up
+# to DEFAULT_SLEEP, so that a node gets its configuration soon after the
+# WAN is up.
+INITIAL_SLEEP=2
 export LIBPACKETMARK_MARK=1
 
 tmpdir=/tmp/ff-Ohb0ba0u/
@@ -14,6 +18,17 @@ version="$(cat /lib/gluon/release)"
 
 LOGGER="logger -s -t nodeconfig.sh"
 $LOGGER "Starting up. I am running ${version}"
+
+retry_sleep=$INITIAL_SLEEP
+
+retry() {
+	# Wait before the next attempt and back off for the attempt after that.
+	sleep "$retry_sleep"
+	retry_sleep=$((retry_sleep * 2))
+	if [ "$retry_sleep" -gt "$DEFAULT_SLEEP" ]; then
+		retry_sleep=$DEFAULT_SLEEP
+	fi
+}
 
 if [ ! -s /etc/parker/wg-privkey ]; then
 	$LOGGER No Wireguard private key found, generating...
@@ -68,7 +83,7 @@ while true; do
 	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
 	if ! ip route show table 1 | grep -Fq via ; then
 		$LOGGER no WAN route. Doing nothing.
-		sleep $DEFAULT_SLEEP
+		retry
 		continue;
 	fi
 
@@ -81,7 +96,7 @@ while true; do
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."
-		sleep $DEFAULT_SLEEP
+		retry
 		continue;
 	fi
 
@@ -95,14 +110,15 @@ while true; do
 			slp=$(echo "$outp" | tail -n1)
 			$LOGGER "nodeconfig.lua successful. Sleeping ${slp}s".
 			touch ${tmpdir}/nodeconfig-successful
+			retry_sleep=$INITIAL_SLEEP
 			sleep "$slp"
 		else
 			echo "$outp"
 			$LOGGER nodeconfig.lua failed.
-			sleep "$DEFAULT_SLEEP"
+			retry
 		fi
 	else
 		$LOGGER Signature validation failed. Doing nothing.
-		sleep "$DEFAULT_SLEEP"
+		retry
 	fi
 done
