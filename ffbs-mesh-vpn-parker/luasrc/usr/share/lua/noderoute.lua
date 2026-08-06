@@ -92,6 +92,18 @@ local function set_wg_route(iface, conc)
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
 end
 
+local function find_concentrator(conf, iface)
+	-- The concentrator of a wg-interface, or nil if the config service no
+	-- longer lists it.
+	local id = tonumber(iface:match("[0-9]+"))
+	for _, conc in ipairs(conf.concentrators or {}) do
+		if conc.id == id then
+			return conc
+		end
+	end
+	return nil
+end
+
 local function link_mtu(iface)
 	-- The MTU an interface currently has, or nil if there is no such
 	-- interface.
@@ -532,15 +544,12 @@ local function update(report)
 	local configured = false
 	for _, act in pairs(util.shuffle(active)) do
 		util.log("activating route for " .. act)
-		local id = tonumber(act:match("[0-9]+"))
-		for _, conc in ipairs(conf["concentrators"]) do
-			if conc["id"] == id then
-				if set_wg_route(act, conc) == 0 then
-					configured = true
-					break
-				else
-					util.log("Failed to activate route. Trying next...")
-				end
+		local conc = find_concentrator(conf, act)
+		if conc ~= nil then
+			if set_wg_route(act, conc) == 0 then
+				configured = true
+			else
+				util.log("Failed to activate route. Trying next...")
 			end
 		end
 		if configured then
