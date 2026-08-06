@@ -1,10 +1,26 @@
 #!/bin/busybox sh
 # simple script to loop noderoute lua script
+# shellcheck shell="busybox sh"
 
 tmpdir=/tmp/ff-Ohb0ba0u/
+config_file="${tmpdir}noderoute.json"
+cycle_stamp="${tmpdir}noderoute-cycle"
+
+# A tunnel counts as usable while its last handshake is younger than this.
+# Keep in sync with noderoute.lua.
+HANDSHAKE_MAX_AGE=180
+# Shortest possible time between two cycles.
+CYCLE_SLEEP=10
+# How much longer we idle at the end of a cycle if nothing happens.
+IDLE_SLEEP=20
+# How often we look for something to happen while idling.
+POLL_SLEEP=5
 
 LOGGER="logger -s -t noderoute.sh"
 $LOGGER Starting up.
+
+# The set of usable tunnels the running configuration is based on.
+tunnels=""
 
 check_batman() {
 	# check if we have a functional batman-setup
@@ -25,13 +41,50 @@ check_batman() {
 	return 0
 }
 
+active_tunnels() {
+	# The wg-interfaces with a recent handshake, i.e. the tunnels
+	# noderoute.lua considers usable.
+	wg show all latest-handshakes |
+		awk -v max_age="$HANDSHAKE_MAX_AGE" '$3 > 0 && systime() - $3 < max_age { printf "%s ", $1 }'
+}
+
+new_config() {
+	# Has nodeconfig.sh installed a configuration since our last cycle
+	# started?
+	[ -f "$config_file" ] && [ "$config_file" -nt "$cycle_stamp" ]
+}
+
+wait_for_change() {
+	# Wait until the set of usable tunnels or the configuration changes,
+	# but no longer than $1 seconds. Checks every $2 seconds and returns
+	# 0 if something changed.
+	local waited=0
+	while true; do
+		if [ "$(active_tunnels)" != "$tunnels" ]; then
+			$LOGGER Set of usable tunnels changed
+			return 0
+		fi
+		if new_config; then
+			$LOGGER New configuration available
+			return 0
+		fi
+		if [ "$waited" -ge "$1" ]; then
+			return 1
+		fi
+		sleep "$2"
+		waited=$((waited + $2))
+	done
+}
+
 while true; do
 	$LOGGER Cycling
+	touch "$cycle_stamp"
+	tunnels="$(active_tunnels)"
 	if ! lua /usr/share/lua/noderoute.lua $tmpdir ; then
 		$LOGGER noderoute.lua returned non-zero
 	fi
 	touch ${tmpdir}/noderoute-successful
-	sleep 10
+	sleep "$CYCLE_SLEEP"
 
 	if batctl gw | grep -q server; then
 		# sanity check: is uradvd running?
@@ -50,5 +103,5 @@ while true; do
 		sleep 30
 	done;
 
-	sleep 20
+	wait_for_change "$IDLE_SLEEP" "$POLL_SLEEP"
 done
