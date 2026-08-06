@@ -10,8 +10,9 @@ local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
 -- How long we are willing to wait for netifd to apply a configuration we
--- have just committed.
+-- have just committed, and for the client services afterwards.
 local NETWORK_TIMEOUT = 60
+local SERVICES_TIMEOUT = 20
 
 util.loggername = "noderoute.lua"
 
@@ -135,6 +136,15 @@ local function network_applied(conf, target_state)
 	return false
 end
 
+local function services_ready()
+	-- Are the services our clients need back up? These are the same
+	-- conditions noderoute.sh complains about when they are missing.
+	if os.execute("pidof uradvd >/dev/null") ~= 0 then
+		return false
+	end
+	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
+end
+
 local function apply_network(conf, target_state)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
@@ -236,10 +246,13 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
-	if changed then
-		util.log("Some network config has changed. Wait another 20s for everything to sette...")
-		util.sleep(20)
-		util.log("... done sleeping for 20s")
+	if changed and target_state then
+		util.log("Some network config has changed. Waiting for the client services...")
+		if util.wait_for(services_ready, SERVICES_TIMEOUT) then
+			util.log("...client services are up.")
+		else
+			util.log("...client services are not up after " .. SERVICES_TIMEOUT .. "s. Continuing anyway.")
+		end
 	end
 
 	return true
