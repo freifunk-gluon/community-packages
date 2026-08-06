@@ -26,6 +26,15 @@ the MTU with the radvd arguments of the FreifunkMUC Gluon fork (branch
 uradvd exits when it gets an MTU below 1280, so `noderoute.lua` does not
 write such a value.
 
+CLAT overhead
+-------------
+
+While the CLAT translates for the clients (464XLAT), `noderoute.lua`
+announces the tunnel MTU minus 28 bytes in DHCP option 26. The CLAT
+replaces the 20-byte IPv4 header with the 40-byte IPv6 header. RFC 7915
+also asks a translator to add an 8-byte fragment header to an IPv4
+fragment.
+
 MSS clamping
 ------------
 

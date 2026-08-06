@@ -17,6 +17,12 @@ local IPV6_ONLY_OPTION = "option:ipv6-only"
 -- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the interface MTU.
 local MTU_OPTION = "option:mtu"
 
+-- The bytes the CLAT adds to an IPv4 packet of a client: 20 because the
+-- IPv6 header is larger than the IPv4 header, and 8 for the fragment
+-- header that a translator inserts into a fragment (RFC 7915). ebpf-clat
+-- inserts it into TCP and UDP fragments and drops ICMP fragments.
+local CLAT_OVERHEAD = 20 + 8
+
 -- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
 -- and exits.
 local MIN_ADV_MTU = 1280
@@ -103,6 +109,16 @@ local function tunnel_mtu(ifaces)
 		end
 	end
 	return result
+end
+
+local function clat_mtu(conf, mtu)
+	-- The largest IPv4 packet of a client that still fits into a tunnel with
+	-- the given MTU after the CLAT has translated it, or nil if the MTU is
+	-- unknown or no CLAT translates IPv4.
+	if mtu == nil or conf == nil or conf.xlat_range6 == nil then
+		return nil
+	end
+	return mtu - CLAT_OVERHEAD
 end
 
 local function uci_delete(config, section, option)
@@ -361,10 +377,11 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
-	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132).
+	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132), minus
+	-- the CLAT overhead while the CLAT translates.
 	local client_mtu4 = nil
 	if target_state and mtu ~= nil then
-		client_mtu4 = mtu
+		client_mtu4 = clat_mtu(conf, mtu) or mtu
 	end
 	-- { nil } is the empty list, i.e. no such option.
 	if set_client_option(MTU_OPTION, { client_mtu4 }) then
