@@ -9,6 +9,10 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- How long we are willing to wait for netifd to apply a configuration we
+-- have just committed.
+local NETWORK_TIMEOUT = 60
+
 util.loggername = "noderoute.lua"
 
 local function dump(foo)
@@ -100,6 +104,37 @@ local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
 
+local function iface_status(iface)
+	local output = util.check_output("ubus call network.interface." .. iface .. " status 2>/dev/null")
+	if output == "" then
+		return nil
+	end
+	return json.parse(output)
+end
+
+local function network_applied(conf, target_state)
+	-- Has netifd applied the interface configuration we have committed?
+	-- On a mode switch the protocol changes, so the state from before the
+	-- reload cannot match.
+	local status = iface_status(DHCP_IFACE)
+	if status == nil then
+		return false
+	end
+	if not target_state then
+		return status.proto == "dhcp"
+	end
+	if status.proto ~= "static" or status.up ~= true then
+		return false
+	end
+	-- The interface may have been up with a different address before.
+	for _, addr in ipairs(status["ipv4-address"] or {}) do
+		if addr.address == conf.address4 then
+			return true
+		end
+	end
+	return false
+end
+
 local function apply_network(conf, target_state)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
@@ -169,9 +204,14 @@ local function apply_network(conf, target_state)
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
 		os.execute("/etc/init.d/network reload")
-		util.log("Network reload finished. Wait another 60s for the config to settle...")
-		util.sleep(60)
-		util.log("...done sleeping for 60s.")
+		util.log("Network reload finished. Waiting for " .. DHCP_IFACE .. " to be reconfigured...")
+		if util.wait_for(function()
+			return network_applied(conf, target_state)
+		end, NETWORK_TIMEOUT) then
+			util.log("..." .. DHCP_IFACE .. " has been reconfigured.")
+		else
+			util.log("..." .. DHCP_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
+		end
 		changed = true
 	end
 
