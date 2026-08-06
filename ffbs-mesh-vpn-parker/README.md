@@ -65,7 +65,8 @@ MTU
 
 Everything our clients send leaves the node through a WireGuard tunnel,
 so how big their packets may be is decided by what is left of the WAN
-MTU once WireGuard has taken its share.
+MTU once WireGuard, and with 464XLAT the CLAT as well, have taken their
+share.
 
 `nodeconfig.sh` reports the MTU the WAN device uses for IPv6 to the config
 service, which answers with the MTU of the tunnels in `mtu`.
@@ -74,9 +75,18 @@ on to the clients:
 
     wg MTU  = conf.mtu
     RA MTU  = the smallest wg MTU of the tunnels with a live handshake
-    DHCP 26 = RA MTU
+    DHCP 26 = RA MTU - 28             while the CLAT translates for us
+            = RA MTU                  when it does not
     MSS     = RA MTU - 60             for TCP over IPv6
             = DHCP 26 - 40            for TCP over IPv4
+
+The 28 bytes the CLAT costs are the 20 between the IPv4 header it takes
+off and the IPv6 header it puts on, plus the 8 bytes of the fragment
+header RFC 7915 asks a translator to add to an IPv4 fragment. The kernel
+fragments IPv4 packets without DF at the MTU of the route, which is
+DHCP 26. ebpf-clat translates each TCP or UDP fragment to an IPv6
+fragment that fits into the wg MTU. Fragmented ICMP is dropped (RFC 7915
+section 1.3), so an IPv4 ping bigger than DHCP 26 gets no answer.
 
 The tunnels with a live handshake are all candidates for the default
 route, and noderoute may pick another one on any of its cycles without
@@ -89,7 +99,11 @@ Nothing announces an MSS. fw4 clamps it, from `mtu_fix '1'` on the
 `vpn_parker` zone, by way of a `tcp option maxseg size set rt mtu` rule
 in `mangle_forward` and `mangle_postrouting`; the kernel subtracts 40
 bytes of IPv4 or 60 bytes of IPv6 and TCP header from the MTU of the
-route a packet takes.
+route a packet takes. That clamp runs before the CLAT, which is attached
+to the tc egress hook of the wg-interface, and it therefore sees the
+untranslated IPv4 packet. The 28 bytes reach it because noderoute puts
+them on the IPv4 default route rather than on the interface, which also
+carries the IPv6 packets that the CLAT does not translate.
 
 site.conf
 ---------

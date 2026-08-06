@@ -10,6 +10,12 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- The IPv4 default route as set_wg_route() has last put it in place, in
+-- the notation of ip route. The busybox ip on our nodes prints no route
+-- metrics, so this is the only place the MTU on that route can be read
+-- back from.
+local ROUTE4_FILE = tmpdir .. "/noderoute-route4"
+
 -- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
 -- that it may do without IPv4 altogether.
 local IPV6_ONLY_OPTION = "option:ipv6-only"
@@ -17,6 +23,13 @@ local IPV6_ONLY_OPTION = "option:ipv6-only"
 -- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the MTU a client may
 -- use on the network it has just been given an address on.
 local MTU_OPTION = "option:mtu"
+
+-- What the CLAT adds to an IPv4 packet of a client: 20 bytes between the
+-- IPv4 and the IPv6 header, plus the 8 bytes of the fragment header a
+-- translator has to insert for a packet that may still be fragmented
+-- (RFC 7915). ebpf-clat inserts it into TCP and UDP fragments and drops
+-- fragmented ICMP.
+local CLAT_OVERHEAD = 20 + 8
 
 -- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
 -- and exits over it, which would leave the whole client network without
@@ -64,7 +77,24 @@ local function get_handshake_ages()
 	return result
 end
 
+local function recorded_mtu4(line)
+	-- The MTU of an IPv4 default route ip has printed without one, as
+	-- set_wg_route() has recorded it: nil if it put none on the route, or
+	-- false if this is not the route it has recorded and we cannot tell.
+	local route = string.match(line, "default via %S+ dev %S+")
+	local recorded = util.read_file(ROUTE4_FILE) or ""
+	if route == nil or string.match(recorded, "default via %S+ dev %S+") ~= route then
+		return false
+	end
+	return tonumber(string.match(recorded, "mtu (%d+)"))
+end
+
 local function get_wg_routes()
+	-- The default routes we have installed, as { iface, mtu } pairs. Only
+	-- IPv4 routes are listed, and only the IPv4 one carries an MTU, see
+	-- set_wg_route(). iproute2 prints that MTU, but busybox ip prints no
+	-- route metrics at all, so for a route without one we go by our own
+	-- record, and an mtu of false means that we cannot tell.
 	local result = {}
 	local output = util.check_output("ip r show proto " .. RT_PROTO)
 	util.log("Checking for wg routes")
@@ -74,7 +104,11 @@ local function get_wg_routes()
 			if not string.find(line, "broadcast") then
 				for iface in string.gmatch(line, "dev [a-z0-9-_]+") do
 					util.log("Route found")
-					table.insert(result, iface:sub(5))
+					local mtu = tonumber(string.match(line, "mtu (%d+)"))
+					if mtu == nil then
+						mtu = recorded_mtu4(line)
+					end
+					table.insert(result, { iface = iface:sub(5), mtu = mtu })
 				end
 			end
 		end
@@ -82,11 +116,35 @@ local function get_wg_routes()
 	return result
 end
 
-local function set_wg_route(iface, conc)
-	local res =
-		os.execute("ip -4 r replace default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+local function set_wg_route(iface, conc, mtu4)
+	-- Route our clients through a tunnel. An IPv4 MTU is put on the route
+	-- rather than on the interface, which carries IPv6 as well: only the
+	-- IPv4 packets have to fit through the CLAT before they reach it.
+	local route4 = "default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO
+	if mtu4 ~= nil then
+		route4 = route4 .. " mtu " .. mtu4
+	end
+	-- The record only ever describes a route the kernel has taken: it goes
+	-- before the route is touched and comes back once ip has succeeded.
+	os.remove(ROUTE4_FILE)
+	local res = os.execute("ip -4 r replace " .. route4)
+	if res == 0 then
+		util.write_file(ROUTE4_FILE, route4)
+	end
 	return res
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+end
+
+local function find_concentrator(conf, iface)
+	-- The concentrator a wg-interface belongs to, or nil once the config
+	-- service has stopped handing it to us.
+	local id = tonumber(iface:match("[0-9]+"))
+	for _, conc in ipairs(conf.concentrators or {}) do
+		if conc.id == id then
+			return conc
+		end
+	end
+	return nil
 end
 
 local function link_mtu(iface)
@@ -108,6 +166,15 @@ local function tunnel_mtu(ifaces)
 		end
 	end
 	return result
+end
+
+local function clat_mtu(conf, mtu)
+	-- The MTU an IPv4 packet of a client may have while the CLAT is in the
+	-- way, or nil when nothing translates it and it travels as it is.
+	if mtu == nil or conf == nil or conf.xlat_range6 == nil then
+		return nil
+	end
+	return mtu - CLAT_OVERHEAD
 end
 
 local function uci_delete(config, section, option)
@@ -374,10 +441,12 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
-	-- The IPv4 half goes out with the addresses we lease (RFC 2132).
+	-- The IPv4 half goes out with the addresses we lease (RFC 2132). A
+	-- client that translates for itself uses its own IPv6 MTU for that and
+	-- ignores this one, which is why both are announced.
 	local client_mtu4 = nil
 	if target_state and mtu ~= nil then
-		client_mtu4 = mtu
+		client_mtu4 = clat_mtu(conf, mtu) or mtu
 	end
 	-- { nil } is the empty list, i.e. no such option.
 	if set_client_option(MTU_OPTION, { client_mtu4 }) then
@@ -464,8 +533,10 @@ local function update(report)
 		conf = json.parse(conf_json)
 	end
 
-	-- What our clients may send.
+	-- What our clients may send, and what the IPv4 default route has to
+	-- hold their packets to for the CLAT to get them through.
 	local mtu = tunnel_mtu(active)
+	local route_mtu4 = clat_mtu(conf, mtu)
 
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
@@ -487,12 +558,23 @@ local function update(report)
 	assert(#current <= 1, "too many current routes")
 	current = current[1]
 	if current then
-		util.log("Currently " .. current .. " is the selected tunnel")
+		util.log("Currently " .. current.iface .. " is the selected tunnel")
 	end
 	util.log("There are " .. #active .. " active tunnels")
-	if current and util.has_value(active, current) then
+	if current and util.has_value(active, current.iface) then
+		if current.mtu ~= route_mtu4 then
+			-- The tunnels have been resized under us, so what our clients
+			-- may send through this one has changed as well - or we cannot
+			-- tell what the route carries (false, see get_wg_routes()) and
+			-- have to put the MTU on it again to be sure.
+			local conc = find_concentrator(conf, current.iface)
+			if conc ~= nil then
+				util.log("Setting the IPv4 MTU of the route via " .. current.iface .. " to " .. tostring(route_mtu4))
+				set_wg_route(current.iface, conc, route_mtu4)
+			end
+		end
 		util.log("current route still active. Doing nothing.")
-		report:write("active (idle) via " .. current)
+		report:write("active (idle) via " .. current.iface)
 		return
 	end
 	if current then
@@ -501,6 +583,7 @@ local function update(report)
 
 	if #active == 0 then
 		util.log("No active tunnels. Removing default routes via wg_x.")
+		os.remove(ROUTE4_FILE)
 		local ip4route = util.check_output("ip -4 r show")
 		for line in string.gmatch(ip4route, "[^\n]+") do
 			if string.find(line, "default via") then
@@ -529,15 +612,12 @@ local function update(report)
 	local configured = false
 	for _, act in pairs(util.shuffle(active)) do
 		util.log("activating route for " .. act)
-		local id = tonumber(act:match("[0-9]+"))
-		for _, conc in ipairs(conf["concentrators"]) do
-			if conc["id"] == id then
-				if set_wg_route(act, conc) == 0 then
-					configured = true
-					break
-				else
-					util.log("Failed to activate route. Trying next...")
-				end
+		local conc = find_concentrator(conf, act)
+		if conc ~= nil then
+			if set_wg_route(act, conc, route_mtu4) == 0 then
+				configured = true
+			else
+				util.log("Failed to activate route. Trying next...")
 			end
 		end
 		if configured then
