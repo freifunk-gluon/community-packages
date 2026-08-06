@@ -23,6 +23,17 @@ They have their corresponding services in `/etc/init.d/` and are usually quite v
 in `logread`.
 This package also takes care of generating the WireGuard Keypair for the node.
 
+Client addresses
+----------------
+
+The config service hands the same `range4` and the same `address4` to every
+node, so all the nodes that mesh with each other claim the same address on
+the client network they share. A node that finds another one using its
+address therefore moves to one of the first 16 addresses of `range4`, chosen
+from its own MAC, and remembers that in `parker.client.address4` until the
+config service gives it a different range. Nodes that have moved keep that
+block of addresses out of the DHCP pool they hand to their clients.
+
 site.conf
 ---------
 
