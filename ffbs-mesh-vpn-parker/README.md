@@ -102,9 +102,19 @@ parker = {
         config_pubkey = "<Your usign config signing pubkey>",
 
         -- optional
+        client_ntp_servers4 = { "198.51.100.123" },
         disable_client_snooping = false,
 },
 ```
+
+`client_ntp_servers4` lists the NTP servers announced to clients via
+DHCPv4 option 42. That option carries IPv4 addresses only, so hostnames
+and IPv6 addresses cannot be used here — unlike in `ntp_servers`, which
+configures the node's own clock.
+
+When it is unset or empty, the first entry of `ntp_servers` is passed on
+to clients as it is. This entry then has to be an IPv4 address, because
+dnsmasq does not start with a hostname or an IPv6 address in option 42.
 
 Multicast snooping
 ------------------

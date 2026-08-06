@@ -7,6 +7,17 @@ local uci = require('simple-uci').cursor()
 -- dnsmasq's name for DHCPv4 option 42 (RFC 2132).
 local NTP_OPTION = 'option:ntp-server'
 
-local ntp_server = site.ntp_servers()[1]
+-- Option 42 carries IPv4 addresses only. check_site.lua makes sure that
+-- client_ntp_servers4 holds nothing else.
+local function client_ntp_servers()
+	local servers = site.parker.client_ntp_servers4({})
+	if #servers > 0 then
+		return servers
+	end
 
-dhcp.set_client_option(uci, NTP_OPTION, { ntp_server })
+	-- ntp_servers configures the node's own clock. Without
+	-- client_ntp_servers4, its first entry is passed on as it is.
+	return { site.ntp_servers()[1] }
+end
+
+dhcp.set_client_option(uci, NTP_OPTION, client_ntp_servers())
