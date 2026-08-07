@@ -15,8 +15,10 @@ It checks if a gateway is reachable in an interval. Different algorithms
 can be selected to determine whether a gateway is assumed reachable:
 
 -   `tq_limit_enabled=true`: (not working with BATMAN_V) define an upper
-    and lower bound to toggle the SSID. As long as the TQ stays
-    in-between those bounds the SSID will not be changed.
+    and lower bound to toggle the SSID. While the TQ stays in-between
+    those bounds, both the SSID and the counter below keep their current
+    value, so a node parked in-between keeps whatever the TQ last
+    recorded outside the bounds.
 
 -   `tq_limit_enabled=false`: there will be only checked, if the gateway
     is reachable with:
