@@ -33,10 +33,6 @@ gateway-connectivity. **Only** if the gateway is not reachable during at
 least half the checks within `switch_timeframe` minutes, the SSID will
 be changed to \"FF_Offline\_\$node_hostname\" (or \_\$node_mac)
 
-The parameter `first` defines a learning phase after reboot (in minutes)
-during which the SSID may be changed to the Offline-SSID **every
-minute**.
-
 # site.conf
 
 Adapt and add this block to your `site.conf`:
@@ -47,8 +43,6 @@ Adapt and add this block to your `site.conf`:
                                 -- the Offline-SSID
                                 -- set to 1440 to change after half a day offline
                                 -- set to 1 minute to change every time the router gets offline
-      first = 5,                -- the first few minutes directly after reboot within which an Offline-SSID may be
-                                -- activated every minute (must be <= switch_timeframe)
       prefix = 'FF_Offline_',   -- use something short to leave space for the nodename (no '~' allowed!)
       suffix = 'nodename',      -- generate the SSID with either 'nodename', 'mac' or to use only the prefix: 'none'
 
@@ -71,7 +65,6 @@ example disable it with:
 Or set the timeframe to every three minutes with
 
     uci set ssid-changer.settings.switch_timeframe='3'
-    uci set ssid-changer.settings.first='3'
 
 # Alternative: gluon-ssid-notifier
 
