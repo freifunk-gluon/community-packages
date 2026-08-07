@@ -29,9 +29,12 @@ The SSID is always changed back to normal every minute as soon as the
 gateway-connectivity is back.
 
 The parameter `switch_timeframe` defines how long it will record the
-gateway-connectivity. **Only** if the gateway is not reachable during at
-least half the checks within `switch_timeframe` minutes, the SSID will
-be changed to \"FF_Offline\_\$node_hostname\" (or \_\$node_mac)
+gateway-connectivity. A counter is raised by one for every minute the
+gateway is unreachable and lowered by one for every minute it is
+reachable, up to a maximum of `switch_timeframe`. **Only** once that
+counter reaches half of `switch_timeframe`, the SSID will be changed to
+\"FF_Offline\_\$node_hostname\" (or \_\$node_mac). The counter is reset
+when the SSID is changed back.
 
 # site.conf
 
