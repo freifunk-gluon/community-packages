@@ -49,7 +49,6 @@ if uptime < 60 then
 	safety_exit('uptime less than one minute')
 end
 
-
 -- Check for hostapd processes
 local function has_hostapd_processes()
 	local handle = io.popen('find /var/run -name "hostapd-*.conf" | wc -l')
