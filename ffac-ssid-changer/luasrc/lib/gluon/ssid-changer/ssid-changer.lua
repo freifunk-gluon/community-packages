@@ -162,15 +162,16 @@ local threshold = math.floor(monitor_duration / 2)
 
 if link_state == 'ONLINE' then
 	log_debug("node is online")
-	if offline_minutes > 0 then
-		offline_minutes = offline_minutes - 1
-	end
-
-	if ssid_state == 'OFFLINE' and offline_minutes == 0 then
+	if ssid_state == 'OFFLINE' then
 		log("reverting offline ssid back to default wireless config")
 		uci:revert('wireless')
 		os.execute('wifi reconf')
 		ssid_state = 'ONLINE'
+		-- start over, so that another switch_timeframe/2 offline minutes are
+		-- required before the offline SSID is set again
+		offline_minutes = 0
+	elseif offline_minutes > 0 then
+		offline_minutes = offline_minutes - 1
 	end
 else
 	log_debug("node is considered offline")
