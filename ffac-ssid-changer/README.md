@@ -1,13 +1,13 @@
-# gluon-ssid-changer
+# ffac-ssid-changer
 
 This package adds a script to change the SSID when there is no
 connection to any gateway. This Offline-SSID can be generated from the
 first and last part of the node\'s name or from the MAC address allowing
 observers to recognize which node does not have a connection to a
 gateway. This script is called once every minute by `micrond`. It will
-change the SSID to the Offline-SSID after the node had no
-gateway-connectivity for several consecutive checks. As soon as the
-gateway-connectivity is back it toggles back to the original SSID.
+change the SSID to the Offline-SSID once the node accumulated enough
+checks without gateway-connectivity (see the counter below). As soon as
+the gateway-connectivity is back it toggles back to the original SSID.
 
 You can enable/disable it in the config mode.
 
@@ -25,16 +25,19 @@ can be selected to determine whether a gateway is assumed reachable:
 
         batctl gwl -H
 
-The SSID is always changed back to normal every minute as soon as the
-gateway-connectivity is back.
+As soon as the gateway is reachable again, the SSID is changed back to
+the regular SSID at the next check, i.e. within one minute. With
+`tq_limit_enabled` this requires the TQ to reach `tq_limit_max` first.
 
-The parameter `switch_timeframe` defines how long it will record the
-gateway-connectivity. A counter is raised by one for every minute the
-gateway is unreachable and lowered by one for every minute it is
-reachable, up to a maximum of `switch_timeframe`. **Only** once that
-counter reaches half of `switch_timeframe`, the SSID will be changed to
-\"FF_Offline\_\$node_hostname\" (or \_\$node_mac). The counter is reset
-when the SSID is changed back.
+The parameter `switch_timeframe` sets the threshold at which the SSID is
+changed and caps how far the counter below can grow. It is not a sliding
+window: a counter is raised by one for every minute the gateway is
+unreachable and lowered by one for every minute it is reachable, up to a
+maximum of `switch_timeframe`. **Only** once that counter reaches
+`switch_timeframe / 2` (rounded down), the SSID will be changed to
+\"FF_Offline\_\$node_hostname\" (or \_\$node_mac). The counter is reset to
+zero when the SSID is changed back, so another `switch_timeframe / 2`
+offline minutes are needed before the Offline-SSID is set again.
 
 # site.conf
 
@@ -42,8 +45,8 @@ Adapt and add this block to your `site.conf`:
 
     ssid_changer = {
       enabled = true,
-      switch_timeframe = 30,    -- after half a timeframe (in minutes) offline the SSID will change to
-                                -- the Offline-SSID
+      switch_timeframe = 30,    -- after half a timeframe (in minutes, rounded down) offline the SSID
+                                -- will change to the Offline-SSID
                                 -- set to 1440 to change after half a day offline
                                 -- set to 1 minute to change every time the router gets offline
       prefix = 'FF_Offline_',   -- use something short to leave space for the nodename (no '~' allowed!)
@@ -54,9 +57,13 @@ Adapt and add this block to your `site.conf`:
                                 -- in-between these two values the SSID will never be changed to prevent it from
                                 -- toggling every minute:
       tq_limit_max = 45,        -- upper limit, above that the online SSID will be used
-      tq_limit_min = 35         -- lower limit, below that the offline SSID will be used
+      tq_limit_min = 35,        -- lower limit, below that the offline SSID will be used
       debug_log_enabled = true, -- optional: enable extra debug logs
     },
+
+While the node is offline, OWE client networks are disabled instead of
+being renamed, because the Offline-SSID is meant to be picked up by
+observers and not to be connected to.
 
 # Commandline options
 
@@ -68,6 +75,11 @@ example disable it with:
 Or set the timeframe to every three minutes with
 
     uci set ssid-changer.settings.switch_timeframe='3'
+
+Note that every setting except `enabled` is written again from the
+`site.conf` on each firmware upgrade and on every `gluon-reconfigure`,
+which the config mode triggers as well. Changes made with `uci` are
+therefore only temporary.
 
 # Alternative: gluon-ssid-notifier
 
@@ -81,11 +93,11 @@ Create a file \"modules\" with the following content in your site
 directory:
 
     GLUON_SITE_FEEDS="community"
-    PACKAGES_SSIDCHANGER_REPO=https://github.com/freifunk-gluon/community-packages.git
-    PACKAGES_SSIDCHANGER_COMMIT=f6db033d6568ea27805c9694b20085b8dec5ba87 # <-- set the newest commit ID here
-    PACKAGES_SSIDCHANGER_BRANCH=master
+    PACKAGES_COMMUNITY_REPO=https://github.com/freifunk-gluon/community-packages.git
+    PACKAGES_COMMUNITY_COMMIT=<COMMIT-HASH> # <-- set the newest commit ID here
+    PACKAGES_COMMUNITY_BRANCH=main
 
-With this done you can add the package `gluon-ssid-changer` to your
+With this done you can add the package `ffac-ssid-changer` to your
 `site.mk`
 
 # History

@@ -20,8 +20,8 @@ define Package/$(PKG_NAME)/description
   any gateway. This SSID can be generated from the node's hostname with the
   first and last part of the nodename or the mac address, to allow observers to
   recognize which node is down. The script is called once a minute by micrond
-  and it will change from online to Offline-SSID once per definable timeframe at
-  most.
+  and it will change to the Offline-SSID once the node has been without a
+  gateway connection for half of a definable timeframe.
 endef
 
 $(eval $(call BuildPackageGluon,$(PKG_NAME)))
