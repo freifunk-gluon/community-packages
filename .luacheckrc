@@ -42,9 +42,11 @@ files["**/luasrc/lib/gluon/config-mode-runtime/*"] = {
 files["**/check_site.lua"] = {
 	read_globals = {
 		"alternatives",
+		"conf_src",
 		"extend",
 		"in_domain",
 		"in_site",
+		"loadvar",
 		"need",
 		"need_alphanumeric_key",
 		"need_array",
