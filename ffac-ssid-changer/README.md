@@ -1,4 +1,4 @@
-# gluon-ssid-changer
+# ffac-ssid-changer
 
 This package adds a script to change the SSID when there is no
 connection to any gateway. This Offline-SSID can be generated from the
@@ -55,7 +55,7 @@ Adapt and add this block to your `site.conf`:
                                 -- in-between these two values the SSID will never be changed to prevent it from
                                 -- toggling every minute:
       tq_limit_max = 45,        -- upper limit, above that the online SSID will be used
-      tq_limit_min = 35         -- lower limit, below that the offline SSID will be used
+      tq_limit_min = 35,        -- lower limit, below that the offline SSID will be used
       debug_log_enabled = true, -- optional: enable extra debug logs
     },
 
@@ -92,11 +92,11 @@ Create a file \"modules\" with the following content in your site
 directory:
 
     GLUON_SITE_FEEDS="community"
-    PACKAGES_SSIDCHANGER_REPO=https://github.com/freifunk-gluon/community-packages.git
-    PACKAGES_SSIDCHANGER_COMMIT=f6db033d6568ea27805c9694b20085b8dec5ba87 # <-- set the newest commit ID here
-    PACKAGES_SSIDCHANGER_BRANCH=master
+    PACKAGES_COMMUNITY_REPO=https://github.com/freifunk-gluon/community-packages.git
+    PACKAGES_COMMUNITY_COMMIT=<COMMIT-HASH> # <-- set the newest commit ID here
+    PACKAGES_COMMUNITY_BRANCH=main
 
-With this done you can add the package `gluon-ssid-changer` to your
+With this done you can add the package `ffac-ssid-changer` to your
 `site.mk`
 
 # History
