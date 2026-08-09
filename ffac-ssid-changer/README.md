@@ -76,6 +76,11 @@ Or set the timeframe to every three minutes with
 
     uci set ssid-changer.settings.switch_timeframe='3'
 
+Or enable the debug logs, which are written to the syslog with the tag
+`ffac-ssid-changer`:
+
+    uci set ssid-changer.settings.debug_log_enabled='1'
+
 Note that every setting except `enabled` is written again from the
 `site.conf` on each firmware upgrade and on every `gluon-reconfigure`,
 which the config mode triggers as well. Changes made with `uci` are
