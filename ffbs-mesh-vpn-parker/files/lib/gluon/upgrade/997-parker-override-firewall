@@ -2,7 +2,11 @@
 
 uci set firewall.@defaults[0].input='ACCEPT'
 uci set firewall.@defaults[0].output='ACCEPT'
-uci set firewall.@defaults[0].forward='ACCEPT'
+# Forward only between the zone pairs that 904-parker-firewall declares.
+# The 'forward' option of a zone covers only traffic within that zone, so
+# this policy decides all other traffic, including that of our clients
+# towards br-wan.
+uci set firewall.@defaults[0].forward='REJECT'
 uci set firewall.@zone[0].input='ACCEPT'
 uci set firewall.@zone[0].output='ACCEPT'
 uci set firewall.@zone[0].forward='ACCEPT'
