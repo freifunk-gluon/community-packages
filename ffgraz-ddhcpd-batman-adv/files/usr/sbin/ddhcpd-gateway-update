@@ -73,7 +73,10 @@ fi
 
 for _ in $(seq "$GW_UPDATE_TRIES"); do
 	gwaddr="$(get_gw_ipv4_address "$gwmac")"
-	[ -n "$gwaddr" ] && break
+	if echo "$gwaddr" | grep -E -q '^(([0-9]){1,3}\.){3}[0-9]{1,3}$'; then
+		break
+	fi
+	gwaddr=""
 done
 
 if [ -z "$gwaddr" ] && [ ! "$gwmac" = "$last_gwmac" ]; then
