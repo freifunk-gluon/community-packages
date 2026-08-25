@@ -57,6 +57,17 @@ end
 local IPV4_PREFIX_MAX = 32
 local IPV6_PREFIX_MAX = 128
 
+-- olsrd6 puts the node address on the mesh interfaces, it refuses to mesh on
+-- an interface that carries nothing but a link local one - so that address is
+-- not ours to remove
+local function drop_ip6(name)
+	local current = uci:get('network', name, 'ip6addr')
+
+	if current and current ~= uci:get('network', 'loopback', 'ip6addr') then
+		uci:del('network', name, 'ip6addr')
+	end
+end
+
 local function static_ip(name, macaddr, actually_use)
 	-- actually_use = if ip should be applied to interface or not
 	-- if set and actually_use=false then it will be removed
@@ -127,14 +138,10 @@ local function static_ip(name, macaddr, actually_use)
 
 			uci:set('network', name, 'ip6addr', ip6:string())
 		else
-			if uci:get('network', name, 'ip6addr') then
-				uci:del('network', name, 'ip6addr')
-			end
+			drop_ip6(name)
 		end
 	else
-		if uci:get('network', name, 'ip6addr') ~= nil then
-			uci:del('network', name, 'ip6addr')
-		end
+		drop_ip6(name)
 
 		if uci:get('network', name, 'ipaddr') ~= nil then
 			uci:del('network', name, 'ipaddr')
