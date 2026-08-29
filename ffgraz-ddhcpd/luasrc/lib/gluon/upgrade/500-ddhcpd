@@ -4,10 +4,13 @@ local uci = require('simple-uci').cursor()
 
 if site.ddhcpd then
 	local enabled = site.ddhcpd.enabled(true)
+	-- the range ddhcpd manages and the netmask it hands out need not match the
+	-- mesh prefix, so prefix4_ddhcpd wins over prefix4 wherever it is set
+	local prefix4 = site.prefix4_ddhcpd(site.prefix4())
 
 	uci:section('ddhcpd', 'settings', 'settings', {
 		enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
-		block_network = site.ddhcpd.range(site.prefix4()),
+		block_network = site.ddhcpd.range(prefix4),
 		block_size_pow = site.ddhcpd.block_size(2),
 		block_timeout = site.ddhcpd.block_timeout(300),
 		dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
@@ -23,17 +26,19 @@ if site.ddhcpd then
 
 	uci:delete('ddhcpd','broadcast')
 
-	local cidr = tonumber(string.gsub(site:prefix4(),"[%w.]+/(%d+)","%1"),10)
-	local netmask = {}
-	for _ = 1, 4 do
-		table.insert(netmask, 256-2^math.max(0,8-cidr))
-		cidr = math.max(0,cidr-8)
+	if prefix4 then
+		local cidr = tonumber(string.gsub(prefix4,"[%w.]+/(%d+)","%1"),10)
+		local netmask = {}
+		for _ = 1, 4 do
+			table.insert(netmask, 256-2^math.max(0,8-cidr))
+			cidr = math.max(0,cidr-8)
+		end
+		netmask = table.concat(netmask,".")
+		uci:section('ddhcpd','dhcp_option','netmask',{
+			code = 1,
+			len = 4,
+			payload = netmask,
+		})
 	end
-	netmask = table.concat(netmask,".")
-	uci:section('ddhcpd','dhcp_option','netmask',{
-		code = 1,
-		len = 4,
-		payload = netmask,
-	})
 	uci:save('ddhcpd')
 end
