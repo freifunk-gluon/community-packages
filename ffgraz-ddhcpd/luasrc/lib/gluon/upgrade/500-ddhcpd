@@ -4,13 +4,15 @@ local uci = require('simple-uci').cursor()
 
 if site.ddhcpd then
 	local enabled = site.ddhcpd.enabled(true)
-	-- the range ddhcpd manages and the netmask it hands out need not match the
-	-- mesh prefix, so prefix4_ddhcpd wins over prefix4 wherever it is set
-	local prefix4 = site.prefix4_ddhcpd(site.prefix4())
+	-- the network ddhcpd manages need not be the mesh prefix, and the netmask
+	-- it hands to clients has to match the network it actually serves, so both
+	-- come from the range - which falls back to prefix4_ddhcpd where that is
+	-- set, and to prefix4 otherwise
+	local network = site.ddhcpd.range(site.prefix4_ddhcpd(site.prefix4()))
 
 	uci:section('ddhcpd', 'settings', 'settings', {
 		enabled = uci:get('ddhcpd', 'settings', 'enabled') or enabled,
-		block_network = site.ddhcpd.range(prefix4),
+		block_network = network,
 		block_size_pow = site.ddhcpd.block_size(2),
 		block_timeout = site.ddhcpd.block_timeout(300),
 		dhcp_lease_time = site.ddhcpd.dhcp_lease_time(300),
@@ -26,8 +28,8 @@ if site.ddhcpd then
 
 	uci:delete('ddhcpd','broadcast')
 
-	if prefix4 then
-		local cidr = tonumber(string.gsub(prefix4,"[%w.]+/(%d+)","%1"),10)
+	if network then
+		local cidr = tonumber(string.gsub(network,"[%w.]+/(%d+)","%1"),10)
 		local netmask = {}
 		for _ = 1, 4 do
 			table.insert(netmask, 256-2^math.max(0,8-cidr))

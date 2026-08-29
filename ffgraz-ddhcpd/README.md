@@ -23,10 +23,12 @@ nodes.
 Choose a free IP-range that is not used by the DHCP-servers of your gateways
 that the DDHCPD can use to assign to clients.
 
-The range defaults to `prefix4` and the netmask handed to clients is derived
-from it. If DDHCPD serves a different network than the mesh does, set
-`prefix4_ddhcpd` next to `prefix4` in your `site.conf` (or in a domain) — it
-takes precedence for both:
+The range defaults to `prefix4` if unset. The netmask handed to clients is
+derived from the range, so DDHCPD can serve a different network than the mesh
+prefix. Where the range itself is unset but DDHCPD still has to serve a network
+other than the mesh prefix, set `prefix4_ddhcpd` next to `prefix4` in your
+`site.conf` (or in a domain) — it takes precedence over `prefix4` as the range's
+fallback:
 
     prefix4 = '10.12.0.0/16',
     prefix4_ddhcpd = '10.12.0.0/16',
