@@ -1,8 +1,10 @@
 #!/usr/bin/env lua
 
 local olsrd = require 'gluon.olsrd'
+local uci = require('simple-uci').cursor()
+local ip = require 'luci.ip' -- luci-lib-ip
 
-local info = olsrd.oi()
+local info = olsrd.get_info()
 
 local function ddhcpdctl(...)
 	local exec = 'exec /usr/sbin/ddhcpdctl '
@@ -15,31 +17,52 @@ local function ddhcpdctl(...)
 	os.execute(exec)
 end
 
-local gateways = { }
+local function set_option(code, address)
+	ddhcpdctl('-o', code .. ':4:' .. address)
+end
 
-local current_gw = nil
+-- What the node hands out when no daemon knows better: whatever
+-- 500-ddhcpd-option-nextnode (and the site on top of it) configured.
+-- Restoring those beats removing the options - a client with no router
+-- and no resolver is worse off than one pointed at its own node, and
+-- this ddhcpd's control socket does not implement removal anyway.
+local function restore_configured()
+	for _, section in ipairs({ 'nextnode_router', 'nextnode_dns' }) do
+		local code = uci:get('ddhcpd', section, 'code')
+		local payload = uci:get('ddhcpd', section, 'payload')
 
--- usually these two are configured to not both do ipv4
--- therefore we can assume that we won't end up with two "current_gw"
-
--- that would be pretty catastrophic on it's own
-
-if info.olsr2.running then
-	for _, network in ipairs(olsrd.olsr2_get_nodeinfo('olsrv2info jsonraw attached_network').attached_network) do
-		if network.attached_net_src == '0.0.0.0/0' then
-			table.insert(gateways, network.node)
-		end
-	end
-
-	for _, route in ipairs(olsrd.olsr2_get_nodeinfo('olsrv2info jsonraw route').route) do
-		if route.dst == '0.0.0.0/0' then
-			current_gw = route.route_lasthop
+		if code and payload then
+			set_option(code, payload)
 		end
 	end
 end
 
-if info.olsr1.running then
-	for _, hna in ipairs(olsrd.olsr1_get_nodeinfo('hna').hna) do
+-- olsrd carries IPv4 only on nodes that mesh over olsr. Everywhere else
+-- - a node that opted out, or one where babel carries IPv4 - the kernel
+-- is the only thing that knows the gateway, so ask it. A default that
+-- babel installed with an IPv6 next hop has no address a DHCP client
+-- could use, which counts as no gateway.
+local function kernel_gateway()
+	local handle = io.popen('ip -4 route show default 2>/dev/null')
+	if not handle then
+		return nil
+	end
+
+	local out = handle:read('*a') or ''
+	handle:close()
+
+	return out:match('via%s+(%d+%.%d+%.%d+%.%d+)%s')
+end
+
+local gateways = { }
+
+local current_gw = nil
+
+-- The IPv4 daemon is the only one that can know an IPv4 gateway, and on
+-- a node where it is not running - olsr turned off, or babel carrying
+-- IPv4 - there is nothing to ask.
+if info.olsr4.running then
+	for _, hna in ipairs(olsrd.get_nodeinfo(4, 'hna').hna) do
 		if hna.destination == '0.0.0.0' then
 			table.insert(gateways, hna.gateway)
 			-- FIXME: determine which gateway is the best to use
@@ -48,14 +71,36 @@ if info.olsr1.running then
 	end
 end
 
+if not current_gw then
+	current_gw = kernel_gateway()
+
+	if current_gw then
+		table.insert(gateways, current_gw)
+	end
+end
+
+-- A DHCP client can only use a router that is on its own link, and the
+-- block ddhcpd hands out is that link. A gateway anywhere else - which
+-- is where the mesh gateways usually are - would leave the client with
+-- a default route it cannot even ARP for, so let the node keep the
+-- traffic and forward it itself.
+if current_gw then
+	local block = uci:get('ddhcpd', 'settings', 'block_network')
+	local network = block and ip.new(block)
+
+	if not network or not network:contains(ip.new(current_gw)) then
+		print('[ddhcpd-olsrd] gateway ' .. current_gw .. ' is off-link for clients, ignoring it')
+		current_gw = nil
+	end
+end
+
 print('[ddhcpd-olsrd] found gateway(s): ' .. table.concat(gateways, ','))
 
 if not current_gw then
-	print('[ddhcpd-olsrd] no current gateway, clearing gateway')
-	ddhcpdctl('-r', '3')
-	ddhcpdctl('-r', '6')
+	print('[ddhcpd-olsrd] no current gateway, handing out the configured ones')
+	restore_configured()
 else
 	print('[ddhcpd-olsrd] setting gateway ' .. current_gw)
-	ddhcpdctl('-o', '3:4:' .. current_gw)
-	ddhcpdctl('-o', '6:4:' .. current_gw)
+	set_option('3', current_gw)
+	set_option('6', current_gw)
 end
