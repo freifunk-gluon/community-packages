@@ -37,4 +37,14 @@ function M.mtu()
 	return site.mesh_vpn.openvpn.mtu(1500)
 end
 
+-- Part of the provider interface: gluon.mesh-vpn asks every provider
+-- this before it publishes a key, and a provider that does not answer
+-- takes the status page down with "attempt to call field
+-- 'pubkey_privacy' (a nil value)". A node identifies itself to the
+-- OpenVPN server with a client certificate and has no public key to
+-- hand out in the first place, so there is nothing to publish.
+function M.pubkey_privacy()
+	return true
+end
+
 return M
