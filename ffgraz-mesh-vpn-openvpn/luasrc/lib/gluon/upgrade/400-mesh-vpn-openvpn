@@ -22,6 +22,10 @@ local vpn = {
 	client = true,
 	dev = vpn_core.get_interface(),
 	dev_type = 'tap',
+	-- mesh_vpn_dns.nft redirects dns from this group to the wan dnsmasq on
+	-- :54. without it the vpn server's name is resolved over the mesh, so
+	-- the tunnel that carries the mesh depends on the mesh already working
+	group = 'gluon-mesh-vpn',
 	mark = '0x01/0x01' -- this doesnt work, even though it should, so we have a custom fw rule
 }
 
