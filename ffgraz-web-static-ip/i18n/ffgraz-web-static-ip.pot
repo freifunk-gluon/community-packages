@@ -14,44 +14,23 @@ msgstr ""
 msgid "Static IPs"
 msgstr ""
 
-msgid "Configure the IPv4 addresses of your node."
+msgid "Configure the IPv4 address of your node."
 msgstr ""
 
-msgid "Configure the IPv6 addresses of your node."
+msgid "Configure the IPv6 address of your node."
 msgstr ""
 
-msgid "enabled"
+msgid "The address %s is in the temporary address range %s.<br />It should be replaced by a properly assigned address as soon as possible."
 msgstr ""
 
-msgid "disabled"
+msgid "IPv4 for this node"
 msgstr ""
 
-msgid "The address %s for \"%s\" is an address in the temporary address range %s.<br />It should be replaced by a properly assigned address as soon as possible."
+msgid "IPv4 address (e.g. 1.2.3.4)"
 msgstr ""
 
-msgid "The address %s for \"%s\" is an address in the temporary address range %s.<br />If you are planning to use this interface, you will need to replace this address with a properly assigned one."
+msgid "IPv6 for this node"
 msgstr ""
 
-msgid "IPv4 for %s (%s)"
-msgstr ""
-
-msgid "IPv6 for %s (%s)"
-msgstr ""
-
-msgid "IBSS (legacy) Mesh on %s"
-msgstr ""
-
-msgid "Mesh on %s"
-msgstr ""
-
-msgid "Mesh VPN"
-msgstr ""
-
-msgid "Mesh on WAN"
-msgstr ""
-
-msgid "Mesh on LAN"
-msgstr ""
-
-msgid "this node"
+msgid "IPv6 address (e.g. aa:bb:cc:dd:ee::ff)"
 msgstr ""
