@@ -1,0 +1,4 @@
+# Vendored verbatim from ecdsautil and respondd, left space-indented so
+# the files stay diffable against their upstreams.
+[{ecdsa_util,hexutil,util}.{c,h}]
+indent_style = unset
