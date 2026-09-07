@@ -26,7 +26,9 @@ local vpn = {
 	-- :54. without it the vpn server's name is resolved over the mesh, so
 	-- the tunnel that carries the mesh depends on the mesh already working
 	group = 'gluon-mesh-vpn',
-	mark = '0x01/0x01' -- this doesnt work, even though it should, so we have a custom fw rule
+	-- SO_MARK on the transport socket; wan4_lookup/wan6_lookup route it out
+	-- the wan. openvpn parses this as an integer, not as a mark/mask pair
+	mark = '1'
 }
 
 for key, value in pairs(site.mesh_vpn.openvpn.config()) do
@@ -73,13 +75,9 @@ if vpn.enabled then
 	uci:section('openvpn', 'openvpn', 'mesh_vpn', vpn)
 end
 
-uci:section('firewall', 'rule', 'openvpn_mark', {
-	name = 'Mark packets to/from VPN clients',
-	target = 'MARK',
-	proto = 'udp',
-	dest_port = '1194',
-	set_mark = '0x01/0x01'
-})
+-- superseded by the mark above: that one is set on the socket itself, so it
+-- does not have to guess the port the site dials out on
+uci:delete('firewall', 'openvpn_mark')
 
 uci:save('openvpn')
 uci:save('firewall')
