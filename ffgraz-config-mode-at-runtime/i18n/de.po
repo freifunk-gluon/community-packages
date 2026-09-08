@@ -90,6 +90,3 @@ msgstr "Authentifizierungsmodus: %s"
 
 msgid "User ID: %s"
 msgstr "Benutzer ID: %s"
-
-msgid "Settings"
-msgstr "Einstellungen"

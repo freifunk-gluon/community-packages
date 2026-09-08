@@ -104,103 +104,61 @@ ul.tabmenu {
 	display: inline-flex;
 }
 
-/* The settings of a category live behind a button: there are enough of them
-   that a row of tabs wraps over several lines and stops being scannable. A
-   checkbox drives it, so it opens without any script. */
-.tabmenu-collapsible {
-	.menu-toggle {
-		position: absolute;
-		opacity: 0;
-		pointer-events: none;
-	}
+/* The settings of a category go down the side: fourteen of them across the
+   top wrap over several lines and push the page itself off the screen. */
+#maincontainer {
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 1em;
+}
 
-	.menu-button {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.7em;
-		margin: 2em 0;
-		padding: 0.8em 1.4em;
-		border-radius: 2em;
-		background: white;
-		color: #333;
-		font-weight: bold;
-		cursor: pointer;
-		user-select: none;
-	}
+.tabmenu-sidebar {
+	flex: 0 0 15em;
+	margin: 1em 0 2em 1em;
+	position: sticky;
+	top: 1em;
 
-	/* three bars, drawn rather than dragged in as an image */
-	.menu-icon {
-		position: relative;
-		display: block;
-		width: 1.1em;
-		height: 2px;
-		background: currentColor;
-
-		&::before,
-		&::after {
-			content: "";
-			position: absolute;
-			left: 0;
-			width: 100%;
-			height: 2px;
-			background: currentColor;
-		}
-
-		&::before { top: -0.38em; }
-		&::after  { top: 0.38em; }
-	}
-
-	/* closed by default, and laid out as a list rather than a row once open:
-	   a dozen entries side by side is what this replaces */
 	ul.tabmenu {
-		display: none;
+		display: flex;
 		flex-direction: column;
-		margin: 0 0 2em;
+		margin: 0;
+		width: 100%;
 		text-align: left;
 	}
 
-	.menu-toggle:checked ~ ul.tabmenu {
-		display: inline-flex;
-	}
-
-	.menu-toggle:focus-visible + .menu-button {
-		outline: 2px solid #333;
-		outline-offset: 2px;
-	}
-
 	ul.tabmenu li {
-		margin: 0;
+		margin: 0 0 0.2em;
+		white-space: normal;
 
 		a {
-			border-radius: 0;
-			padding: 0.7em 1.4em;
+			padding: 0.6em 1em;
+			border-radius: 0.4em;
 		}
 	}
 }
 
-ul.tabmenu li {
-	white-space: nowrap;
-	margin: 0 0.5em;
-	padding: 0;
-	text-align: center;
+/* Narrow enough that a column beside the page leaves no room for it: the
+   entries go back across the top and wrap as they used to. */
+@media (max-width: 60em) {
+	#maincontainer {
+		flex-direction: column;
+		align-items: stretch;
+	}
 
-	a {
-		display: block;
-		text-decoration: none;
-		padding: 1em;
-		margin: 0;
-		color: #333;
-		border-radius: 2em;
+	.tabmenu-sidebar {
+		flex: none;
+		margin: 1em;
+		position: static;
 
-		&:hover {
-			background: lighten($ffyellow, 35);
+		ul.tabmenu {
+			flex-direction: row;
+			flex-wrap: wrap;
 		}
 	}
 
-	&.active a {
-		font-weight: bold;
-		background: white;
-		color: #333;
+	#maincontent {
+		min-width: 0;
 	}
 }
 

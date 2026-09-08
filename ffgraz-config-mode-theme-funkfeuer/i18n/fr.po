@@ -17,6 +17,3 @@ msgid ""
 "You must enable JavaScript in your browser or the web interface will not "
 "work properly."
 msgstr ""
-
-msgid "Settings"
-msgstr "Paramètres"
