@@ -294,6 +294,9 @@ ul.tabmenu li {
 
 #maincontent {
 	padding: 0 1em 2em;
+	// as a flex item it would otherwise be as wide as whatever is on the page,
+	// so a form of short rows came out narrower than the page before it
+	flex: 1 1 auto;
 	max-width: 60em;
 	min-width: 40em;
 	margin: 1em auto;
