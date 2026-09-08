@@ -104,6 +104,32 @@ ul.tabmenu {
 	display: inline-flex;
 }
 
+ul.tabmenu li {
+	white-space: nowrap;
+	margin: 0 0.5em;
+	padding: 0;
+	text-align: center;
+
+	a {
+		display: block;
+		text-decoration: none;
+		padding: 1em;
+		margin: 0;
+		color: #333;
+		border-radius: 2em;
+
+		&:hover {
+			background: lighten($ffyellow, 35);
+		}
+	}
+
+	&.active a {
+		font-weight: bold;
+		background: white;
+		color: #333;
+	}
+}
+
 /* The settings of a category go down the side: fourteen of them across the
    top wrap over several lines and push the page itself off the screen. */
 #maincontainer {
@@ -125,21 +151,28 @@ ul.tabmenu {
 		display: flex;
 		flex-direction: column;
 		margin: 0;
-		padding: 0.4em;
+		padding: 0;
 		width: 100%;
 		text-align: left;
 		background: #fff;
 		border-radius: 0.6em;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+		/* the entries run edge to edge, so the panel clips them into its
+		   own corners rather than each one carrying a shape of its own */
+		overflow: hidden;
 	}
 
 	ul.tabmenu li {
 		margin: 0;
+		/* a list down the side reads from the left, and an entry too long
+		   for the column wraps rather than being cut off */
+		text-align: left;
 		white-space: normal;
 
 		a {
-			padding: 0.6em 0.9em;
-			border-radius: 0.4em;
+			padding: 0.8em 1.1em;
+			border-radius: 0;
+			line-height: 1.3;
 			/* the accent grows on the left rather than the box jumping
 			   about, so nothing moves as the pointer runs down the list */
 			border-left: 3px solid transparent;
@@ -152,18 +185,16 @@ ul.tabmenu {
 			color: #333;
 		}
 
-		/* the page you are on wears the colour of the bar above it, a shade
-		   down: white on the bar colour itself is about 3.4:1 in the
-		   funkfeuer palette, which is under what body text needs */
+		/* the page you are on wears the colour of the bar above it */
 		&.active a {
-			background: darken($ffmagenta, 12);
-			border-left-color: darken($ffmagenta, 24);
+			background: $ffmagenta;
+			border-left-color: darken($ffmagenta, 20);
 			color: #fff;
 			font-weight: bold;
 		}
 
 		&.active a:hover {
-			background: darken($ffmagenta, 18);
+			background: darken($ffmagenta, 6);
 			color: #fff;
 		}
 	}
