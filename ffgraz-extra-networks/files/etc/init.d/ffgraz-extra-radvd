@@ -10,14 +10,16 @@ START=51
 start_service() {
 	for network in private exposed; do
 		# the prefix to advertise, and the node's own address in it
-		set -- $(lua -e '
+		# through the environment: a bare word after -e is taken as a script
+		# to run, not as an argument to the one already given
+		set -- $(NETWORK="$network" lua -e '
 			local e = require("gluon.extranets")
-			local address = e.address6(arg[1])
+			local address = e.address6(os.getenv("NETWORK"))
 			local prefix = e.public6(address)
 			if prefix then
 				local host = address:gsub("/.*", "")
 				io.write(prefix, " ", host)
-			end' "$network" 2>/dev/null)
+			end' 2>/dev/null)
 
 		# Only a range that was actually assigned. One the node made up for
 		# itself is not announced to the mesh either, so an address out of it
