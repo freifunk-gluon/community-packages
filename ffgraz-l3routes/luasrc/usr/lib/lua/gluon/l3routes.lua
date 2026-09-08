@@ -63,6 +63,17 @@ function M.collect()
 		seen[key] = true
 
 		p.interface = spec.interface
+
+		-- a next hop, for a prefix that is not on the interface itself
+		if spec.gateway then
+			local gateway = ip.new(spec.gateway)
+			assert(gateway, 'l3routes: not an address: ' .. tostring(spec.gateway))
+			assert((gateway:is4() and 4 or 6) == p.family,
+				'l3routes: gateway ' .. spec.gateway .. ' is not of the same family as ' .. p.cidr)
+
+			p.gateway = gateway:string()
+		end
+
 		p.metric = tonumber(spec.metric)
 		p.table = spec.table or 'main'
 		p.is_local = spec.is_local == true or spec.is_local == '1'

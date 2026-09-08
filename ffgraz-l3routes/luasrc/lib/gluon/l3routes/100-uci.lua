@@ -7,6 +7,7 @@ uci:foreach('gluon-l3routes', 'route', function(s)
 		route({
 			cidr = s.cidr,
 			interface = s.interface,
+			gateway = s.gateway,
 			metric = s.metric,
 			table = s.table,
 			is_local = s.is_local,

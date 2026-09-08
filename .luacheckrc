@@ -33,6 +33,19 @@ files["**/luasrc/lib/gluon/config-mode*/*"] = {
 	},
 }
 
+files["**/luasrc/lib/gluon/nftables/*"] = {
+	read_globals = {
+		"include",
+
+		"bridge_rule",
+		"bridge_chain",
+		"bridge_table",
+		"bridge_include_rule",
+		"bridge_include_table",
+	},
+	max_line_length = false,
+}
+
 files["**/luasrc/lib/gluon/l3routes/*"] = {
 	read_globals = {
 		"route",

@@ -30,9 +30,24 @@ for applier in "$FEED"/ffgraz-l3routes-*/luasrc/lib/gluon/upgrade/*; do
 	$SCP "$applier" "$NODE:/lib/gluon/upgrade/"
 done
 
-if [ -e "$FEED/ffgraz-olsr-public-ip/luasrc/lib/gluon/upgrade/500-public-ip" ]; then
-	$SCP "$FEED/ffgraz-olsr-public-ip/luasrc/lib/gluon/upgrade/500-public-ip" \
-		"$NODE:/lib/gluon/upgrade/"
+for extra in "$FEED"/ffgraz-olsr-public-ip/luasrc/lib/gluon/upgrade/*; do
+	[ -e "$extra" ] || continue
+	$SCP "$extra" "$NODE:/lib/gluon/upgrade/"
+done
+
+for lib in "$FEED"/*/luasrc/usr/lib/lua/gluon/*.lua; do
+	[ -e "$lib" ] || continue
+	$SCP "$lib" "$NODE:/usr/lib/lua/gluon/"
+done
+
+for nft in "$FEED"/*/luasrc/lib/gluon/nftables/*.lua; do
+	[ -e "$nft" ] || continue
+	$SCP "$nft" "$NODE:/lib/gluon/nftables/"
+done
+
+if [ -d "$FEED/ffgraz-web-olsr-public-ip" ]; then
+	$SCP "$FEED/ffgraz-web-olsr-public-ip/luasrc/lib/gluon/config-mode/model/admin/publicip.lua" \
+		"$NODE:/lib/gluon/config-mode/model/admin/"
 fi
 
 if [ -d "$FEED/ffgraz-web-l3routes" ]; then
@@ -42,6 +57,6 @@ if [ -d "$FEED/ffgraz-web-l3routes" ]; then
 		"$NODE:/lib/gluon/config-mode/controller/admin/"
 fi
 
-ssh "$NODE" 'chmod +x /lib/gluon/upgrade/850-l3routes /lib/gluon/upgrade/900-l3routes-* /lib/gluon/upgrade/500-public-ip 2>/dev/null; true'
+ssh "$NODE" 'chmod +x /lib/gluon/upgrade/850-l3routes /lib/gluon/upgrade/900-l3routes-* /lib/gluon/upgrade/[0-9]*-public-ip* 2>/dev/null; true'
 ssh "$NODE" 'touch /etc/config/gluon-l3routes /etc/config/gluon-l3routes-custom'
 ssh "$NODE" 'gluon-reconfigure'

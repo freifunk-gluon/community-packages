@@ -7,6 +7,7 @@ for _, entry in ipairs(site.l3routes({})) do
 		route({
 			cidr = entry.cidr,
 			interface = entry.interface,
+			gateway = entry.gateway,
 			metric = entry.metric,
 			is_local = entry.is_local,
 			firewall = entry.firewall,

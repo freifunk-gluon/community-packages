@@ -16,6 +16,8 @@ takes rule snippets from `/lib/gluon/nftables/`. Two functions are in scope:
 route({
     cidr      = '10.42.7.0/24',  -- required, host bits are normalised away
     interface = 'lan',           -- required, a network interface, not a device
+    gateway   = '10.42.7.1',     -- optional next hop, for a prefix that is not
+                                 -- on the interface itself
     metric    = 128,             -- optional
     table     = 'main',          -- optional, the table the route is installed in
     is_local  = false,           -- the prefix is an address the node already has

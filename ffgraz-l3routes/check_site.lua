@@ -4,6 +4,7 @@
 need_array(in_domain({'l3routes'}), function(entry)
 	need_string_match(extend(entry, {'cidr'}), '^[%x:%.]+/%d+$', false)
 	need_string(extend(entry, {'interface'}), false)
+	need_string_match(extend(entry, {'gateway'}), '^[%x:%.]+$', false)
 	need_number(extend(entry, {'metric'}), false)
 	need_boolean(extend(entry, {'is_local'}), false)
 	need_boolean(extend(entry, {'firewall'}), false)

@@ -60,6 +60,7 @@ for i, r in ipairs(routes) do
 		uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d'):format(i), {
 			interface = r.interface,
 			target = r.cidr,
+			gateway = r.gateway,
 			metric = r.metric,
 			-- gluon puts wan in ip4table 1 and wan6 in ip6table 1; babeld only
 			-- redistributes from its import-tables, and the mesh forwards out
