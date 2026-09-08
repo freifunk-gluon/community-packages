@@ -13,49 +13,55 @@ msgstr ""
 msgid "Public IP"
 msgstr ""
 
-msgid "Configuration for OLSR Public IP. You will get the necessary details from the mesh admins."
+msgid "A public IP reaches this node through a tunnel from the mesh gateway. Ask the mesh admins for the details."
 msgstr ""
 
 msgid "Enabled"
 msgstr ""
 
-msgid "Use of the address"
+msgid "Who gets it"
 msgstr ""
 
-msgid "Give this node the public IP"
+msgid "This node"
 msgstr ""
 
-msgid "Forward the public IP to another device"
+msgid "A device behind this node"
 msgstr ""
 
-msgid "IPv4 address, for example 193.33.151.50"
+msgid "For example 193.33.151.50"
 msgstr ""
 
-msgid "Peer IP"
+msgid "Gateway of the tunnel"
 msgstr ""
 
-msgid "IPv4 address of the other end of the tunnel"
+msgid "The other end of the tunnel, in the mesh"
 msgstr ""
 
 msgid "Forwarding"
 msgstr ""
 
-msgid "The device the public IP belongs to. The node announces the address to the mesh, takes the tunnel apart and passes what comes out on to this device, which is where the address is configured."
+msgid "The node takes the tunnel apart and passes everything on to this device, which is where the public IP is configured."
 msgstr ""
 
 msgid "Device address"
 msgstr ""
 
-msgid "IPv4 address this node reaches the device at. Leave empty when the device answers for the public IP on the interface below."
+msgid "Leave empty when the device answers for the public IP itself on the network below."
 msgstr ""
 
-msgid "Interface"
+msgid "Gateway address"
 msgstr ""
 
-msgid "The interface the device is reached over"
+msgid "An address for this node on that network, which the device uses as its gateway. Any free address will do."
 msgstr ""
 
-msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
+msgid "Network"
+msgstr ""
+
+msgid "Where the device is connected"
+msgstr ""
+
+msgid "This node has no IPv4 address of its own yet, so it cannot pass a public IP on to another device."
 msgstr ""
 
 msgid "Port %s to %s"
@@ -76,10 +82,10 @@ msgstr ""
 msgid "Public port"
 msgstr ""
 
-msgid "The port on the public address, for example 443 or 8000-8010"
+msgid "For example 443, or 8000-8010 for a range"
 msgstr ""
 
-msgid "IPv4 address of the device the port leads to"
+msgid "Where the port leads to"
 msgstr ""
 
 msgid "Device port"
@@ -91,7 +97,7 @@ msgstr ""
 msgid "Device network"
 msgstr ""
 
-msgid "The interface the device is reached over; nothing beyond it becomes reachable"
+msgid "Where that device is connected. Nothing beyond it becomes reachable."
 msgstr ""
 
 msgid "Description"

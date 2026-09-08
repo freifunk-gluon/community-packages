@@ -10,41 +10,140 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Route announcements"
-msgstr ""
-
-msgid "Networks this node reaches and announces to the rest of the mesh, listed by the interface they are reached over. Enter them as prefixes, for example 10.42.7.0/24 or 2001:db8:1::/48."
-msgstr ""
-
-msgid "Routes via %s"
-msgstr ""
-
-msgid "Device: %s"
-msgstr ""
-
-msgid "Imports"
-msgstr ""
-
-msgid "Also announce routes this node already has in its kernel, by routing table or by routing protocol. Restrict them to a prefix, otherwise the uplink default route would be announced into the mesh as well."
-msgstr ""
-
-msgid "Restrict to"
-msgstr ""
-
-msgid "A prefix the imported routes have to be inside of"
-msgstr ""
-
-msgid "Routing tables"
-msgstr ""
-
-msgid "Kernel routing table numbers"
-msgstr ""
-
-msgid "Routing protocols"
-msgstr ""
-
-msgid "Kernel routing protocol numbers or names"
-msgstr ""
-
 msgid "Routes"
+msgstr ""
+
+msgid "Shared networks"
+msgstr ""
+
+msgid "This node only shares its own addresses so far. Add a network below to let the rest of the mesh reach it through here."
+msgstr ""
+
+msgid "Nothing is shared yet."
+msgstr ""
+
+msgid "%s via %s"
+msgstr ""
+
+msgid "New network"
+msgstr ""
+
+msgid "A network this node can reach, or an address of its own, offered to the rest of the mesh."
+msgstr ""
+
+msgid "Share this"
+msgstr ""
+
+msgid "Address range"
+msgstr ""
+
+msgid "For example 10.42.7.0/24 or 2001:db8:1::/48"
+msgstr ""
+
+msgid "Reached over"
+msgstr ""
+
+msgid "Where this network is connected"
+msgstr ""
+
+msgid "This is"
+msgstr ""
+
+msgid "A network behind it"
+msgstr ""
+
+msgid "An address of this node"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "Leave empty unless this route should win over another"
+msgstr ""
+
+msgid "Routing table"
+msgstr ""
+
+msgid "Advanced. Leave as it is unless something else manages this route."
+msgstr ""
+
+msgid "Open the firewall"
+msgstr ""
+
+msgid "Let the mesh actually reach it. Turn this off only if you set the firewall up yourself."
+msgstr ""
+
+msgid "Import protocol %s from table %s"
+msgstr ""
+
+msgid "Import table %s"
+msgstr ""
+
+msgid "Import protocol %s"
+msgstr ""
+
+msgid "New import"
+msgstr ""
+
+msgid "Share routes this node already learned from another routing daemon. Always set a limit, or the node would offer the whole internet to the mesh."
+msgstr ""
+
+msgid "Which table to take them from, as a number"
+msgstr ""
+
+msgid "Routing protocol"
+msgstr ""
+
+msgid "Which daemon they came from, as a number or name"
+msgstr ""
+
+msgid "Limit to"
+msgstr ""
+
+msgid "Only share routes inside this range"
+msgstr ""
+
+msgid "Smallest range"
+msgstr ""
+
+msgid "Skip anything smaller than this, for example 24"
+msgstr ""
+
+msgid "Applies to"
+msgstr ""
+
+msgid "IPv4 and IPv6"
+msgstr ""
+
+msgid "IPv4"
+msgstr ""
+
+msgid "IPv6"
+msgstr ""
+
+msgid "Leave empty unless these should win over other routes"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Action"
+msgstr ""
+
+msgid "Add a network"
+msgstr ""
+
+msgid "Add an import"
+msgstr ""
+
+msgid "Remove one"
+msgstr ""
+
+msgid "Interface"
+msgstr ""
+
+msgid "Which one"
+msgstr ""
+
+msgid "Import %s"
 msgstr ""

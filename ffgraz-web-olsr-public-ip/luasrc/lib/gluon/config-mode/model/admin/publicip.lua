@@ -11,57 +11,55 @@ f.reload = true
 local devices = l3routes.devices()
 
 local s = f:section(Section, nil, translate(
-	'Configuration for OLSR Public IP. You will get the necessary details from '
-	.. 'the mesh admins.'
+	'A public IP reaches this node through a tunnel from the mesh gateway. '
+	.. 'Ask the mesh admins for the details.'
 ))
 
 local enabled = s:option(Flag, "enabled", translate("Enabled"))
 enabled.default = uci:get_bool('gluon', 'olsr_public_ip', 'enabled')
 
-local mode = s:option(ListValue, "mode", translate("Use of the address"))
-mode:value('local', translate('Give this node the public IP'))
-mode:value('forward', translate('Forward the public IP to another device'))
+local mode = s:option(ListValue, "mode", translate('Who gets it'))
+mode:value('local', translate('This node'))
+mode:value('forward', translate('A device behind this node'))
 mode.default = uci:get('gluon', 'olsr_public_ip', 'mode') or 'local'
 mode:depends(enabled, true)
 
 local publicIP = s:option(Value, "publicip", translate("Public IP"),
-	translate("IPv4 address, for example 193.33.151.50"))
+	translate("For example 193.33.151.50"))
 publicIP:depends(enabled, true)
 publicIP.datatype = "ip4addr"
 publicIP.default = uci:get('gluon', 'olsr_public_ip', 'ip4')
 
-local peeraddr = s:option(Value, "peeraddr", translate("Peer IP"),
-	translate("IPv4 address of the other end of the tunnel"))
+local peeraddr = s:option(Value, "peeraddr", translate("Gateway of the tunnel"),
+	translate("The other end of the tunnel, in the mesh"))
 peeraddr:depends(enabled, true)
 peeraddr.datatype = "ip4addr"
 peeraddr.default = uci:get('gluon', 'olsr_public_ip', 'peeraddr')
 	or site.olsr_public_ip_default_peeraddr()
 
 local fs = f:section(Section, translate('Forwarding'), translate(
-	'The device the public IP belongs to. The node announces the address to '
-	.. 'the mesh, takes the tunnel apart and passes what comes out on to this '
-	.. 'device, which is where the address is configured.'
+	'The node takes the tunnel apart and passes everything on to this device, '
+	.. 'which is where the public IP is configured.'
 ))
 
 
 local target = fs:option(Value, "target", translate("Device address"),
-	translate("IPv4 address this node reaches the device at. Leave empty when "
-		.. "the device answers for the public IP on the interface below."))
+	translate("Leave empty when the device answers for the public IP itself on "
+		.. "the network below."))
 target:depends(mode, 'forward')
 target.datatype = "ip4addr"
 target.optional = true
 target.default = uci:get('gluon', 'olsr_public_ip', 'target')
 
 local gateway = fs:option(Value, "gateway", translate("Gateway address"),
-	translate("The address this node takes on that segment, and the gateway the "
-		.. "device talks back to. A host address: both sides carry a /32 and "
-		.. "reach each other over the interface below."))
+	translate("An address for this node on that network, which the device uses "
+		.. "as its gateway. Any free address will do."))
 gateway:depends(mode, 'forward')
 gateway.datatype = "ip4addr"
 gateway.default = uci:get('gluon', 'olsr_public_ip', 'gateway')
 
-local target_interface = fs:option(ListValue, "target_interface", translate("Interface"),
-	translate("The interface the device is reached over"))
+local target_interface = fs:option(ListValue, "target_interface", translate("Network"),
+	translate("Where the device is connected"))
 for _, dev in ipairs(devices) do
 	target_interface:value(dev.interface, l3routes.device_label(dev))
 end
@@ -74,17 +72,14 @@ target_interface:depends(mode, 'forward')
 if not publicip.node_ip4() then
 	fs:element('model/warning', {
 		content = translate(
-			'This node has no IPv4 address of its own, so it cannot take a '
-			.. 'tunnel apart on behalf of another device. Forwarding will not work.'),
+			'This node has no IPv4 address of its own yet, so it cannot pass a '
+			.. 'public IP on to another device.'),
 	}, 'no_node_ip')
 end
 
---[[
-	Port forwards, for a node that holds the address itself. What comes out of
-	the tunnel is traffic from the internet, and the zone it arrives in
-	forwards nothing on its own - only the ports listed here get through, each
-	as the one forward rule firewall4 derives from its redirect.
-]]
+-- Port forwards, for a node that holds the address itself. The tunnel's zone
+-- forwards nothing on its own; only the ports listed here get through, each as
+-- the one forward rule firewall4 derives from its redirect.
 
 -- a single port or a range, the way firewall4 spells them; there is no
 -- datatype for this in gluon-web-model
@@ -139,7 +134,7 @@ for _, entry in ipairs(entries) do
 	proto.default = entry.proto or 'tcp'
 
 	local sport = ps:option(Value, name .. '_src_dport', translate('Public port'),
-		translate('The port on the public address, for example 443 or 8000-8010'))
+		translate('For example 443, or 8000-8010 for a range'))
 	sport.default = entry.src_dport
 
 	function sport:validate()
@@ -147,7 +142,7 @@ for _, entry in ipairs(entries) do
 	end
 
 	local dip = ps:option(Value, name .. '_dest_ip', translate('Device address'),
-		translate('IPv4 address of the device the port leads to'))
+		translate('Where the port leads to'))
 	dip.datatype = 'ip4addr'
 	dip.default = entry.dest_ip
 
@@ -161,8 +156,8 @@ for _, entry in ipairs(entries) do
 	end
 
 	local dzone = ps:option(ListValue, name .. '_dest_interface', translate('Device network'),
-		translate('The interface the device is reached over; nothing beyond it '
-			.. 'becomes reachable'))
+		translate('Where that device is connected. Nothing beyond it becomes '
+			.. 'reachable.'))
 	for _, dev in ipairs(devices) do
 		dzone:value(dev.interface, l3routes.device_label(dev))
 	end

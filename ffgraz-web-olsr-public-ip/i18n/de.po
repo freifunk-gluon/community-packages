@@ -13,50 +13,56 @@ msgstr ""
 msgid "Public IP"
 msgstr "Öffentliche IP"
 
-msgid "Configuration for OLSR Public IP. You will get the necessary details from the mesh admins."
-msgstr "Konfiguration der öffentlichen OLSR-IP. Die nötigen Angaben bekommst du von den Mesh-Admins."
+msgid "A public IP reaches this node through a tunnel from the mesh gateway. Ask the mesh admins for the details."
+msgstr "Eine öffentliche IP erreicht diesen Knoten über einen Tunnel vom Mesh-Gateway. Die Details bekommst du von den Mesh-Admins."
 
 msgid "Enabled"
 msgstr "Aktiviert"
 
-msgid "Use of the address"
-msgstr "Verwendung der Adresse"
+msgid "Who gets it"
+msgstr "Wer sie bekommt"
 
-msgid "Give this node the public IP"
-msgstr "Diesem Knoten die öffentliche IP geben"
+msgid "This node"
+msgstr "Dieser Knoten"
 
-msgid "Forward the public IP to another device"
-msgstr "Die öffentliche IP an ein anderes Gerät weiterleiten"
+msgid "A device behind this node"
+msgstr "Ein Gerät hinter diesem Knoten"
 
-msgid "IPv4 address, for example 193.33.151.50"
-msgstr "IPv4-Adresse, zum Beispiel 193.33.151.50"
+msgid "For example 193.33.151.50"
+msgstr "Zum Beispiel 193.33.151.50"
 
-msgid "Peer IP"
-msgstr "Gegenstelle"
+msgid "Gateway of the tunnel"
+msgstr "Gegenstelle des Tunnels"
 
-msgid "IPv4 address of the other end of the tunnel"
-msgstr "IPv4-Adresse des anderen Tunnelendes"
+msgid "The other end of the tunnel, in the mesh"
+msgstr "Das andere Ende des Tunnels, im Mesh"
 
 msgid "Forwarding"
 msgstr "Weiterleitung"
 
-msgid "The device the public IP belongs to. The node announces the address to the mesh, takes the tunnel apart and passes what comes out on to this device, which is where the address is configured."
-msgstr "Das Gerät, dem die öffentliche IP gehört. Der Knoten kündigt die Adresse im Mesh an, packt den Tunnel aus und reicht den Inhalt an dieses Gerät weiter, auf dem die Adresse eingerichtet ist."
+msgid "The node takes the tunnel apart and passes everything on to this device, which is where the public IP is configured."
+msgstr "Der Knoten packt den Tunnel aus und reicht alles an dieses Gerät weiter, auf dem die öffentliche IP eingerichtet ist."
 
 msgid "Device address"
 msgstr "Adresse des Geräts"
 
-msgid "IPv4 address this node reaches the device at. Leave empty when the device answers for the public IP on the interface below."
-msgstr "IPv4-Adresse, unter der dieser Knoten das Gerät erreicht. Leer lassen, wenn das Gerät die öffentliche IP direkt auf der Schnittstelle darunter beantwortet."
+msgid "Leave empty when the device answers for the public IP itself on the network below."
+msgstr "Leer lassen, wenn das Gerät die öffentliche IP im Netz darunter selbst beantwortet."
 
-msgid "Interface"
-msgstr "Schnittstelle"
+msgid "Gateway address"
+msgstr "Gateway-Adresse"
 
-msgid "The interface the device is reached over"
-msgstr "Die Schnittstelle, über die das Gerät erreicht wird"
+msgid "An address for this node on that network, which the device uses as its gateway. Any free address will do."
+msgstr "Eine Adresse für diesen Knoten in diesem Netz, die das Gerät als Gateway verwendet. Jede freie Adresse geht."
 
-msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
-msgstr "Dieser Knoten hat keine eigene IPv4-Adresse und kann den Tunnel daher nicht stellvertretend für ein anderes Gerät auspacken. Die Weiterleitung wird nicht funktionieren."
+msgid "Network"
+msgstr "Netz"
+
+msgid "Where the device is connected"
+msgstr "Wo das Gerät angeschlossen ist"
+
+msgid "This node has no IPv4 address of its own yet, so it cannot pass a public IP on to another device."
+msgstr "Dieser Knoten hat noch keine eigene IPv4-Adresse und kann eine öffentliche IP daher nicht an ein anderes Gerät weiterreichen."
 
 msgid "Port %s to %s"
 msgstr "Port %s an %s"
@@ -65,7 +71,7 @@ msgid "New port forward"
 msgstr "Neue Portweiterleitung"
 
 msgid "Forward this"
-msgstr "Diese weiterleiten"
+msgstr "Weiterleiten"
 
 msgid "Protocol"
 msgstr "Protokoll"
@@ -76,11 +82,11 @@ msgstr "TCP und UDP"
 msgid "Public port"
 msgstr "Öffentlicher Port"
 
-msgid "The port on the public address, for example 443 or 8000-8010"
-msgstr "Der Port auf der öffentlichen Adresse, zum Beispiel 443 oder 8000-8010"
+msgid "For example 443, or 8000-8010 for a range"
+msgstr "Zum Beispiel 443, oder 8000-8010 für einen Bereich"
 
-msgid "IPv4 address of the device the port leads to"
-msgstr "IPv4-Adresse des Geräts, zu dem der Port führt"
+msgid "Where the port leads to"
+msgstr "Wohin der Port führt"
 
 msgid "Device port"
 msgstr "Port des Geräts"
@@ -91,8 +97,8 @@ msgstr "Leer lassen, um den öffentlichen Port zu verwenden"
 msgid "Device network"
 msgstr "Netz des Geräts"
 
-msgid "The interface the device is reached over; nothing beyond it becomes reachable"
-msgstr "Die Schnittstelle, über die das Gerät erreicht wird; nichts dahinter wird dadurch erreichbar"
+msgid "Where that device is connected. Nothing beyond it becomes reachable."
+msgstr "Wo dieses Gerät angeschlossen ist. Nichts dahinter wird dadurch erreichbar."
 
 msgid "Description"
 msgstr "Beschreibung"

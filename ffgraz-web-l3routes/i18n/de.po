@@ -10,41 +10,140 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Route announcements"
-msgstr "Routen-Ankündigungen"
-
-msgid "Networks this node reaches and announces to the rest of the mesh, listed by the interface they are reached over. Enter them as prefixes, for example 10.42.7.0/24 or 2001:db8:1::/48."
-msgstr "Netze, die dieser Knoten erreicht und dem restlichen Mesh ankündigt, aufgelistet nach der Schnittstelle, über die sie erreicht werden. Als Präfix eintragen, zum Beispiel 10.42.7.0/24 oder 2001:db8:1::/48."
-
-msgid "Routes via %s"
-msgstr "Routen über %s"
-
-msgid "Device: %s"
-msgstr "Gerät: %s"
-
-msgid "Imports"
-msgstr "Importe"
-
-msgid "Also announce routes this node already has in its kernel, by routing table or by routing protocol. Restrict them to a prefix, otherwise the uplink default route would be announced into the mesh as well."
-msgstr "Zusätzlich Routen ankündigen, die dieser Knoten bereits im Kernel hat, nach Routing-Tabelle oder Routing-Protokoll. Auf ein Präfix einschränken, sonst würde auch die Standardroute des Uplinks ins Mesh angekündigt."
-
-msgid "Restrict to"
-msgstr "Einschränken auf"
-
-msgid "A prefix the imported routes have to be inside of"
-msgstr "Ein Präfix, innerhalb dessen die importierten Routen liegen müssen"
-
-msgid "Routing tables"
-msgstr "Routing-Tabellen"
-
-msgid "Kernel routing table numbers"
-msgstr "Nummern von Kernel-Routing-Tabellen"
-
-msgid "Routing protocols"
-msgstr "Routing-Protokolle"
-
-msgid "Kernel routing protocol numbers or names"
-msgstr "Nummern oder Namen von Kernel-Routing-Protokollen"
-
 msgid "Routes"
 msgstr "Routen"
+
+msgid "Shared networks"
+msgstr "Geteilte Netze"
+
+msgid "This node only shares its own addresses so far. Add a network below to let the rest of the mesh reach it through here."
+msgstr "Dieser Knoten teilt bisher nur seine eigenen Adressen. Füge unten ein Netz hinzu, damit das restliche Mesh es über diesen Knoten erreichen kann."
+
+msgid "Nothing is shared yet."
+msgstr "Es wird noch nichts geteilt."
+
+msgid "%s via %s"
+msgstr "%s über %s"
+
+msgid "New network"
+msgstr "Neues Netz"
+
+msgid "A network this node can reach, or an address of its own, offered to the rest of the mesh."
+msgstr "Ein Netz, das dieser Knoten erreicht, oder eine eigene Adresse, die dem restlichen Mesh angeboten wird."
+
+msgid "Share this"
+msgstr "Teilen"
+
+msgid "Address range"
+msgstr "Adressbereich"
+
+msgid "For example 10.42.7.0/24 or 2001:db8:1::/48"
+msgstr "Zum Beispiel 10.42.7.0/24 oder 2001:db8:1::/48"
+
+msgid "Reached over"
+msgstr "Erreichbar über"
+
+msgid "Where this network is connected"
+msgstr "Wo dieses Netz angeschlossen ist"
+
+msgid "This is"
+msgstr "Das ist"
+
+msgid "A network behind it"
+msgstr "Ein Netz dahinter"
+
+msgid "An address of this node"
+msgstr "Eine Adresse dieses Knotens"
+
+msgid "Priority"
+msgstr "Priorität"
+
+msgid "Leave empty unless this route should win over another"
+msgstr "Leer lassen, außer diese Route soll einer anderen vorgezogen werden"
+
+msgid "Routing table"
+msgstr "Routing-Tabelle"
+
+msgid "Advanced. Leave as it is unless something else manages this route."
+msgstr "Fortgeschritten. So lassen, außer etwas anderes verwaltet diese Route."
+
+msgid "Open the firewall"
+msgstr "Firewall öffnen"
+
+msgid "Let the mesh actually reach it. Turn this off only if you set the firewall up yourself."
+msgstr "Damit das Mesh es wirklich erreicht. Nur abschalten, wenn du die Firewall selbst einrichtest."
+
+msgid "Import protocol %s from table %s"
+msgstr "Protokoll %s aus Tabelle %s importieren"
+
+msgid "Import table %s"
+msgstr "Tabelle %s importieren"
+
+msgid "Import protocol %s"
+msgstr "Protokoll %s importieren"
+
+msgid "New import"
+msgstr "Neuer Import"
+
+msgid "Share routes this node already learned from another routing daemon. Always set a limit, or the node would offer the whole internet to the mesh."
+msgstr "Routen teilen, die dieser Knoten bereits von einem anderen Routing-Daemon kennt. Immer eine Grenze setzen, sonst bietet der Knoten dem Mesh das ganze Internet an."
+
+msgid "Which table to take them from, as a number"
+msgstr "Aus welcher Tabelle, als Nummer"
+
+msgid "Routing protocol"
+msgstr "Routing-Protokoll"
+
+msgid "Which daemon they came from, as a number or name"
+msgstr "Von welchem Daemon sie stammen, als Nummer oder Name"
+
+msgid "Limit to"
+msgstr "Begrenzen auf"
+
+msgid "Only share routes inside this range"
+msgstr "Nur Routen innerhalb dieses Bereichs teilen"
+
+msgid "Smallest range"
+msgstr "Kleinster Bereich"
+
+msgid "Skip anything smaller than this, for example 24"
+msgstr "Alles Kleinere überspringen, zum Beispiel 24"
+
+msgid "Applies to"
+msgstr "Gilt für"
+
+msgid "IPv4 and IPv6"
+msgstr "IPv4 und IPv6"
+
+msgid "IPv4"
+msgstr "IPv4"
+
+msgid "IPv6"
+msgstr "IPv6"
+
+msgid "Leave empty unless these should win over other routes"
+msgstr "Leer lassen, außer diese sollen anderen Routen vorgezogen werden"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Action"
+msgstr "Aktion"
+
+msgid "Add a network"
+msgstr "Netz hinzufügen"
+
+msgid "Add an import"
+msgstr "Import hinzufügen"
+
+msgid "Remove one"
+msgstr "Eines entfernen"
+
+msgid "Interface"
+msgstr "Schnittstelle"
+
+msgid "Which one"
+msgstr "Welches"
+
+msgid "Import %s"
+msgstr "Import %s"

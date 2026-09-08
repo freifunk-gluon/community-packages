@@ -1,11 +1,8 @@
---[[
-	Extra route announcements for the mesh.
-
-	Prefixes to announce come from the drop-in snippets in /lib/gluon/l3routes,
-	loaded the way gluon-firewall loads /lib/gluon/nftables: every snippet is
-	Lua and calls route{} / import{}. The mesh protocols pick the collected set
-	up in their own upgrade scripts and announce it their own way.
-]]
+-- Extra route announcements for the mesh.
+--
+-- The prefixes come from the drop-in snippets in /lib/gluon/l3routes, loaded
+-- the way gluon-firewall loads /lib/gluon/nftables. The mesh protocols pick
+-- the collected set up and announce it their own way.
 
 local glob = require 'posix.glob'
 local ip   = require 'luci.ip' -- luci-lib-ip
@@ -211,18 +208,10 @@ function M.families(protocol)
 	return { [4] = olsr, [6] = olsr and not babel }
 end
 
---[[
-	The interfaces gluon itself knows about, by the role it gave them.
-
-	Taken from the interface sections of /etc/config/gluon rather than from
-	netifd's: those are gluon's own model of the node, they resolve without
-	ubus - gluon-reconfigure runs from uci-defaults at boot, long before netifd
-	is up - and they do not change when netifd renames something.
-
-	Each role is resolved to the network interface that carries its ports and
-	to that interface's device, since a route attaches to the one and a
-	firewall zone or a macvlan is built on the other.
-]]
+-- The interfaces gluon knows about, by role, out of /etc/config/gluon.
+--
+-- Not from netifd's configuration: gluon-reconfigure runs from uci-defaults at
+-- boot, before netifd is up, so anything needing ubus is not there to ask.
 local ROLES = { 'uplink', 'mesh', 'client', 'private' }
 
 -- the interfaces a network section is made of, however they are spelled
@@ -246,13 +235,10 @@ local function members(section)
 	return ret
 end
 
---[[
-	The device a network interface will have, named the way netifd names one.
-	Worked out rather than asked for, so that it is the same before netifd is
-	running as after: a bridge's device is br-<name>, and reporting its first
-	port instead once built a macvlan on eth0, which is enslaved to br-wan and
-	so never came up.
-]]
+-- The device netifd will give an interface, worked out rather than asked for
+-- so it is the same before netifd runs as after. Reporting a bridge's first
+-- port instead once built a macvlan on eth0, enslaved to br-wan, which never
+-- came up.
 local function device_of(section, name)
 	if section.device then
 		return section.device
@@ -290,11 +276,8 @@ local function carrier(ifnames)
 	return found
 end
 
---[[
-	Every role gluon has interfaces for, as a role -> {network, device} map.
-	`network` is what a route attaches to, `device` what a zone or a macvlan is
-	built on.
-]]
+-- role -> {network, device}: a route attaches to the network interface, a
+-- firewall zone or a macvlan is built on the device.
 function M.interfaces()
 	local ret = {}
 
@@ -330,14 +313,8 @@ function M.devices()
 	return ret
 end
 
---[[
-	The firewall zone a network interface is covered by, or nil where nothing
-	covers it.
-
-	Compared by device rather than by name: on a layer-3 node "client" and
-	"local_node" are two interfaces, and two zones naming different interfaces
-	of the same bridge still overlap.
-]]
+-- The firewall zone covering an interface, by device rather than by name: two
+-- zones naming different interfaces of the same bridge still overlap.
 function M.zones()
 	local devices, ret = {}, {}
 
@@ -364,14 +341,9 @@ function M.zone_of(role, zones, ifaces)
 	return zones[(iface and iface.device) or role]
 end
 
---[[
-	Whether an interface has an address that covers the given one.
-
-	netifd only installs a route through a next hop it can place on the
-	interface, and a mesh interface is addressed with a /32, so nothing is ever
-	within it. Returns nil where it cannot be told - without ubus there are no
-	addresses to compare against.
-]]
+-- Whether an interface has an address covering the given one. netifd only
+-- installs a route through a next hop it can place, and a mesh interface is a
+-- /32, so nothing ever is. nil where it cannot be told.
 function M.reaches(role, address, ifaces)
 	local iface = (ifaces or M.interfaces())[role]
 

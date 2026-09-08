@@ -27,17 +27,17 @@ end
 local route_entries = entries('route')
 local import_entries = entries('import')
 
-local f = Form(translate('Route announcements'))
+local f = Form(translate('Shared networks'))
 -- saving can rename the sections (their titles carry the prefix), so the page
 -- is built again from what was written
 f.reload = true
 
 if #route_entries == 0 and #import_entries == 0 then
 	local s = f:section(Section, nil, translate(
-		'Nothing is announced beyond this node\'s own addresses. '
-		.. 'Add a route or an import below.'))
+		'This node only shares its own addresses so far. Add a network below '
+		.. 'to let the rest of the mesh reach it through here.'))
 	s:element('model/warning', {
-		content = translate('No announcements are configured.'),
+		content = translate('Nothing is shared yet.'),
 	}, 'empty')
 end
 
@@ -50,51 +50,50 @@ for _, entry in ipairs(route_entries) do
 
 	local title = entry.cidr
 		and translatef('%s via %s', entry.cidr, entry.interface or '?')
-		or translate('New route')
+		or translate('New network')
 
 	local s = f:section(Section, title, translate(
-		'A network this node reaches over one of its interfaces, or an address '
-		.. 'the node itself carries, announced to the rest of the mesh.'))
+		'A network this node can reach, or an address of its own, offered to '
+		.. 'the rest of the mesh.'))
 
-	local enabled = s:option(Flag, name .. '_enabled', translate('Announce this'))
+	local enabled = s:option(Flag, name .. '_enabled', translate('Share this'))
 	enabled.default = entry.enabled ~= '0'
 
-	local cidr = s:option(Value, name .. '_cidr', translate('Network'),
-		translate('A prefix, for example 10.42.7.0/24 or 2001:db8:1::/48'))
+	local cidr = s:option(Value, name .. '_cidr', translate('Address range'),
+		translate('For example 10.42.7.0/24 or 2001:db8:1::/48'))
 	cidr.default = entry.cidr
 
 	function cidr:validate()
 		return self.data ~= nil and l3routes.parse(self.data) ~= nil
 	end
 
-	local interface = s:option(ListValue, name .. '_interface', translate('Interface'),
-		translate('The interface this network is reached over'))
+	local interface = s:option(ListValue, name .. '_interface', translate('Reached over'),
+		translate('Where this network is connected'))
 	for _, dev in ipairs(devices) do
 		interface:value(dev.interface, l3routes.device_label(dev))
 	end
 	interface.default = entry.interface or (devices[1] and devices[1].interface)
 
-	local kind = s:option(ListValue, name .. '_kind', translate('Announce as'))
-	kind:value('route', translate('Network behind this interface'))
-	kind:value('local', translate('Address of this node'))
+	local kind = s:option(ListValue, name .. '_kind', translate('This is'))
+	kind:value('route', translate('A network behind it'))
+	kind:value('local', translate('An address of this node'))
 	kind.default = entry.is_local == '1' and 'local' or 'route'
 
-	local metric = s:option(Value, name .. '_metric', translate('Metric'),
-		translate('Leave empty for the default'))
+	local metric = s:option(Value, name .. '_metric', translate('Priority'),
+		translate('Leave empty unless this route should win over another'))
 	metric.optional = true
 	metric.datatype = 'uinteger'
 	metric.default = entry.metric
 
 	local rtable = s:option(Value, name .. '_table', translate('Routing table'),
-		translate('The table the route is installed in'))
+		translate('Advanced. Leave as it is unless something else manages this route.'))
 	rtable.optional = true
 	rtable.default = entry.table or 'main'
 	rtable:depends(kind, 'route')
 
-	local firewall = s:option(Flag, name .. '_firewall', translate('Manage the firewall'),
-		translate('Put the interface into a firewall zone the mesh may forward into. '
-			.. 'Interfaces the node manages itself, such as the client network and '
-			.. 'the uplink, are left alone either way.'))
+	local firewall = s:option(Flag, name .. '_firewall', translate('Open the firewall'),
+		translate('Let the mesh actually reach it. Turn this off only if you set '
+			.. 'the firewall up yourself.'))
 	firewall.default = entry.firewall ~= '0'
 	firewall:depends(kind, 'route')
 
@@ -129,27 +128,26 @@ for _, entry in ipairs(import_entries) do
 	end
 
 	local s = f:section(Section, title, translate(
-		'Routes this node already has in its kernel, announced to the mesh as '
-		.. 'well. Give a routing table, a routing protocol, or both. Restrict '
-		.. 'them to a prefix, otherwise the default route of the uplink would '
-		.. 'be announced along with them.'))
+		'Share routes this node already learned from another routing daemon. '
+		.. 'Always set a limit, or the node would offer the whole internet to '
+		.. 'the mesh.'))
 
-	local enabled = s:option(Flag, name .. '_enabled', translate('Announce this'))
+	local enabled = s:option(Flag, name .. '_enabled', translate('Share this'))
 	enabled.default = entry.enabled ~= '0'
 
 	local rtable = s:option(Value, name .. '_table', translate('Routing table'),
-		translate('A kernel routing table number'))
+		translate('Which table to take them from, as a number'))
 	rtable.optional = true
 	rtable.datatype = 'uinteger'
 	rtable.default = entry.table
 
 	local proto = s:option(Value, name .. '_proto', translate('Routing protocol'),
-		translate('A kernel routing protocol number or name'))
+		translate('Which daemon they came from, as a number or name'))
 	proto.optional = true
 	proto.default = entry.proto
 
-	local cidr = s:option(Value, name .. '_cidr', translate('Restrict to'),
-		translate('A prefix the imported routes have to lie inside of'))
+	local cidr = s:option(Value, name .. '_cidr', translate('Limit to'),
+		translate('Only share routes inside this range'))
 	cidr.optional = true
 	cidr.default = entry.cidr
 
@@ -162,20 +160,20 @@ for _, entry in ipairs(import_entries) do
 		return self.data ~= nil or proto.data ~= nil
 	end
 
-	local le = s:option(Value, name .. '_le', translate('Longest prefix'),
-		translate('Ignore routes more specific than this, for example 24'))
+	local le = s:option(Value, name .. '_le', translate('Smallest range'),
+		translate('Skip anything smaller than this, for example 24'))
 	le.optional = true
 	le.datatype = 'uinteger'
 	le.default = entry.le
 
-	local family = s:option(ListValue, name .. '_family', translate('Address family'))
-	family:value('', translate('Both'))
+	local family = s:option(ListValue, name .. '_family', translate('Applies to'))
+	family:value('', translate('IPv4 and IPv6'))
 	family:value('4', translate('IPv4'))
 	family:value('6', translate('IPv6'))
 	family.default = entry.family or ''
 
-	local metric = s:option(Value, name .. '_metric', translate('Metric'),
-		translate('Leave empty for the default'))
+	local metric = s:option(Value, name .. '_metric', translate('Priority'),
+		translate('Leave empty unless these should win over other routes'))
 	metric.optional = true
 	metric.datatype = 'uinteger'
 	metric.default = entry.metric
@@ -252,10 +250,10 @@ f_actions.reload = true
 local sa = f_actions:section(Section)
 
 local action = sa:option(ListValue, 'action', translate('Action'))
-action:value('add_route', translate('Add a route'))
+action:value('add_route', translate('Add a network'))
 action:value('add_import', translate('Add an import'))
 if #route_entries > 0 or #import_entries > 0 then
-	action:value('delete', translate('Remove an announcement'))
+	action:value('delete', translate('Remove one'))
 end
 
 local add_interface = sa:option(ListValue, 'add_interface', translate('Interface'))
@@ -264,7 +262,7 @@ for _, dev in ipairs(devices) do
 end
 add_interface:depends(action, 'add_route')
 
-local remove = sa:option(ListValue, 'remove', translate('Announcement'))
+local remove = sa:option(ListValue, 'remove', translate('Which one'))
 for _, entry in ipairs(route_entries) do
 	remove:value(entry['.name'],
 		translatef('%s via %s', entry.cidr or '?', entry.interface or '?'))

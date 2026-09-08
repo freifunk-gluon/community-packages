@@ -1,12 +1,9 @@
 #!/usr/bin/lua
 
---[[
-	The tunnel the public address arrives through.
-
-	Announcing the address is declared in /lib/gluon/l3routes/300-public-ip.lua,
-	and rewriting the encapsulated packets in forward mode is done by
-	/lib/gluon/nftables/900-public-ip.lua.
-]]
+-- The tunnel the public address arrives through.
+--
+-- Announcing it is declared in /lib/gluon/l3routes/300-public-ip.lua, and the
+-- rewrite forward mode needs in /lib/gluon/nftables/900-public-ip.lua.
 
 local uci = require('simple-uci').cursor()
 local l3routes = require 'gluon.l3routes'
@@ -18,35 +15,14 @@ if config then
 	uci:section('network', 'interface', publicip.INTERFACE, {
 		proto = 'ipip',
 		peeraddr = config.peeraddr,
-		--[[
-			In local mode the node carries the public address itself, so the
-			tunnel terminates on it directly.
-
-			In forward mode the address belongs to another device, so the
-			encapsulated packets are addressed to something this node does not
-			have and the kernel would not decapsulate them. The tunnel
-			terminates on the node's own address instead, and the nftables rule
-			rewrites the outer destination to match; what comes out is then
-			routed on to the device that holds the address.
-		]]
+		-- local mode terminates on the public address; forward mode on the
+		-- node's own, since the packets are addressed to something this node
+		-- does not have and the rewrite makes them match
 		ipaddr = config.mode == 'forward' and config.node_ip4 or config.ip4,
 	})
 
-	--[[
-		ipaddr above is where the tunnel terminates, not an address the node
-		carries: netifd hands it to the kernel as the tunnel's local endpoint
-		and assigns nothing. The kernel only takes packets for a tunnel whose
-		local endpoint it actually owns, so in local mode the address has to be
-		put on the device as well - an alias, so netifd keeps it in step with
-		the tunnel.
-
-		Forward mode terminates on the node's own address, which it already has.
-	]]
-	--[[
-		Everything the address sends goes back out of the tunnel: a default
-		route in a table of its own, and a rule that picks that table for
-		anything sourced from the address.
-	]]
+	-- Everything the address sends goes back out of the tunnel: a default
+	-- route in a table of its own, and a rule picking it.
 	uci:section('network', 'route', 'pubip_return', {
 		interface = publicip.INTERFACE,
 		target = '0.0.0.0/0',
@@ -59,14 +35,9 @@ if config then
 		priority = publicip.RULE_PRIORITY,
 	})
 
-	--[[
-		The encapsulated packets are addressed to the node itself and arrive
-		over the mesh, and the mesh zone rejects everything it was not told
-		about - so the tunnel never saw them and nothing was decapsulated.
-
-		Only ipip from the gateway is let in, which is the one thing the tunnel
-		is there for.
-	]]
+	-- The encapsulated packets are addressed to the node and arrive over the
+	-- mesh, and the mesh zone rejects what it was not told about - so the
+	-- tunnel never saw them. Only ipip from the gateway is let in.
 	uci:section('firewall', 'rule', 'public_ip_tunnel', {
 		name = 'Allow the public IP tunnel',
 		src = 'mesh',
@@ -76,14 +47,9 @@ if config then
 		target = 'ACCEPT',
 	})
 
-	--[[
-		Forwarding rides the target interface on a macvlan child of its own,
-		with the gateway address on it. That keeps the whole path out of the
-		policy of whatever interface it rides - gluon's uplink masquerades,
-		drops forwarded traffic and keeps its own routing table - so nothing
-		has to be carved out of it prefix by prefix. l3routes finds the device
-		in no zone and gives it one, with the mesh forwardings already on it.
-	]]
+	-- Forwarding rides a macvlan child of the target interface, keeping the
+	-- whole path out of that interface's policy. l3routes finds the device in
+	-- no zone and gives it one, with the mesh forwardings on it.
 	if config.mode == 'forward' then
 		local parent = l3routes.interfaces()[config.target_interface]
 
@@ -101,15 +67,10 @@ if config then
 				netmask = '255.255.255.255',
 			})
 		end
-		--[[
-			What comes out of the tunnel arrives on the tunnel device, which is
-			in no zone, so nothing could be forwarded off it - the packets the
-			gateway sends would be decapsulated and then dropped.
 
-			It gets one here, and it reaches exactly one place: the device the
-			address is forwarded to. Nothing else on the node becomes reachable
-			through the tunnel.
-		]]
+		-- What the tunnel decapsulates arrives on the tunnel device, which is in
+		-- no zone, so nothing could be forwarded off it. It reaches exactly one
+		-- place: the device the address is forwarded to.
 		uci:section('firewall', 'zone', publicip.ZONE, {
 			name = publicip.ZONE,
 			network = { publicip.INTERFACE },
@@ -134,6 +95,9 @@ if config then
 		uci:delete('network', publicip.FORWARD_DEVICE_SECTION)
 	end
 
+	-- ipaddr above is the tunnel's local endpoint, not an address the node
+	-- carries, and the kernel only takes packets for a tunnel whose endpoint
+	-- it owns - so in local mode the address goes on the device too.
 	if config.mode == 'local' then
 		uci:section('network', 'interface', publicip.ADDRESS_INTERFACE, {
 			proto = 'static',

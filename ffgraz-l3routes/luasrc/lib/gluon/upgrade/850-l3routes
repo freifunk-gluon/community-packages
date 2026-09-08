@@ -22,12 +22,9 @@ local function device_of(name)
 	return (iface and iface.device) or name
 end
 
---[[
-	A device with disable_ipv6 set takes no IPv6 route - netifd accepts the
-	section, the kernel refuses the route, and the announcement points at
-	nothing. br-client is exactly this on a layer-3 node, where l3roamd owns
-	the client IPv6. Say so rather than leaving it silent.
-]]
+-- A device with disable_ipv6 takes no IPv6 route: netifd accepts the section,
+-- the kernel refuses it, and the announcement points at nothing. br-client is
+-- exactly this, where l3roamd owns the client IPv6.
 local function ipv6_disabled(device)
 	local f = device and io.open('/proc/sys/net/ipv6/conf/' .. device .. '/disable_ipv6')
 	if not f then
@@ -42,17 +39,10 @@ end
 
 local zone_networks, seen = {}, {}
 
---[[
-	A prefix this node announces but cannot currently deliver must be dropped
-	here, not handed back to the mesh.
-
-	Without this the packet falls through to whatever covering route the mesh
-	knows - the aggregate the announced address sits in - which points at a
-	gateway that routes it straight back, and it bounces until its TTL runs
-	out. So every announced prefix also gets an unreachable route, at a metric
-	high enough that the real one wins whenever it is there. babeld does the
-	same for the prefixes it originates.
-]]
+-- An announced prefix the node cannot deliver must be dropped here, or it
+-- falls through to the covering route the mesh knows, comes straight back and
+-- bounces until its TTL runs out. High metric, so the real route wins whenever
+-- it is there. babeld does the same for what it originates.
 local UNREACHABLE_METRIC = 2000000000
 
 -- before the main lookup at 32766, and clear of the rules gluon sets up for
@@ -60,11 +50,8 @@ local UNREACHABLE_METRIC = 2000000000
 local RULE_PRIORITY = 21000
 
 for i, r in ipairs(routes) do
-	--[[
-		The configuration names a role; a route attaches to the network
-		interface gluon put that role's ports into, and a zone or a macvlan is
-		built on that interface's device.
-	]]
+	-- The configuration names a role; a route attaches to the network
+	-- interface carrying its ports, a zone or macvlan to its device.
 	local network = (ifaces[r.interface] or {}).network or r.interface
 
 	uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d_null'):format(i), {
@@ -81,19 +68,12 @@ for i, r in ipairs(routes) do
 			interface = network,
 			target = r.cidr,
 			gateway = r.gateway,
-			--[[
-				A next hop the kernel cannot place on the interface is refused
-				with "Network unreachable"; naming both the interface and the
-				next hop says where it is, which is what onlink means, and is
-				how olsrd installs its own routes here.
-			]]
+			-- naming both the interface and the next hop says where it is,
+			-- which is what onlink means, and how olsrd routes here
 			onlink = r.gateway and true or nil,
 			metric = r.metric,
-			--[[
-				Left unset unless something was asked for: netifd reads "main"
-				as "no table given" and then puts the route in the table the
-				interface itself uses, so naming it would not mean what it says.
-			]]
+			-- Left unset unless asked for: netifd reads "main" as "no table
+			-- given" and then uses the table the interface itself uses.
 			table = r.table,
 		})
 
@@ -108,18 +88,9 @@ for i, r in ipairs(routes) do
 				:format(r.interface, r.gateway, r.cidr))
 		end
 
-		--[[
-			An interface with a table of its own - gluon gives wan ip4table 1 -
-			takes the route there instead of into main, and netifd cannot be
-			told otherwise: it reads "main" as "no table given" and falls back
-			to the interface's own.
-
-			Which would leave the prefix announced and undeliverable, since
-			forwarding looks in main. A rule for that destination sends the
-			lookup to the table the route actually went to. It sits before the
-			main lookup at 32766, and the unreachable route stays behind it as
-			the fallback for when the real one is gone.
-		]]
+		-- An interface with a table of its own - gluon gives wan ip4table 1 -
+		-- takes the route there. A rule for that destination sends the lookup
+		-- to the right table, before main at 32766.
 		local own_table = uci:get('network', network,
 			r.family == 4 and 'ip4table' or 'ip6table')
 
@@ -147,17 +118,10 @@ for i, r in ipairs(routes) do
 		local zone = l3routes.zone_of(r.interface, zones, ifaces)
 
 		if zone then
-			--[[
-				The interface is already in a zone - gluon's own uplink or
-				client network, or one another package set up. Its policy is
-				not ours to rewrite: putting br-wan into a second zone, or
-				opening mesh to wan wholesale, would turn the node into a
-				gateway for everything rather than for the prefix it
-				announced.
-
-				So only the announced prefix is let through, in the direction
-				the announcement promises. Replies come back on conntrack.
-			]]
+			-- The interface already has a zone, and its policy is not ours to
+			-- rewrite: opening mesh to wan wholesale would make the node a
+			-- gateway for everything. Only the announced prefix is let through;
+			-- replies come back on conntrack.
 			for _, peer in ipairs({ 'mesh', 'loc_client' }) do
 				-- towards the prefix
 				uci:section('firewall', 'rule', ('l3routes_%d_%s_in'):format(i, peer), {
@@ -172,13 +136,8 @@ for i, r in ipairs(routes) do
 					target = 'ACCEPT',
 				})
 
-				--[[
-					And back out of it. Replies ride conntrack, but what the
-					prefix itself starts does not, and the zone it sits in
-					forwards nothing by default - gluon's uplink zone ends in
-					drop_to_wan. Without this the address can be reached and
-					cannot answer for itself.
-				]]
+				-- And back out of it: what the prefix itself starts does not ride
+				-- conntrack, and gluon's uplink zone ends in a drop.
 				uci:section('firewall', 'rule', ('l3routes_%d_%s_out'):format(i, peer), {
 					name = ('l3routes from %s via %s'):format(r.cidr, r.interface),
 					src = zone,
@@ -190,13 +149,9 @@ for i, r in ipairs(routes) do
 				})
 			end
 
-			--[[
-				And it must not be masqueraded on the way through: gluon
-				masquerades everything leaving the uplink, which would hide
-				every mesh client behind the node's own address. An announced
-				prefix is routed, not translated - the device is meant to see
-				who is talking to it.
-			]]
+			-- Not masqueraded either: that would hide every client behind the
+			-- node's own address, and an announced prefix is routed, not
+			-- translated.
 			if r.family == 4 then
 				uci:section('firewall', 'nat', ('l3routes_%d_nonat'):format(i), {
 					name = ('l3routes no-nat %s'):format(r.cidr),

@@ -1,16 +1,12 @@
---[[
-	Forward mode: make the kernel decapsulate a tunnel that is not addressed to
-	this node.
-
-	The encapsulated packets arrive with the public address as their outer
-	destination, which the node does not have - the device it forwards to does.
-	Rewriting the outer destination to the node's own address on the way in
-	makes the ipip tunnel take them; the inner packet is then routed on to that
-	device by the route l3routes installs.
-
-	This is an ingress hook, so it has to name the devices it runs on: every
-	device the mesh comes in over, which is where these packets arrive from.
-]]
+-- Forward mode: make the kernel decapsulate a tunnel that is not addressed to
+-- this node.
+--
+-- The packets arrive with the public address as their outer destination, which
+-- the node does not have. Rewriting it to the node's own address on the way in
+-- makes the ipip tunnel take them; l3routes routes what comes out onward.
+--
+-- An ingress hook has to name its devices, so it runs on every device the mesh
+-- comes in over.
 
 local publicip = require 'gluon.publicip'
 local util = require 'gluon.util'
@@ -36,12 +32,9 @@ local function mesh_devices()
 	return devices
 end
 
---[[
-	The table is declared and deleted every time, and only filled when there is
-	something to rewrite. firewall4 flushes its own table on a reload and not
-	this one, so leaving the file out when the rules are not wanted would leave
-	the previous ones in the kernel for as long as the node is up.
-]]
+-- Declared and deleted every time, filled only when there is something to
+-- rewrite: firewall4 flushes its own table on reload and not this one, so
+-- leaving the file out would leave the previous rules in the kernel.
 local out = {
 	'table netdev gluon_public_ip',
 	'delete table netdev gluon_public_ip',

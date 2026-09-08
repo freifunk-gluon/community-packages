@@ -1,17 +1,12 @@
 #!/usr/bin/lua
 
---[[
-	Announces what gluon.l3routes collected through babeld.
-
-	babeld redistributes kernel routes that a filter allows - "by default,
-	babeld redistributes all local addresses, and no other routes" - so every
-	announced prefix needs an explicit allow.
-
-	The filters are inserted before the first filter line of the configuration
-	gluon-mesh-babel wrote at 300, not appended to it: filters are
-	first-match-wins, and that file ends in "redistribute local ip 0.0.0.0/0
-	deny", which would swallow every is_local announcement.
-]]
+-- Announces what gluon.l3routes collected, through babeld.
+--
+-- "By default, babeld redistributes all local addresses, and no other routes",
+-- so every announced prefix needs an explicit allow. The filters go in before
+-- the first filter of the config written at 300, not after: they are
+-- first-match-wins and that file ends in a deny that would swallow every
+-- is_local announcement.
 
 local l3routes = require 'gluon.l3routes'
 
@@ -28,11 +23,8 @@ if not (families[4] or families[6]) then
 	return
 end
 
---[[
-	babeld filters have no address family clause of their own, so a filter that
-	names no prefix - a protocol-only import - is pinned to the families this
-	node may announce.
-]]
+-- babeld filters have no family clause, so a filter naming no prefix is
+-- pinned to the families this node may announce
 local ANY = {
 	[4] = { 'ip 0.0.0.0/0', 'le 32' },
 	[6] = { 'ip ::/0', 'le 128' },

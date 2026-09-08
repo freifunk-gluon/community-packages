@@ -1,14 +1,10 @@
 #!/usr/bin/lua
 
---[[
-	Announces what gluon.l3routes collected as olsr HNAs.
-
-	Hna4 takes a dotted netmask, Hna6 a prefix length - the shape
-	olsrd_write_hna4/6 in the olsrd init script reads them in.
-
-	The olsrd and olsrd6 configurations are not reset by 001-reset-uci, so the
-	sections written here carry a marker and are pruned by it.
-]]
+-- Announces what gluon.l3routes collected, as olsr HNAs.
+--
+-- Hna4 takes a dotted netmask, Hna6 a prefix length. The olsrd configurations
+-- are not reset by 001-reset-uci, so what is written here carries a marker and
+-- is pruned by it.
 
 local uci = require('simple-uci').cursor()
 local l3routes = require 'gluon.l3routes'
@@ -18,11 +14,8 @@ uci:delete_all('olsrd6', 'Hna6', { gluon_l3routes = '1' })
 
 local collected = l3routes.collect()
 
---[[
-	olsr carries IPv4 wherever it is enabled, and IPv6 only on an image without
-	babel: where gluon-mesh-babel is installed, olsrd6 is not started at all and
-	babel announces the v6 prefixes.
-]]
+-- olsr carries IPv4 where it is enabled, and IPv6 only without babel: there
+-- olsrd6 is not started at all and babel announces the v6 prefixes
 local families = l3routes.families('olsr')
 
 local n = 0
@@ -53,15 +46,10 @@ for _, r in ipairs(collected.routes) do
 	hna(r)
 end
 
---[[
-	olsrd has no kernel route redistribution, so an import is snapshotted into
-	HNAs here.
-
-	ponytail: refreshed on gluon-reconfigure only - routes that appear in the
-	imported table later are not picked up until the next one. Making it live
-	would mean restarting olsrd on every route change, which is worse; the
-	upgrade path is an olsrd plugin, not a restart loop.
-]]
+-- olsrd has no kernel route redistribution, so an import is snapshotted into
+-- HNAs here. ponytail: refreshed on gluon-reconfigure only - making it live
+-- would mean restarting olsrd per route change, and the real answer is an
+-- olsrd plugin.
 for _, imp in ipairs(collected.imports) do
 	for _, p in ipairs(l3routes.resolve(imp)) do
 		hna(p)
