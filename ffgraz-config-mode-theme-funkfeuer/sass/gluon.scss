@@ -119,21 +119,52 @@ ul.tabmenu {
 	position: sticky;
 	top: 1em;
 
+	/* a panel of its own, so the list reads as one thing beside the page
+	   rather than as text floating next to it */
 	ul.tabmenu {
 		display: flex;
 		flex-direction: column;
 		margin: 0;
+		padding: 0.4em;
 		width: 100%;
 		text-align: left;
+		background: #fff;
+		border-radius: 0.6em;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 	}
 
 	ul.tabmenu li {
-		margin: 0 0 0.2em;
+		margin: 0;
 		white-space: normal;
 
 		a {
-			padding: 0.6em 1em;
+			padding: 0.6em 0.9em;
 			border-radius: 0.4em;
+			/* the accent grows on the left rather than the box jumping
+			   about, so nothing moves as the pointer runs down the list */
+			border-left: 3px solid transparent;
+			transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+		}
+
+		a:hover {
+			background: lighten($ffyellow, 38);
+			border-left-color: $ffyellow;
+			color: #333;
+		}
+
+		/* the page you are on wears the colour of the bar above it, a shade
+		   down: white on the bar colour itself is about 3.4:1 in the
+		   funkfeuer palette, which is under what body text needs */
+		&.active a {
+			background: darken($ffmagenta, 12);
+			border-left-color: darken($ffmagenta, 24);
+			color: #fff;
+			font-weight: bold;
+		}
+
+		&.active a:hover {
+			background: darken($ffmagenta, 18);
+			color: #fff;
 		}
 	}
 }
