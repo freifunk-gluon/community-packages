@@ -60,6 +60,13 @@ local UNREACHABLE_METRIC = 2000000000
 local RULE_PRIORITY = 21000
 
 for i, r in ipairs(routes) do
+	--[[
+		The configuration names a role; a route attaches to the network
+		interface gluon put that role's ports into, and a zone or a macvlan is
+		built on that interface's device.
+	]]
+	local network = (ifaces[r.interface] or {}).network or r.interface
+
 	uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d_null'):format(i), {
 		interface = 'loopback',
 		target = r.cidr,
@@ -71,7 +78,7 @@ for i, r in ipairs(routes) do
 	-- so there is nothing to install - only something to announce
 	if not r.is_local then
 		uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d'):format(i), {
-			interface = r.interface,
+			interface = network,
 			target = r.cidr,
 			gateway = r.gateway,
 			--[[
@@ -113,7 +120,7 @@ for i, r in ipairs(routes) do
 			main lookup at 32766, and the unreachable route stays behind it as
 			the fallback for when the real one is gone.
 		]]
-		local own_table = uci:get('network', r.interface,
+		local own_table = uci:get('network', network,
 			r.family == 4 and 'ip4table' or 'ip6table')
 
 		if not r.table and own_table then
@@ -200,7 +207,7 @@ for i, r in ipairs(routes) do
 				})
 			end
 		else
-			table.insert(zone_networks, r.interface)
+			table.insert(zone_networks, network)
 		end
 	end
 end

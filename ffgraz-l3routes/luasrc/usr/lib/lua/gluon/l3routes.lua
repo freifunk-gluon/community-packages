@@ -211,24 +211,21 @@ function M.families(protocol)
 	return { [4] = olsr, [6] = olsr and not babel }
 end
 
+--[[
+	The interfaces gluon itself knows about, by the role it gave them.
+
+	Taken from the interface sections of /etc/config/gluon rather than from
+	netifd's: those are gluon's own model of the node, they resolve without
+	ubus - gluon-reconfigure runs from uci-defaults at boot, long before netifd
+	is up - and they do not change when netifd renames something.
+
+	Each role is resolved to the network interface that carries its ports and
+	to that interface's device, since a route attaches to the one and a
+	firewall zone or a macvlan is built on the other.
+]]
 local ROLES = { 'uplink', 'mesh', 'client', 'private' }
 
--- The role gluon gave each physical interface, keyed by interface name, out of
--- the interface sections of /etc/config/gluon.
-local function roles_by_ifname()
-	local ret = {}
-
-	for _, role in ipairs(ROLES) do
-		for _, ifname in ipairs(util.get_role_interfaces(uci, role)) do
-			ret[ifname] = ret[ifname] or {}
-			table.insert(ret[ifname], role)
-		end
-	end
-
-	return ret
-end
-
--- The interfaces a network section is made of, however they are spelled
+-- the interfaces a network section is made of, however they are spelled
 local function members(section)
 	local ret = {}
 
@@ -250,58 +247,70 @@ local function members(section)
 end
 
 --[[
-	Every configured network interface, as a name -> {device, up, roles} map.
+	The device a network interface will have, named the way netifd names one.
+	Worked out rather than asked for, so that it is the same before netifd is
+	running as after: a bridge's device is br-<name>, and reporting its first
+	port instead once built a macvlan on eth0, which is enslaved to br-wan and
+	so never came up.
+]]
+local function device_of(section, name)
+	if section.device then
+		return section.device
+	end
 
-	The list comes out of uci, so it is the same before and after netifd has
-	brought anything up, and each entry carries the roles gluon gave the
-	interfaces it is made of. ubus is only asked for the device names and the
-	current state, which uci cannot know.
+	if section.type == 'bridge' then
+		return 'br-' .. name
+	end
+
+	return section.ifname and section.ifname:match('^%S+')
+end
+
+-- the network interface carrying any of these ports, and its device
+local function carrier(ifnames)
+	local want, found = {}, nil
+
+	for _, ifname in ipairs(ifnames) do
+		want[ifname] = true
+	end
+
+	uci:foreach('network', 'interface', function(section)
+		if found then
+			return
+		end
+
+		for _, member in ipairs(members(section)) do
+			if want[member] then
+				local name = section['.name']
+				found = { network = name, device = device_of(section, name) }
+				return
+			end
+		end
+	end)
+
+	return found
+end
+
+--[[
+	Every role gluon has interfaces for, as a role -> {network, device} map.
+	`network` is what a route attaches to, `device` what a zone or a macvlan is
+	built on.
 ]]
 function M.interfaces()
 	local ret = {}
-	local roles = roles_by_ifname()
 
-	uci:foreach('network', 'interface', function(s)
-		local name = s['.name']
-		local seen, own = {}, {}
+	for _, role in ipairs(ROLES) do
+		local ifnames = util.get_role_interfaces(uci, role)
 
-		for _, member in ipairs(members(s)) do
-			for _, role in ipairs(roles[member] or {}) do
-				if not seen[role] then
-					seen[role] = true
-					table.insert(own, role)
-				end
-			end
-		end
+		if #ifnames > 0 then
+			local found = carrier(ifnames)
 
-		table.sort(own)
-
-		ret[name] = {
-			interface = name,
-			device = s.device or s.ifname,
-			roles = own,
-		}
-	end)
-
-	local ok, ubus = pcall(require, 'ubus')
-	local conn = ok and ubus.connect()
-	local dump = conn and conn:call('network.interface', 'dump', {})
-
-	if dump then
-		for _, iface in ipairs(dump.interface) do
-			local entry = ret[iface.interface]
-
-			if entry then
-				entry.device = iface.l3_device or iface.device or entry.device
-				entry.up = iface.up
-				entry.addresses = {}
-
-				for _, key in ipairs({ 'ipv4-address', 'ipv6-address' }) do
-					for _, addr in ipairs(iface[key] or {}) do
-						table.insert(entry.addresses,
-							addr.address .. '/' .. addr.mask)
-					end
-				end
+			if found then
+				ret[role] = {
+					interface = role,
+					network = found.network,
+					device = found.device,
+					roles = { role },
+				}
 			end
 		end
 	end
@@ -309,45 +318,15 @@ function M.interfaces()
 	return ret
 end
 
--- The interfaces worth offering as a route target, for the UI.
+-- The roles worth offering as a route target.
 function M.devices()
-	local ifaces = M.interfaces()
-	local names = {}
+	local ret = {}
 
-	--[[
-		"client" and "local_node" are the same network seen twice: local-node
-		is a veth into br-client, and it is the end the node itself lives on -
-		it carries the address, it is the one in the loc_client firewall zone,
-		and unlike br-client it takes IPv6 routes. So the client network is
-		offered as local_node, and br-client is left out.
-	]]
-	local client = ifaces['local_node'] and 'client' or nil
-
-	for name in pairs(ifaces) do
-		-- the mesh is where the announcement goes, not where it points, and
-		-- the daemons' own plumbing is never a route target
-		if not (name == 'loopback' or name == 'mmfd' or name == 'l3roamd'
-			or name == client or name:match('^mesh')) then
-			table.insert(names, name)
-		end
+	for _, iface in pairs(M.interfaces()) do
+		table.insert(ret, iface)
 	end
 
-	-- sort before de-duplicating, so that of two interfaces on one device the
-	-- same one always wins: wan and wan6 are both br-wan, and it should stay
-	-- "wan" from one reconfigure to the next
-	table.sort(names)
-
-	local ret, by_device = {}, {}
-
-	for _, name in ipairs(names) do
-		local iface = ifaces[name]
-
-		if not (iface.device and by_device[iface.device]) then
-			by_device[iface.device or name] = true
-			table.insert(ret, iface)
-		end
-	end
-
+	table.sort(ret, function(a, b) return a.interface < b.interface end)
 	return ret
 end
 
@@ -360,28 +339,29 @@ end
 	of the same bridge still overlap.
 ]]
 function M.zones()
-	local ifaces = M.interfaces()
-	local ret = {}
+	local devices, ret = {}, {}
+
+	uci:foreach('network', 'interface', function(section)
+		local name = section['.name']
+		devices[name] = device_of(section, name)
+	end)
 
 	uci:foreach('firewall', 'zone', function(zone)
 		for _, network in ipairs(zone.network or {}) do
-			local iface = ifaces[network]
-			local device = (iface and iface.device) or network
-
-			ret[device] = zone.name or zone['.name']
+			ret[devices[network] or network] = zone.name or zone['.name']
 		end
 	end)
 
 	return ret
 end
 
-function M.zone_of(interface, zones, ifaces)
+function M.zone_of(role, zones, ifaces)
 	zones = zones or M.zones()
 	ifaces = ifaces or M.interfaces()
 
-	local iface = ifaces[interface]
+	local iface = ifaces[role]
 
-	return zones[(iface and iface.device) or interface]
+	return zones[(iface and iface.device) or role]
 end
 
 --[[
@@ -392,8 +372,8 @@ end
 	within it. Returns nil where it cannot be told - without ubus there are no
 	addresses to compare against.
 ]]
-function M.reaches(interface, address, ifaces)
-	local iface = (ifaces or M.interfaces())[interface]
+function M.reaches(role, address, ifaces)
+	local iface = (ifaces or M.interfaces())[role]
 
 	if not (iface and iface.addresses) then
 		return nil
@@ -413,21 +393,13 @@ function M.reaches(interface, address, ifaces)
 end
 
 -- How an interface is named in the config mode: "wan (br-wan, uplink)"
+-- How a role is named in the config mode: "uplink (br-wan)"
 function M.device_label(dev)
-	local parts = {}
-
-	if dev.device then
-		table.insert(parts, dev.device)
-	end
-	for _, role in ipairs(dev.roles or {}) do
-		table.insert(parts, role)
-	end
-
-	if #parts == 0 then
+	if not dev.device then
 		return dev.interface
 	end
 
-	return string.format('%s (%s)', dev.interface, table.concat(parts, ', '))
+	return string.format('%s (%s)', dev.interface, dev.device)
 end
 
 -- Persistent, id-keyed adds for other modules; replayed by 100-uci.lua.
