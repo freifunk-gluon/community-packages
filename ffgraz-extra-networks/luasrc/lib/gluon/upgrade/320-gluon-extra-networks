@@ -103,6 +103,27 @@ local function configure(network, address4, routed4, address6, routed6)
 			target = 'MASQUERADE',
 		})
 	end
+
+	--[[
+		The same for IPv6. A range carved out of the node's own unique-local
+		prefix is no more routable than a private IPv4 one, so without this
+		everything on it would be addressed and still unable to leave - and
+		worse than having no IPv6 at all, since a client would try it first.
+
+		The whole unique-local prefix rather than the piece assigned to this
+		network: ip6assign hands that out at runtime, and the firewall is
+		generated before there is one.
+	]]
+	if not (routed6 or network.routed_only) then
+		uci:section('firewall', 'nat', name .. '_masq6', {
+			name = name .. '_masq6',
+			src = 'mesh',
+			src_ip = uci:get('network', 'globals', 'ula_prefix'),
+			family = 'ipv6',
+			proto = 'all',
+			target = 'MASQUERADE',
+		})
+	end
 end
 
 for _, network in ipairs(extranets.NETWORKS) do

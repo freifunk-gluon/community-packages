@@ -162,6 +162,52 @@ function M.routed4(address)
 	return parsed:network():string() .. '/' .. parsed:prefix()
 end
 
+--[[
+	The IPv6 range a network actually carries, and the node's own address in
+	it, or nil.
+
+	From netifd rather than from uci: a range that was assigned is in the
+	config, but ip6assign carves the private network's out of the node's own
+	prefix at runtime, and that one is nowhere to be found until netifd has
+	done it. Both are worth advertising - clients on a made up range still
+	reach the node and each other by it.
+]]
+function M.advertised6(name)
+	local ok, ubus = pcall(require, 'ubus')
+	local conn = ok and ubus.connect()
+
+	if not conn then
+		return nil
+	end
+
+	local status = conn:call('network.interface.' .. name, 'status', {})
+	conn:close()
+
+	if not status then
+		return nil
+	end
+
+	-- a range of its own, as it was configured
+	local address = (status['ipv6-address'] or {})[1]
+
+	if address and address.address and address.mask then
+		local parsed = ip.new(address.address .. '/' .. address.mask)
+		return parsed:network():string() .. '/' .. address.mask, address.address
+	end
+
+	-- or a piece of the node's own prefix, handed out by ip6assign
+	local assignment = (status['ipv6-prefix-assignment'] or {})[1]
+
+	if assignment and assignment.address and assignment.mask then
+		local local_address = assignment['local-address'] or {}
+
+		return assignment.address .. '/' .. assignment.mask,
+			local_address.address or assignment.address
+	end
+
+	return nil
+end
+
 -- What a network is addressed with, whether or not it is routed
 function M.address4(name)
 	return uci:get('network', name, 'ipaddr')
