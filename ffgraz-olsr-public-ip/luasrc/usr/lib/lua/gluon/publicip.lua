@@ -37,6 +37,23 @@ M.INTERFACE = 'pubip'
 -- the alias that carries the address itself, see 500-public-ip
 M.ADDRESS_INTERFACE = 'pubip4'
 
+--[[
+	Forwarding puts the traffic on a device of its own rather than on the
+	interface it rides: a macvlan child, with its own address and its own
+	firewall zone.
+
+	Sharing the uplink would mean carving the prefix out of gluon's uplink
+	policy - past its masquerading, past a forward chain that ends in a drop,
+	and into the separate routing table it keeps - one exception at a time. A
+	device of its own has none of that to work around, and gluon does the same
+	for the mesh where it has to ride the uplink port (m_uplink).
+]]
+M.FORWARD_INTERFACE = 'pubfwd'
+
+-- the device section is named separately: a uci section name is unique across
+-- the file whatever its type, so sharing one would merge the two
+M.FORWARD_DEVICE_SECTION = 'pubfwd_dev'
+
 -- the firewall zone the tunnel is put into, so that what arrives through it
 -- can be forwarded on
 M.ZONE = 'public_ip'
@@ -96,15 +113,26 @@ function M.config()
 	config.target_interface = uci:get('gluon', 'olsr_public_ip', 'target_interface')
 
 	--[[
-		Forwarding needs an interface to pass the traffic out of, and an address
+		The address the node itself takes on that segment: the literal gateway
+		the forwarded device talks back to, and what the node sends its ARP
+		requests for the public address from - without an address there the
+		requests would go out from 0.0.0.0 and most hosts ignore those.
+
+		A /32 on both sides. Neither address is in a subnet the other holds, so
+		each reaches the other by an explicit route onto the device, the way a
+		point to point link works on a shared segment.
+	]]
+	config.gateway = address(uci:get('gluon', 'olsr_public_ip', 'gateway'))
+
+	--[[
+		Forwarding needs an interface to ride, an address on it, and an address
 		of its own to terminate the tunnel on.
 
 		The address of the device is optional: with one the public address is
-		routed to it as a next hop, without one it is routed onto the interface
-		itself, which is what is wanted when the device answers for the address
-		directly on that segment.
+		routed to it as a next hop, without one it is routed onto the segment
+		and the device answers for it there.
 	]]
-	if not (config.target_interface and node_ip4) then
+	if not (config.target_interface and config.gateway and node_ip4) then
 		return nil
 	end
 

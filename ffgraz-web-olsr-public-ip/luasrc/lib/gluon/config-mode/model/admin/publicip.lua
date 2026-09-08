@@ -52,6 +52,14 @@ target.datatype = "ip4addr"
 target.optional = true
 target.default = uci:get('gluon', 'olsr_public_ip', 'target')
 
+local gateway = fs:option(Value, "gateway", translate("Gateway address"),
+	translate("The address this node takes on that segment, and the gateway the "
+		.. "device talks back to. A host address: both sides carry a /32 and "
+		.. "reach each other over the interface below."))
+gateway:depends(mode, 'forward')
+gateway.datatype = "ip4addr"
+gateway.default = uci:get('gluon', 'olsr_public_ip', 'gateway')
+
 local target_interface = fs:option(ListValue, "target_interface", translate("Interface"),
 	translate("The interface the device is reached over"))
 for _, dev in ipairs(devices) do
@@ -188,6 +196,7 @@ function f:write()
 		peeraddr = peeraddr.data,
 		target = target.data,
 		target_interface = target_interface.data,
+		gateway = gateway.data,
 	})
 
 	for _, forward in ipairs(forwards) do

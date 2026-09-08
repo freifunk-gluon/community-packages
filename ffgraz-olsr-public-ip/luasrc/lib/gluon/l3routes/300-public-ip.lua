@@ -14,7 +14,7 @@ if config then
 		]]
 		route({
 			cidr = config.ip4 .. '/32',
-			interface = config.target_interface,
+			interface = publicip.FORWARD_INTERFACE,
 			gateway = config.target,
 			source = 'olsr-public-ip',
 		})
