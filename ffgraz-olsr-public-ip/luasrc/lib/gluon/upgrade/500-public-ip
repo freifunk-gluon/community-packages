@@ -43,6 +43,23 @@ if config then
 		Forward mode terminates on the node's own address, which it already has.
 	]]
 	--[[
+		Everything the address sends goes back out of the tunnel: a default
+		route in a table of its own, and a rule that picks that table for
+		anything sourced from the address.
+	]]
+	uci:section('network', 'route', 'pubip_return', {
+		interface = publicip.INTERFACE,
+		target = '0.0.0.0/0',
+		table = tostring(publicip.TABLE),
+	})
+
+	uci:section('network', 'rule', 'pubip_return_rule', {
+		src = config.ip4 .. '/32',
+		lookup = tostring(publicip.TABLE),
+		priority = publicip.RULE_PRIORITY,
+	})
+
+	--[[
 		The encapsulated packets are addressed to the node itself and arrive
 		over the mesh, and the mesh zone rejects everything it was not told
 		about - so the tunnel never saw them and nothing was decapsulated.
@@ -68,8 +85,7 @@ if config then
 		in no zone and gives it one, with the mesh forwardings already on it.
 	]]
 	if config.mode == 'forward' then
-		local ifaces = l3routes.interfaces()
-		local parent = ifaces[config.target_interface]
+		local parent = l3routes.interfaces()[config.target_interface]
 
 		if parent and parent.device then
 			uci:section('network', 'device', publicip.FORWARD_DEVICE_SECTION, {
@@ -133,6 +149,8 @@ else
 	uci:delete('network', publicip.ADDRESS_INTERFACE)
 	uci:delete('network', publicip.FORWARD_INTERFACE)
 	uci:delete('network', publicip.FORWARD_DEVICE_SECTION)
+	uci:delete('network', 'pubip_return')
+	uci:delete('network', 'pubip_return_rule')
 end
 
 uci:save('network')

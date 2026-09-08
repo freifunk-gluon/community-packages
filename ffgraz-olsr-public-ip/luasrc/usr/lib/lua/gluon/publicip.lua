@@ -54,6 +54,21 @@ M.FORWARD_INTERFACE = 'pubfwd'
 -- the file whatever its type, so sharing one would merge the two
 M.FORWARD_DEVICE_SECTION = 'pubfwd_dev'
 
+--[[
+	Where the address sends its own traffic.
+
+	The address is routed to the mesh gateway, so what it answers has to go
+	back the same way - out of the tunnel, not out of whatever uplink this node
+	happens to have, where it would leave with a source address that does not
+	belong there and be dropped as spoofed.
+
+	A table of its own with a default route through the tunnel, and a rule
+	picking it for anything sourced from the address. The proto handler this
+	package started out with did the same by hand.
+]]
+M.TABLE = 112
+M.RULE_PRIORITY = 21100
+
 -- the firewall zone the tunnel is put into, so that what arrives through it
 -- can be forwarded on
 M.ZONE = 'public_ip'
