@@ -1,0 +1,160 @@
+#!/usr/bin/lua
+
+--[[
+	Installs what the announced prefixes need locally: a kernel route per
+	range, and a firewall zone that lets the mesh reach it.
+
+	001-reset-uci regenerates network and firewall from scratch on every
+	gluon-reconfigure, so nothing has to be pruned here - only written.
+]]
+
+local uci = require('simple-uci').cursor()
+local util = require 'gluon.util'
+local l3routes = require 'gluon.l3routes'
+
+local routes = l3routes.collect().routes
+
+--[[
+	Which zone already covers a network. Compared by device, not by name: on a
+	layer-3 node "client" and "local_node" are two interfaces, and two zones
+	naming different interfaces on the same bridge still overlap.
+]]
+local ifaces = l3routes.interfaces()
+
+local function device_of(name)
+	local iface = ifaces[name]
+	return (iface and iface.device) or name
+end
+
+local owner = {}
+uci:foreach('firewall', 'zone', function(z)
+	for _, net in ipairs(z.network or {}) do
+		owner[device_of(net)] = z.name or z['.name']
+	end
+end)
+
+--[[
+	A device with disable_ipv6 set takes no IPv6 route - netifd accepts the
+	section, the kernel refuses the route, and the announcement points at
+	nothing. br-client is exactly this on a layer-3 node, where l3roamd owns
+	the client IPv6. Say so rather than leaving it silent.
+]]
+local function ipv6_disabled(device)
+	local f = device and io.open('/proc/sys/net/ipv6/conf/' .. device .. '/disable_ipv6')
+	if not f then
+		return false
+	end
+
+	local value = f:read('*l')
+	f:close()
+
+	return value == '1'
+end
+
+local zone_networks, seen = {}, {}
+
+for i, r in ipairs(routes) do
+	-- an is_local prefix is an address netifd already put on the interface,
+	-- so there is nothing to install - only something to announce
+	if not r.is_local then
+		uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d'):format(i), {
+			interface = r.interface,
+			target = r.cidr,
+			metric = r.metric,
+			-- gluon puts wan in ip4table 1 and wan6 in ip6table 1; babeld only
+			-- redistributes from its import-tables, and the mesh forwards out
+			-- of main
+			table = r.table,
+		})
+	end
+
+	if r.family == 6 and ipv6_disabled(device_of(r.interface)) then
+		util.log(('l3routes: %s has IPv6 disabled on %s, %s cannot be routed there')
+			:format(r.interface, device_of(r.interface), r.cidr))
+	end
+
+	if r.firewall and not seen[r.interface] then
+		seen[r.interface] = true
+
+		local zone = owner[device_of(r.interface)]
+
+		if l3routes.is_gluon_managed(r.interface) then
+			-- Announcing a prefix must not change how the node treats its own
+			-- client bridge or its uplink. Where gluon wants mesh forwarding
+			-- it has already set it up (310-layer3-firewall); where it does
+			-- not - the uplink - opening it would turn the node into a
+			-- gateway, and that is the operator's call.
+			util.log(('l3routes: %s is one of gluon\'s own networks, leaving the firewall alone for it')
+				:format(r.interface))
+		elseif zone then
+			util.log(('l3routes: %s is already in firewall zone %s, leaving the firewall alone for it')
+				:format(r.interface, zone))
+		else
+			table.insert(zone_networks, r.interface)
+		end
+	end
+end
+
+uci:save('network')
+
+if #zone_networks > 0 then
+	table.sort(zone_networks)
+
+	uci:section('firewall', 'zone', 'l3routes', {
+		name = 'l3routes',
+		network = zone_networks,
+		input = 'REJECT',
+		output = 'ACCEPT',
+		forward = 'REJECT',
+	})
+
+	-- The same rule gluon gives every zone it creates (300-firewall-rules).
+	-- Hosts inside an announced v6 range do neighbour discovery with this node
+	-- as their router, so without this v6 in the range does not work at all.
+	uci:section('firewall', 'rule', 'l3routes_ICMPv6_in', {
+		src = 'l3routes',
+		proto = 'icmp',
+		icmp_type = {
+			'echo-request',
+			'echo-reply',
+			'destination-unreachable',
+			'packet-too-big',
+			'time-exceeded',
+			'bad-header',
+			'unknown-header-type',
+			'router-solicitation',
+			'neighbour-solicitation',
+			'router-advertisement',
+			'neighbour-advertisement',
+			'130/0', -- Multicast Listener Query
+			'131/0', -- Multicast Listener Report
+			'132/0', -- Multicast Listener Done
+			'143/0', -- MLDv2
+		},
+		limit = '1000/sec',
+		family = 'ipv6',
+		target = 'ACCEPT',
+	})
+
+	uci:section('firewall', 'rule', 'l3routes_ICMPv4_in', {
+		src = 'l3routes',
+		proto = 'icmp',
+		icmp_type = { 'echo-request' },
+		family = 'ipv4',
+		target = 'ACCEPT',
+	})
+
+	for _, pair in ipairs({
+		{ 'mesh', 'l3routes' },
+		{ 'l3routes', 'mesh' },
+		{ 'loc_client', 'l3routes' },
+		{ 'l3routes', 'loc_client' },
+	}) do
+		uci:section('firewall', 'forwarding', 'l3r_' .. pair[1] .. '_' .. pair[2], {
+			src = pair[1],
+			dest = pair[2],
+		})
+	end
+end
+
+uci:save('firewall')

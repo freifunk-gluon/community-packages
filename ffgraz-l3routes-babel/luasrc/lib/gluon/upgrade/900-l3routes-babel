@@ -1,0 +1,115 @@
+#!/usr/bin/lua
+
+--[[
+	Announces what gluon.l3routes collected through babeld.
+
+	babeld redistributes kernel routes that a filter allows - "by default,
+	babeld redistributes all local addresses, and no other routes" - so every
+	announced prefix needs an explicit allow.
+
+	The filters are inserted before the first filter line of the configuration
+	gluon-mesh-babel wrote at 300, not appended to it: filters are
+	first-match-wins, and that file ends in "redistribute local ip 0.0.0.0/0
+	deny", which would swallow every is_local announcement.
+]]
+
+local l3routes = require 'gluon.l3routes'
+
+local CONF = '/etc/gluon-babeld.conf'
+local BEGIN = '# gluon.l3routes'
+local FINISH = '# end gluon.l3routes'
+
+local collected = l3routes.collect()
+
+local out = { BEGIN }
+
+local function redistribute(clauses)
+	table.insert(out, 'redistribute ' .. table.concat(clauses, ' ') .. ' allow')
+end
+
+local tables = {}
+for _, imp in ipairs(collected.imports) do
+	if imp.table and not tables[imp.table] then
+		tables[imp.table] = true
+		-- "can be specified multiple times with a cumulative effect"
+		table.insert(out, 'import-table ' .. imp.table)
+	end
+end
+
+for _, imp in ipairs(collected.imports) do
+	local clauses = {}
+
+	if imp.proto then
+		table.insert(clauses, 'proto ' .. imp.proto)
+	end
+	if imp.prefix then
+		table.insert(clauses, 'ip ' .. imp.prefix.cidr)
+		table.insert(clauses, 'le ' .. imp.le)
+	end
+	if imp.metric then
+		table.insert(clauses, 'metric ' .. imp.metric)
+	end
+
+	redistribute(clauses)
+end
+
+for _, r in ipairs(collected.routes) do
+	local clauses = {}
+
+	-- babeld's own vocabulary: an address the node carries is redistributed by
+	-- a 'local'-qualified filter, a route behind an interface is not
+	if r.is_local then
+		table.insert(clauses, 'local')
+	end
+
+	table.insert(clauses, 'ip ' .. r.cidr)
+	table.insert(clauses, 'eq ' .. r.plen)
+
+	if r.metric then
+		table.insert(clauses, 'metric ' .. r.metric)
+	end
+
+	redistribute(clauses)
+end
+
+table.insert(out, FINISH)
+
+-- Everything before the first filter is a global option and stays on top.
+local FILTERS = {
+	redistribute = true,
+	['in'] = true,
+	out = true,
+	install = true,
+}
+
+local head, tail = {}, {}
+local seen_filter, in_block = false, false
+
+for line in io.lines(CONF) do
+	-- Drop a block left by an earlier run: 300 rewrites the file on a full
+	-- gluon-reconfigure, but this script is also run on its own.
+	if line == BEGIN then
+		in_block = true
+	elseif line == FINISH then
+		in_block = false
+	elseif not in_block then
+		if FILTERS[line:match('^%s*(%a+)') or ''] then
+			seen_filter = true
+		end
+
+		table.insert(seen_filter and tail or head, line)
+	end
+end
+
+local file = assert(io.open(CONF, 'w'))
+for _, lines in ipairs({ head, out, tail }) do
+	for _, line in ipairs(lines) do
+		file:write(line, '\n')
+	end
+end
+file:close()
+
+-- The init script hashes the configuration file, so a reload restarts babeld
+-- when - and only when - these lines actually changed. Only nudge a daemon
+-- that is already running: at boot this runs long before babeld starts.
+os.execute('pgrep babeld >/dev/null && /etc/init.d/gluon-mesh-babel reload >/dev/null 2>&1')

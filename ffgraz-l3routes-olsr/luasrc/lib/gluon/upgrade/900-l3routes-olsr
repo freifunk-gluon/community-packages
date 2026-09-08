@@ -1,0 +1,65 @@
+#!/usr/bin/lua
+
+--[[
+	Announces what gluon.l3routes collected as olsr HNAs.
+
+	Hna4 takes a dotted netmask, Hna6 a prefix length - the shape
+	olsrd_write_hna4/6 in the olsrd init script reads them in.
+
+	The olsrd and olsrd6 configurations are not reset by 001-reset-uci, so the
+	sections written here carry a marker and are pruned by it.
+]]
+
+local uci = require('simple-uci').cursor()
+local l3routes = require 'gluon.l3routes'
+
+uci:delete_all('olsrd', 'Hna4', { gluon_l3routes = '1' })
+uci:delete_all('olsrd6', 'Hna6', { gluon_l3routes = '1' })
+
+local collected = l3routes.collect()
+
+local n = 0
+
+local function hna(p)
+	n = n + 1
+
+	if p.family == 4 then
+		uci:section('olsrd', 'Hna4', 'l3routes_' .. n, {
+			gluon_l3routes = '1',
+			netaddr = p.network,
+			netmask = p.mask,
+		})
+	else
+		uci:section('olsrd6', 'Hna6', 'l3routes_' .. n, {
+			gluon_l3routes = '1',
+			netaddr = p.network,
+			prefix = tostring(p.plen),
+		})
+	end
+end
+
+for _, r in ipairs(collected.routes) do
+	hna(r)
+end
+
+--[[
+	olsrd has no kernel route redistribution, so an import is snapshotted into
+	HNAs here.
+
+	ponytail: refreshed on gluon-reconfigure only - routes that appear in the
+	imported table later are not picked up until the next one. Making it live
+	would mean restarting olsrd on every route change, which is worse; the
+	upgrade path is an olsrd plugin, not a restart loop.
+]]
+for _, imp in ipairs(collected.imports) do
+	for _, p in ipairs(l3routes.resolve(imp)) do
+		hna(p)
+	end
+end
+
+uci:save('olsrd')
+uci:save('olsrd6')
+
+-- Only nudge a daemon that is already running: at boot this script runs from
+-- uci-defaults, long before olsrd is meant to start.
+os.execute('pgrep olsrd >/dev/null && /etc/init.d/olsrd reload >/dev/null 2>&1')

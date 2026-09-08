@@ -33,6 +33,13 @@ files["**/luasrc/lib/gluon/config-mode*/*"] = {
 	},
 }
 
+files["**/luasrc/lib/gluon/l3routes/*"] = {
+	read_globals = {
+		"route",
+		"import",
+	},
+}
+
 files["**/luasrc/lib/gluon/config-mode-runtime/*"] = {
 	globals = {
 		"Auth"
