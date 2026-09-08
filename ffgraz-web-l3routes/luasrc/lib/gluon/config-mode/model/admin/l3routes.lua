@@ -18,25 +18,6 @@ end
 
 local devices = l3routes.devices()
 
--- "mesh_other (br-mesh_other, mesh)" - the roles come from the interface
--- sections of /etc/config/gluon
-local function label(dev)
-	local parts = {}
-
-	if dev.device then
-		table.insert(parts, dev.device)
-	end
-	for _, role in ipairs(dev.roles or {}) do
-		table.insert(parts, role)
-	end
-
-	if #parts == 0 then
-		return dev.interface
-	end
-
-	return translatef('%s (%s)', dev.interface, table.concat(parts, ', '))
-end
-
 local function entries(stype)
 	local ret = {}
 	uci:foreach(CONFIG, stype, function(s) table.insert(ret, s) end)
@@ -89,7 +70,7 @@ for _, entry in ipairs(route_entries) do
 	local interface = s:option(ListValue, name .. '_interface', translate('Interface'),
 		translate('The interface this network is reached over'))
 	for _, dev in ipairs(devices) do
-		interface:value(dev.interface, label(dev))
+		interface:value(dev.interface, l3routes.device_label(dev))
 	end
 	interface.default = entry.interface or (devices[1] and devices[1].interface)
 
@@ -279,7 +260,7 @@ end
 
 local add_interface = sa:option(ListValue, 'add_interface', translate('Interface'))
 for _, dev in ipairs(devices) do
-	add_interface:value(dev.interface, label(dev))
+	add_interface:value(dev.interface, l3routes.device_label(dev))
 end
 add_interface:depends(action, 'add_route')
 

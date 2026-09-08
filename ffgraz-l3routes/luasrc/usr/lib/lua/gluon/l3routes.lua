@@ -301,11 +301,20 @@ function M.devices()
 	local ifaces = M.interfaces()
 	local names = {}
 
+	--[[
+		"client" and "local_node" are the same network seen twice: local-node
+		is a veth into br-client, and it is the end the node itself lives on -
+		it carries the address, it is the one in the loc_client firewall zone,
+		and unlike br-client it takes IPv6 routes. So the client network is
+		offered as local_node, and br-client is left out.
+	]]
+	local client = ifaces['local_node'] and 'client' or nil
+
 	for name in pairs(ifaces) do
 		-- the mesh is where the announcement goes, not where it points, and
 		-- the daemons' own plumbing is never a route target
-		if not (name == 'loopback' or name == 'local_node' or name == 'mmfd'
-			or name == 'l3roamd' or name:match('^mesh')) then
+		if not (name == 'loopback' or name == 'mmfd' or name == 'l3roamd'
+			or name == client or name:match('^mesh')) then
 			table.insert(names, name)
 		end
 	end
@@ -327,6 +336,57 @@ function M.devices()
 	end
 
 	return ret
+end
+
+--[[
+	The firewall zone a network interface is covered by, or nil where nothing
+	covers it.
+
+	Compared by device rather than by name: on a layer-3 node "client" and
+	"local_node" are two interfaces, and two zones naming different interfaces
+	of the same bridge still overlap.
+]]
+function M.zones()
+	local ifaces = M.interfaces()
+	local ret = {}
+
+	uci:foreach('firewall', 'zone', function(zone)
+		for _, network in ipairs(zone.network or {}) do
+			local iface = ifaces[network]
+			local device = (iface and iface.device) or network
+
+			ret[device] = zone.name or zone['.name']
+		end
+	end)
+
+	return ret
+end
+
+function M.zone_of(interface, zones, ifaces)
+	zones = zones or M.zones()
+	ifaces = ifaces or M.interfaces()
+
+	local iface = ifaces[interface]
+
+	return zones[(iface and iface.device) or interface]
+end
+
+-- How an interface is named in the config mode: "wan (br-wan, uplink)"
+function M.device_label(dev)
+	local parts = {}
+
+	if dev.device then
+		table.insert(parts, dev.device)
+	end
+	for _, role in ipairs(dev.roles or {}) do
+		table.insert(parts, role)
+	end
+
+	if #parts == 0 then
+		return dev.interface
+	end
+
+	return string.format('%s (%s)', dev.interface, table.concat(parts, ', '))
 end
 
 -- Persistent, id-keyed adds for other modules; replayed by 100-uci.lua.

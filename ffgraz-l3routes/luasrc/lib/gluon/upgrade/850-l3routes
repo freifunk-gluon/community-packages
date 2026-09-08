@@ -14,24 +14,13 @@ local l3routes = require 'gluon.l3routes'
 
 local routes = l3routes.collect().routes
 
---[[
-	Which zone already covers a network. Compared by device, not by name: on a
-	layer-3 node "client" and "local_node" are two interfaces, and two zones
-	naming different interfaces on the same bridge still overlap.
-]]
 local ifaces = l3routes.interfaces()
+local zones = l3routes.zones()
 
 local function device_of(name)
 	local iface = ifaces[name]
 	return (iface and iface.device) or name
 end
-
-local owner = {}
-uci:foreach('firewall', 'zone', function(z)
-	for _, net in ipairs(z.network or {}) do
-		owner[device_of(net)] = z.name or z['.name']
-	end
-end)
 
 --[[
 	A device with disable_ipv6 set takes no IPv6 route - netifd accepts the
@@ -53,7 +42,27 @@ end
 
 local zone_networks, seen = {}, {}
 
+--[[
+	A prefix this node announces but cannot currently deliver must be dropped
+	here, not handed back to the mesh.
+
+	Without this the packet falls through to whatever covering route the mesh
+	knows - the aggregate the announced address sits in - which points at a
+	gateway that routes it straight back, and it bounces until its TTL runs
+	out. So every announced prefix also gets an unreachable route, at a metric
+	high enough that the real one wins whenever it is there. babeld does the
+	same for the prefixes it originates.
+]]
+local UNREACHABLE_METRIC = 2000000000
+
 for i, r in ipairs(routes) do
+	uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d_null'):format(i), {
+		interface = 'loopback',
+		target = r.cidr,
+		type = 'unreachable',
+		metric = UNREACHABLE_METRIC,
+	})
+
 	-- an is_local prefix is an address netifd already put on the interface,
 	-- so there is nothing to install - only something to announce
 	if not r.is_local then
@@ -77,7 +86,7 @@ for i, r in ipairs(routes) do
 	if r.firewall and not seen[r.interface] then
 		seen[r.interface] = true
 
-		local zone = owner[device_of(r.interface)]
+		local zone = l3routes.zone_of(r.interface, zones, ifaces)
 
 		if l3routes.is_gluon_managed(r.interface) then
 			-- Announcing a prefix must not change how the node treats its own
