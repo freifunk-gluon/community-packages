@@ -19,3 +19,6 @@ msgid ""
 msgstr ""
 "Bitte aktiviere JavaScript in deinem Browser, damit das Webinterface korrekt "
 "funktionieren kann."
+
+msgid "Settings"
+msgstr "Einstellungen"

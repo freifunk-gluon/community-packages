@@ -1,12 +1,7 @@
 <%#
-Copyright 2008 Steven Barth <steven@midlink.org>
-Copyright 2008-2010 Jo-Philipp Wich <xm@subsignal.org>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
+SPDX-License-Identifier: Apache-2.0
+SPDX-FileCopyrightText: 2008 Steven Barth <steven@midlink.org>
+SPDX-FileCopyrightText: 2008-2010 Jo-Philipp Wich <xm@subsignal.org>
 -%>
 <%
 	local pretty_hostname = require "pretty_hostname"
@@ -43,7 +38,7 @@ You may obtain a copy of the License at
 		table.sort(ret,
 			function(a, b)
 				return (node.nodes[a].order or 100)
-				     < (node.nodes[b].order or 100)
+					< (node.nodes[b].order or 100)
 			end
 		)
 		return ret
@@ -67,8 +62,29 @@ You may obtain a copy of the License at
 		local children = node_children(node)
 		if #children == 0 then return end
 
+		--[[
+			The settings of a category are behind a button rather than spread
+			across the page: there are a dozen of them now, and a row that
+			wraps over three lines is no longer something you can scan. The
+			button says which page you are on, which is what the row of tabs
+			used to tell you.
+
+			A checkbox opens it, so it works before any script has loaded -
+			the menu is how you reach the page that says scripts are required.
+		]]
+		local collapsible = (#prefix == 1)
+		local toggle = 'menu-toggle-' .. #prefix
+		local current = name and node.nodes[name] and title(node.nodes[name])
+
 	%>
-	<div class="tabmenu<%=#prefix%>">
+	<div class="tabmenu<%=#prefix%><% if collapsible then %> tabmenu-collapsible<% end %>">
+		<% if collapsible then %>
+			<input class="menu-toggle" id="<%=toggle%>" type="checkbox">
+			<label class="menu-button" for="<%=toggle%>">
+				<span class="menu-icon"></span>
+				<span class="menu-current"><% if current then %><%|current%><% else %><%:Settings%><% end %></span>
+			</label>
+		<% end %>
 		<ul class="tabmenu l<%=#prefix%>">
 			<%
 				for i, v in ipairs(children) do
@@ -125,7 +141,7 @@ You may obtain a copy of the License at
 	</div>
 
 	<div id="maincontainer">
-	  <%
+		<%
 			if not hidenav then
 				menutree(unpack(request))
 			end

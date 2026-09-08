@@ -69,3 +69,6 @@ msgstr ""
 
 msgid "User ID: %s"
 msgstr ""
+
+msgid "Settings"
+msgstr ""

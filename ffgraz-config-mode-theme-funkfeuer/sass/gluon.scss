@@ -7,7 +7,7 @@
 	sass --sourcemap=none -C -t compressed sass/gluon.scss files/lib/gluon/config-mode/www/static/gluon.css
 
 	When committing changes to this file make sure to commit the respective
-	changes to the compiled version within the same commit!
+	changes to the compilid version within the same commit!
 */
 
 /* Colors adjusted based on the CI from https://download.funkfeuer.at/misc/Funkfeuer-CI/VIguide_FUNKFEUER_last.pdf */
@@ -102,6 +102,80 @@ ul.tabmenu {
 	padding: 0;
 	margin: 2em 0;
 	display: inline-flex;
+}
+
+/* The settings of a category live behind a button: there are enough of them
+   that a row of tabs wraps over several lines and stops being scannable. A
+   checkbox drives it, so it opens without any script. */
+.tabmenu-collapsible {
+	.menu-toggle {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.menu-button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.7em;
+		margin: 2em 0;
+		padding: 0.8em 1.4em;
+		border-radius: 2em;
+		background: white;
+		color: #333;
+		font-weight: bold;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	/* three bars, drawn rather than dragged in as an image */
+	.menu-icon {
+		position: relative;
+		display: block;
+		width: 1.1em;
+		height: 2px;
+		background: currentColor;
+
+		&::before,
+		&::after {
+			content: "";
+			position: absolute;
+			left: 0;
+			width: 100%;
+			height: 2px;
+			background: currentColor;
+		}
+
+		&::before { top: -0.38em; }
+		&::after  { top: 0.38em; }
+	}
+
+	/* closed by default, and laid out as a list rather than a row once open:
+	   a dozen entries side by side is what this replaces */
+	ul.tabmenu {
+		display: none;
+		flex-direction: column;
+		margin: 0 0 2em;
+		text-align: left;
+	}
+
+	.menu-toggle:checked ~ ul.tabmenu {
+		display: inline-flex;
+	}
+
+	.menu-toggle:focus-visible + .menu-button {
+		outline: 2px solid #333;
+		outline-offset: 2px;
+	}
+
+	ul.tabmenu li {
+		margin: 0;
+
+		a {
+			border-radius: 0;
+			padding: 0.7em 1.4em;
+		}
+	}
 }
 
 ul.tabmenu li {
