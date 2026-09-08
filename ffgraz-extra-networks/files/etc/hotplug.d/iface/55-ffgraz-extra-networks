@@ -1,11 +1,14 @@
 # dnsmasq works out its dhcp-ranges from the interfaces as they are when it
 # starts, and it starts before netifd has these bridges: left alone it comes up
 # serving DNS only, with no dhcp-range at all and nothing listening on port 67,
-# and never hands out an address on either network. uradvd likewise has nothing
-# to bind to until the bridge is there.
+# and never hands out an address on either network. uradvd needs no help here: it
+# retries until the bridge turns up.
 case "$ACTION:$INTERFACE" in
 	ifup:private|ifup:exposed)
-		/etc/init.d/dnsmasq restart
-		/etc/init.d/ffgraz-extra-radvd restart
+		# Detached, and not because it is slow: this runs inside procd's own
+		# hotplug handler, and restarting a service in there blocks procd for
+		# long enough that the watchdog reboots the node - every few minutes,
+		# for as long as the interfaces keep coming up.
+		( /etc/init.d/dnsmasq restart ) >/dev/null 2>&1 &
 		;;
 esac
