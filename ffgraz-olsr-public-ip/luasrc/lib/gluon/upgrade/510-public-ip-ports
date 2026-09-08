@@ -27,23 +27,9 @@ if #ports == 0 then
 	return
 end
 
---[[
-	What comes out of the tunnel is traffic from the internet, and it arrives on
-	the tunnel device, which is in no zone of its own.
-
-	It gets one here, and that zone forwards nothing: no zone-to-zone
-	forwarding is set up for it at all. Only the ports named below get through,
-	each as the single forward rule firewall4 derives from its redirect, so the
-	mesh and the clients stay out of reach of everything that was not asked
-	for.
-]]
-uci:section('firewall', 'zone', publicip.ZONE, {
-	name = publicip.ZONE,
-	network = { publicip.INTERFACE },
-	input = 'REJECT',
-	output = 'ACCEPT',
-	forward = 'REJECT',
-})
+-- The tunnel's zone forwards nothing on its own (500-public-ip): only the
+-- ports listed here cross, each as the one forward rule firewall4 derives
+-- from its redirect.
 
 local zones = l3routes.zones()
 local ifaces = l3routes.interfaces()

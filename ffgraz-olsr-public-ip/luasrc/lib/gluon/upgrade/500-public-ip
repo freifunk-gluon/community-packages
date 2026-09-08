@@ -29,6 +29,20 @@ if config then
 		table = tostring(publicip.TABLE),
 	})
 
+	--[[
+		The tunnel wraps what it sends in a packet from the same address, so
+		without this the encapsulating packet matches the rule below and is
+		routed straight back into the tunnel. In local mode that is where the
+		address lives, so it loops: the device counted every reply as a
+		transmit error and nothing left the node.
+	]]
+	uci:section('network', 'rule', 'pubip_peer_rule', {
+		src = config.ip4 .. '/32',
+		dest = config.peeraddr .. '/32',
+		lookup = 'main',
+		priority = publicip.RULE_PRIORITY - 1,
+	})
+
 	uci:section('network', 'rule', 'pubip_return_rule', {
 		src = config.ip4 .. '/32',
 		lookup = tostring(publicip.TABLE),
@@ -43,6 +57,28 @@ if config then
 		src = 'mesh',
 		src_ip = config.peeraddr,
 		proto = '4',
+		family = 'ipv4',
+		target = 'ACCEPT',
+	})
+
+	-- What comes out of the tunnel arrives on the tunnel device, which would
+	-- otherwise be in no zone: nothing could be forwarded off it, and nothing
+	-- addressed to the node itself would be answered.
+	uci:section('firewall', 'zone', publicip.ZONE, {
+		name = publicip.ZONE,
+		network = { publicip.INTERFACE },
+		input = 'REJECT',
+		output = 'ACCEPT',
+		forward = 'REJECT',
+	})
+
+	-- A public address that does not answer a ping looks dead. The rest of
+	-- what reaches the node stays rejected.
+	uci:section('firewall', 'rule', 'public_ip_icmp', {
+		name = 'Allow ping to the public IP',
+		src = publicip.ZONE,
+		proto = 'icmp',
+		icmp_type = { 'echo-request' },
 		family = 'ipv4',
 		target = 'ACCEPT',
 	})
@@ -68,17 +104,6 @@ if config then
 			})
 		end
 
-		-- What the tunnel decapsulates arrives on the tunnel device, which is in
-		-- no zone, so nothing could be forwarded off it. It reaches exactly one
-		-- place: the device the address is forwarded to.
-		uci:section('firewall', 'zone', publicip.ZONE, {
-			name = publicip.ZONE,
-			network = { publicip.INTERFACE },
-			input = 'REJECT',
-			output = 'ACCEPT',
-			forward = 'REJECT',
-		})
-
 		for _, pair in ipairs({
 			{ publicip.ZONE, l3routes.ZONE },
 			{ l3routes.ZONE, publicip.ZONE },
@@ -89,7 +114,6 @@ if config then
 			})
 		end
 
-		uci:save('firewall')
 	else
 		uci:delete('network', publicip.FORWARD_INTERFACE)
 		uci:delete('network', publicip.FORWARD_DEVICE_SECTION)
@@ -115,6 +139,8 @@ else
 	uci:delete('network', publicip.FORWARD_DEVICE_SECTION)
 	uci:delete('network', 'pubip_return')
 	uci:delete('network', 'pubip_return_rule')
+	uci:delete('network', 'pubip_peer_rule')
 end
 
 uci:save('network')
+uci:save('firewall')
