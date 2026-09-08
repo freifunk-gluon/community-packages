@@ -33,6 +33,9 @@ uci:set('network', 'globals', 'ula_prefix',
 local address6 = previous('ip6addr')
 local routed6 = privatenet.public6(address6)
 
+local address4 = previous('ipaddr') or '192.168.66.1/24'
+local routed4 = privatenet.routed4(address4)
+
 uci:section('network', 'interface', NETWORK, {
 	type = 'bridge',
 	ifname = util.get_role_interfaces(uci, 'private'),
@@ -40,7 +43,7 @@ uci:section('network', 'interface', NETWORK, {
 	-- not 192.168.178.1/24: that is the default of the router most people
 	-- have upstream, so the private network would land on the same subnet as
 	-- the uplink and neither would be reachable from the other
-	ipaddr = previous('ipaddr') or '192.168.66.1/24',
+	ipaddr = address4,
 	ip6addr = routed6 and address6 or nil,
 	ip6assign = not routed6 and '64' or nil,
 })
@@ -49,12 +52,17 @@ uci:section('network', 'interface', NETWORK, {
 -- has to go or two servers end up on one bridge
 uci:delete('dhcp', LEGACY)
 
+-- a pool that does not fit inside the range leaves dnsmasq unable to hand out
+-- a single address, so a range too small for one serves IPv6 only
+local pool_start, pool_limit = privatenet.pool4(address4)
+
 uci:section('dhcp', 'dhcp', NETWORK, {
 	interface = NETWORK,
-	start = '100',
-	limit = '150',
+	start = pool_start and tostring(pool_start) or nil,
+	limit = pool_limit and tostring(pool_limit) or nil,
+	ignore = not pool_start and '1' or nil,
 	leasetime = '12h',
-	dhcpv4 = 'server',
+	dhcpv4 = pool_start and 'server' or nil,
 	dhcpv6 = 'server',
 	ra = 'server',
 	ra_slaac = '1',
@@ -72,14 +80,18 @@ uci:section('firewall', 'zone', NETWORK, {
 	forward = 'ACCEPT',
 })
 
--- the mesh knows nothing of this network, so it leaves behind the node
-uci:section('firewall', 'nat', 'private_masq', {
-	name = 'private_masq',
-	src = 'mesh',
-	src_ip = uci:get('network', NETWORK, 'ipaddr'),
-	proto = 'all',
-	target = 'MASQUERADE',
-})
+-- A range out of the mesh's own prefix is announced by 300-private-net.lua and
+-- routed back here, so translating it would only hide it. Anything else means
+-- nothing to the other nodes and has to leave behind the node's address.
+if not routed4 then
+	uci:section('firewall', 'nat', 'private_masq', {
+		name = 'private_masq',
+		src = 'mesh',
+		src_ip = address4,
+		proto = 'all',
+		target = 'MASQUERADE',
+	})
+end
 
 uci:section('firewall', 'forwarding', 'private_to_mesh', {
 	src = NETWORK,
