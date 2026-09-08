@@ -126,3 +126,8 @@ end
 uci:save('firewall')
 uci:save('network')
 uci:save('dhcp')
+
+-- The advertisements are ours to start, and the service is not enabled by
+-- installing it; doing it here means it also survives someone disabling it by
+-- hand and running a reconfigure afterwards.
+os.execute('/etc/init.d/ffgraz-extra-radvd enable')

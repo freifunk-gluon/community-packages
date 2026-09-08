@@ -1,0 +1,11 @@
+# dnsmasq works out its dhcp-ranges from the interfaces as they are when it
+# starts, and it starts before netifd has these bridges: left alone it comes up
+# serving DNS only, with no dhcp-range at all and nothing listening on port 67,
+# and never hands out an address on either network. uradvd likewise has nothing
+# to bind to until the bridge is there.
+case "$ACTION:$INTERFACE" in
+	ifup:private|ifup:exposed)
+		/etc/init.d/dnsmasq restart
+		/etc/init.d/ffgraz-extra-radvd restart
+		;;
+esac
