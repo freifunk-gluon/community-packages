@@ -10,7 +10,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-private-net
   TITLE:=A private network of the node's own, behind the mesh
-  DEPENDS:=+gluon-core +luci-lib-ip +ffgraz-l3routes
+  DEPENDS:=+gluon-core +luci-lib-ip +ffgraz-l3routes +uradvd
 endef
 
 define Package/ffgraz-private-net/description
