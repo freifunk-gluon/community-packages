@@ -25,5 +25,5 @@ msgstr "Der Knoten nimmt die erste Adresse, zum Beispiel 192.168.178.1/24"
 msgid "IPv6 range"
 msgstr "IPv6-Bereich"
 
-msgid "An address range of your own, or \"auto\" to have one made up"
-msgstr "Ein eigener Adressbereich, oder \"auto\" für einen erzeugten"
+msgid "Paste the range you were assigned, with the node's address in it, for example 2001:db8:1234::1/64. The mesh is told to route it here. Leave empty for one made up locally, which stays behind the node."
+msgstr "Den dir zugewiesenen Bereich einfügen, mit der Adresse des Knotens darin, zum Beispiel 2001:db8:1234::1/64. Dem Mesh wird gesagt, dass es ihn hierher routen soll. Leer lassen für einen lokal erzeugten, der hinter dem Knoten bleibt."

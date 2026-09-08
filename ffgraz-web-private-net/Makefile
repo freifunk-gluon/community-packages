@@ -9,7 +9,7 @@ PKG_LICENSE:=MIT
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-web-private-net
-  DEPENDS:=+gluon-web-admin +ffgraz-private-net
+  DEPENDS:=+gluon-web-admin +ffgraz-private-net +luci-lib-ip
   TITLE:=Settings for the node's private network
 endef
 

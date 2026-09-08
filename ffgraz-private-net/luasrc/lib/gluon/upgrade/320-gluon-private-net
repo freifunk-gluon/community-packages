@@ -9,8 +9,9 @@
 
 local uci = require("simple-uci").cursor()
 local util = require 'gluon.util'
+local privatenet = require 'gluon.privatenet'
 
-local NETWORK = 'private'
+local NETWORK = privatenet.NETWORK
 local LEGACY = 'ap'
 
 -- what the node was configured with before, including under the old name
@@ -22,6 +23,16 @@ end
 uci:set('network', 'globals', 'ula_prefix',
 	uci:get('network_gluon-old', 'globals', 'ula_prefix'))
 
+--[[
+	An assigned IPv6 range goes on the bridge as it was given, and
+	300-private-net.lua hands it to l3routes so the mesh routes it here. A made
+	up one is left to ip6assign, which carves a piece off the node's own
+	unique-local prefix - nothing outside the node knows it, so it is
+	translated on the way out rather than announced.
+]]
+local address6 = previous('ip6addr')
+local routed6 = privatenet.public6(address6)
+
 uci:section('network', 'interface', NETWORK, {
 	type = 'bridge',
 	ifname = util.get_role_interfaces(uci, 'private'),
@@ -30,7 +41,8 @@ uci:section('network', 'interface', NETWORK, {
 	-- have upstream, so the private network would land on the same subnet as
 	-- the uplink and neither would be reachable from the other
 	ipaddr = previous('ipaddr') or '192.168.66.1/24',
-	ip6assign = '64',
+	ip6addr = routed6 and address6 or nil,
+	ip6assign = not routed6 and '64' or nil,
 })
 
 -- dhcp is not regenerated on reconfigure, so the section under the old name
