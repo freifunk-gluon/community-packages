@@ -21,3 +21,15 @@ for _, network in ipairs(extranets.NETWORKS) do
 		})
 	end
 end
+
+-- The transit networks to the bridging devices, so the mesh can reach them to
+-- be managed. This is the HNA an olsr node announces for its link nets.
+for _, link in ipairs(extranets.links()) do
+	if link.prefix then
+		route({
+			cidr = link.prefix,
+			interface = link.interface,
+			source = 'linknet',
+		})
+	end
+end

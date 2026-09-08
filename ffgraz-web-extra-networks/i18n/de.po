@@ -51,3 +51,18 @@ msgstr "Bleibt hinter diesem Knoten, erreichbar über dessen eigene Adresse."
 
 msgid "Not set up."
 msgstr "Nicht eingerichtet."
+
+msgid "Links to other nodes"
+msgstr "Verbindungen zu anderen Knoten"
+
+msgid "The transit networks to the devices that bridge this node to another one. Give each a /30: the node takes the first address, the device the second, and the range is announced so the mesh can reach the device to manage it."
+msgstr "Die Transfernetze zu den Geräten, die diesen Knoten mit einem anderen verbinden. Jedem ein /30 geben: der Knoten nimmt die erste Adresse, das Gerät die zweite, und der Bereich wird angekündigt, damit das Mesh das Gerät zur Verwaltung erreicht."
+
+msgid "Give the device %s, with a static route to %s."
+msgstr "Dem Gerät %s geben, mit einer statischen Route zu %s."
+
+msgid "A /30, for example 10.12.211.144/30."
+msgstr "Ein /30, zum Beispiel 10.12.211.144/30."
+
+msgid "Range on %s"
+msgstr "Bereich auf %s"

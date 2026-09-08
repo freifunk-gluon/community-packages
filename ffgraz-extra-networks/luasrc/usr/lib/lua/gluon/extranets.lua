@@ -5,6 +5,7 @@
 
 local ip = require 'luci.ip' -- luci-lib-ip
 local site = require 'gluon.site'
+local util = require 'gluon.util'
 local uci = require('simple-uci').cursor()
 
 local M = {}
@@ -30,6 +31,80 @@ M.NETWORKS = {
 	{ name = 'private', role = 'private', default4 = '192.168.66.1/24', routed_only = false },
 	{ name = 'exposed', role = 'exposed', routed_only = true },
 }
+
+--[[
+	A link network is the transit to a device bridging this node to another
+	one - a 60 GHz radio, typically. The node takes the first address of a /30
+	and the device the second, the device is given a static route back, and the
+	/30 is announced so the mesh can reach the device to manage it.
+
+	This is not the node carrying another address of its own the way it used to
+	before ffgraz-static-ip stopped putting addresses on interfaces: the second
+	address of the pair belongs to something else.
+]]
+M.LINK_ROLE = 'link'
+
+-- a /30 and nothing else: the pair of usable addresses is the whole point
+function M.linknet(cidr)
+	if type(cidr) ~= 'string' then
+		return nil
+	end
+
+	local parsed = ip.new(cidr)
+
+	if not (parsed and parsed:is4() and parsed:prefix() == 30) then
+		return nil
+	end
+
+	return parsed:network():string() .. '/30'
+end
+
+-- what goes on the node, and what the device on the other end is given
+function M.link_hosts(cidr)
+	local parsed = M.linknet(cidr) and ip.new(cidr)
+
+	if not parsed then
+		return nil
+	end
+
+	return parsed:minhost():string(), parsed:maxhost():string(), parsed:mask():string()
+end
+
+--[[
+	The interfaces gluon gave the link role, in the order they are configured,
+	each with the netifd interface built for it.
+
+	Entries without an address are kept: the config mode page lists them so the
+	operator has somewhere to put one, and the upgrade script skips them.
+]]
+function M.links()
+	local ret = {}
+
+	uci:foreach('gluon', 'interface', function(section)
+		local roles = section.role or {}
+
+		if type(roles) == 'string' then
+			roles = { roles }
+		end
+
+		if util.contains(roles, M.LINK_ROLE) and section.name then
+			local cidr = section.linknet
+			-- short, because the bridge built from it is br-<name> and the
+			-- kernel takes 15 characters for a device name
+			local interface = 'lnk' .. (#ret + 1)
+
+			table.insert(ret, {
+				section = section['.name'],
+				device = section.name,
+				cidr = cidr,
+				prefix = M.linknet(cidr),
+				interface = interface,
+			})
+		end
+	end)
+
+	return ret
+end
 
 function M.get(name)
 	for _, network in ipairs(M.NETWORKS) do

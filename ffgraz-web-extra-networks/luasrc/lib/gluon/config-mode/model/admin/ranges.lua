@@ -122,6 +122,46 @@ function exposed6:validate()
 	return extranets.public6(self.data) ~= nil
 end
 
+-- The links to the devices bridging this node to another one. One row per
+-- interface given the link role on the network page, so the section is absent
+-- until there is a link and never longer than there are links.
+
+local links = extranets.links()
+local link_options = {}
+
+if #links > 0 then
+	local l = f:section(Section, translate('Links to other nodes'), translate(
+		'The transit networks to the devices that bridge this node to another '
+		.. 'one. Give each a /30: the node takes the first address, the device '
+		.. 'the second, and the range is announced so the mesh can reach the '
+		.. 'device to manage it.'
+	))
+
+	for _, link in ipairs(links) do
+		local node, peer = extranets.link_hosts(link.cidr)
+
+		local hint
+		if node then
+			-- the two things that have to be typed into the device itself
+			hint = translatef('Give the device %s, with a static route to %s.',
+				peer, node)
+		else
+			hint = translate('A /30, for example 10.12.211.144/30.')
+		end
+
+		local option = l:option(Value, 'link_' .. link.section,
+			translatef('Range on %s', link.device), hint)
+		option.optional = true
+		option.default = link.cidr
+
+		function option:validate()
+			return self.data == nil or extranets.linknet(self.data) ~= nil
+		end
+
+		link_options[link.section] = option
+	end
+end
+
 function f:write()
 	--[[
 		An assigned range goes on the bridge and gets announced; a made up one
@@ -144,6 +184,13 @@ function f:write()
 	uci:set('network', 'exposed', 'ip6addr', exposed4.data and exposed6.data or nil)
 
 	uci:save('network')
+
+	-- the link ranges live on the interface they belong to, next to its role
+	for section, option in pairs(link_options) do
+		uci:set('gluon', section, 'linknet', option.data)
+	end
+
+	uci:save('gluon')
 
 	-- the bridges, the DHCP servers and the firewall around them are all set
 	-- up when the configuration is generated

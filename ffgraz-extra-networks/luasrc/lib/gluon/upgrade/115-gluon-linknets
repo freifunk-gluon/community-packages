@@ -1,0 +1,47 @@
+#!/usr/bin/lua
+
+--[[
+	The transit networks to the devices bridging this node to another one.
+
+	Each gets a wired mesh interface of its own rather than joining the one
+	gluon builds for the mesh role: that one is a bridge over every wired mesh
+	port at once, and a /30 on it would span all of them.
+
+	Early on purpose. 300-firewall-rules collects the gluon_wired interfaces
+	into the wired_mesh zone, and gluon_wired builds the gluon_mesh child that
+	olsrd meshes on, so everything downstream treats a link like any other
+	wired mesh port once it exists here.
+]]
+
+local uci = require("simple-uci").cursor()
+local util = require 'gluon.util'
+local extranets = require 'gluon.extranets'
+
+for _, link in ipairs(extranets.links()) do
+	if link.prefix then
+		local node, peer, netmask = extranets.link_hosts(link.cidr)
+
+		uci:section('network', 'interface', link.interface, {
+			type = 'bridge',
+			ifname = { link.device },
+			proto = 'gluon_wired',
+		})
+
+		-- the mesh address of the node goes on this interface as it does on
+		-- every other mesh interface, so the /30 is an alias next to it
+		uci:section('network', 'interface', link.interface .. '_4', {
+			proto = 'static',
+			device = '@' .. link.interface,
+			ipaddr = node,
+			netmask = netmask,
+		})
+
+		util.log(('linknets: %s carries %s, the device on it is %s')
+			:format(link.device, node, peer))
+	elseif link.cidr then
+		util.log(('linknets: %s is not a /30, leaving %s without one')
+			:format(tostring(link.cidr), link.device))
+	end
+end
+
+uci:save('network')
