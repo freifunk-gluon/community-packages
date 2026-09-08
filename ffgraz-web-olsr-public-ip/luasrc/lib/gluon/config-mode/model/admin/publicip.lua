@@ -43,10 +43,13 @@ local fs = f:section(Section, translate('Forwarding'), translate(
 	.. 'device, which is where the address is configured.'
 ))
 
+
 local target = fs:option(Value, "target", translate("Device address"),
-	translate("IPv4 address this node reaches the device at"))
+	translate("IPv4 address this node reaches the device at. Leave empty when "
+		.. "the device answers for the public IP on the interface below."))
 target:depends(mode, 'forward')
 target.datatype = "ip4addr"
+target.optional = true
 target.default = uci:get('gluon', 'olsr_public_ip', 'target')
 
 local target_interface = fs:option(ListValue, "target_interface", translate("Interface"),

@@ -46,16 +46,13 @@ msgstr ""
 msgid "Device address"
 msgstr ""
 
-msgid "IPv4 address this node reaches the device at"
+msgid "IPv4 address this node reaches the device at. Leave empty when the device answers for the public IP on the interface below."
 msgstr ""
 
 msgid "Interface"
 msgstr ""
 
 msgid "The interface the device is reached over"
-msgstr ""
-
-msgid "%s (%s)"
 msgstr ""
 
 msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
@@ -94,7 +91,7 @@ msgstr ""
 msgid "Device network"
 msgstr ""
 
-msgid "Where the device sits; nothing outside it becomes reachable"
+msgid "The interface the device is reached over; nothing beyond it becomes reachable"
 msgstr ""
 
 msgid "Description"

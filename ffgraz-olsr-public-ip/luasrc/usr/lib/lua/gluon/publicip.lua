@@ -95,9 +95,16 @@ function M.config()
 	config.target = address(uci:get('gluon', 'olsr_public_ip', 'target'))
 	config.target_interface = uci:get('gluon', 'olsr_public_ip', 'target_interface')
 
-	-- forwarding needs somewhere to forward to, and an address of its own to
-	-- terminate the tunnel on
-	if not (config.target and config.target_interface and node_ip4) then
+	--[[
+		Forwarding needs an interface to pass the traffic out of, and an address
+		of its own to terminate the tunnel on.
+
+		The address of the device is optional: with one the public address is
+		routed to it as a next hop, without one it is routed onto the interface
+		itself, which is what is wanted when the device answers for the address
+		directly on that segment.
+	]]
+	if not (config.target_interface and node_ip4) then
 		return nil
 	end
 

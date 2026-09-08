@@ -46,17 +46,14 @@ msgstr "Das Gerät, dem die öffentliche IP gehört. Der Knoten kündigt die Adr
 msgid "Device address"
 msgstr "Adresse des Geräts"
 
-msgid "IPv4 address this node reaches the device at"
-msgstr "IPv4-Adresse, unter der dieser Knoten das Gerät erreicht"
+msgid "IPv4 address this node reaches the device at. Leave empty when the device answers for the public IP on the interface below."
+msgstr "IPv4-Adresse, unter der dieser Knoten das Gerät erreicht. Leer lassen, wenn das Gerät die öffentliche IP direkt auf der Schnittstelle darunter beantwortet."
 
 msgid "Interface"
 msgstr "Schnittstelle"
 
 msgid "The interface the device is reached over"
 msgstr "Die Schnittstelle, über die das Gerät erreicht wird"
-
-msgid "%s (%s)"
-msgstr "%s (%s)"
 
 msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
 msgstr "Dieser Knoten hat keine eigene IPv4-Adresse und kann den Tunnel daher nicht stellvertretend für ein anderes Gerät auspacken. Die Weiterleitung wird nicht funktionieren."
@@ -94,8 +91,8 @@ msgstr "Leer lassen, um den öffentlichen Port zu verwenden"
 msgid "Device network"
 msgstr "Netz des Geräts"
 
-msgid "Where the device sits; nothing outside it becomes reachable"
-msgstr "Wo das Gerät sitzt; nichts außerhalb wird dadurch erreichbar"
+msgid "The interface the device is reached over; nothing beyond it becomes reachable"
+msgstr "Die Schnittstelle, über die das Gerät erreicht wird; nichts dahinter wird dadurch erreichbar"
 
 msgid "Description"
 msgstr "Beschreibung"

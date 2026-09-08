@@ -6,7 +6,12 @@ local config = publicip.config()
 
 if config then
 	if config.mode == 'forward' then
-		-- the address is another device's; the mesh reaches it through here
+		--[[
+			The address is another device's, and the mesh reaches it through
+			here. With an address for the device it becomes the next hop;
+			without one the route goes onto the interface itself and the device
+			answers for the address there.
+		]]
 		route({
 			cidr = config.ip4 .. '/32',
 			interface = config.target_interface,
