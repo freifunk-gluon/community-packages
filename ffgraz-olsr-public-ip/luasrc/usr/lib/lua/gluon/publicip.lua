@@ -23,6 +23,20 @@ M.MODES = { 'local', 'forward' }
 -- the uci section type of a single port forward
 M.PORT = 'olsr_public_ip_port'
 
+--[[
+	The netifd interface the tunnel runs on.
+
+	Deliberately short: netifd calls the device it creates "ipip-<interface>",
+	and a device name is capped at 15 characters. The interface used to be
+	called olsr_public_ip, which makes ipip-olsr_public_ip - four characters too
+	long, so netifd refused to create the device and the tunnel never came up at
+	all.
+]]
+M.INTERFACE = 'pubip'
+
+-- the alias that carries the address itself, see 500-public-ip
+M.ADDRESS_INTERFACE = 'pubip4'
+
 -- the firewall zone the tunnel is put into, so that what arrives through it
 -- can be forwarded on
 M.ZONE = 'public_ip'
@@ -118,10 +132,10 @@ function M.ports()
 			src_dport = section.src_dport,
 			dest_ip = dest,
 			dest_port = section.dest_port,
-			-- the zone the destination sits in; it decides what the forwarded
-			-- port is allowed to reach, so it is named per entry rather than
-			-- opening the tunnel onto everything at once
-			dest_zone = section.dest_zone or 'loc_client',
+			-- the interface the destination sits behind; it decides what the
+			-- forwarded port is allowed to reach, so it is named per entry
+			-- rather than opening the tunnel onto everything at once
+			dest_interface = section.dest_interface,
 			comment = section.comment,
 		})
 	end)

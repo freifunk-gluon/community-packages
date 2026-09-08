@@ -14,7 +14,7 @@ local publicip = require 'gluon.publicip'
 local config = publicip.config()
 
 if config then
-	uci:section('network', 'interface', 'olsr_public_ip', {
+	uci:section('network', 'interface', publicip.INTERFACE, {
 		proto = 'ipip',
 		peeraddr = config.peeraddr,
 		--[[
@@ -30,8 +30,30 @@ if config then
 		]]
 		ipaddr = config.mode == 'forward' and config.node_ip4 or config.ip4,
 	})
+
+	--[[
+		ipaddr above is where the tunnel terminates, not an address the node
+		carries: netifd hands it to the kernel as the tunnel's local endpoint
+		and assigns nothing. The kernel only takes packets for a tunnel whose
+		local endpoint it actually owns, so in local mode the address has to be
+		put on the device as well - an alias, so netifd keeps it in step with
+		the tunnel.
+
+		Forward mode terminates on the node's own address, which it already has.
+	]]
+	if config.mode == 'local' then
+		uci:section('network', 'interface', publicip.ADDRESS_INTERFACE, {
+			proto = 'static',
+			device = '@' .. publicip.INTERFACE,
+			ipaddr = config.ip4,
+			netmask = '255.255.255.255',
+		})
+	else
+		uci:delete('network', publicip.ADDRESS_INTERFACE)
+	end
 else
-	uci:delete('network', 'olsr_public_ip')
+	uci:delete('network', publicip.INTERFACE)
+	uci:delete('network', publicip.ADDRESS_INTERFACE)
 end
 
 uci:save('network')

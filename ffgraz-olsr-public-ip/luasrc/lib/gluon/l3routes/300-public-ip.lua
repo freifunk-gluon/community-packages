@@ -18,7 +18,7 @@ if config then
 		-- route to install for it - only a host prefix to announce
 		route({
 			cidr = config.ip4 .. '/32',
-			interface = 'olsr_public_ip',
+			interface = publicip.INTERFACE,
 			is_local = true,
 			source = 'olsr-public-ip',
 		})
