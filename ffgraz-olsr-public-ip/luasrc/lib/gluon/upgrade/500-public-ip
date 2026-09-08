@@ -43,6 +43,23 @@ if config then
 		Forward mode terminates on the node's own address, which it already has.
 	]]
 	--[[
+		The encapsulated packets are addressed to the node itself and arrive
+		over the mesh, and the mesh zone rejects everything it was not told
+		about - so the tunnel never saw them and nothing was decapsulated.
+
+		Only ipip from the gateway is let in, which is the one thing the tunnel
+		is there for.
+	]]
+	uci:section('firewall', 'rule', 'public_ip_tunnel', {
+		name = 'Allow the public IP tunnel',
+		src = 'mesh',
+		src_ip = config.peeraddr,
+		proto = '4',
+		family = 'ipv4',
+		target = 'ACCEPT',
+	})
+
+	--[[
 		Forwarding rides the target interface on a macvlan child of its own,
 		with the gateway address on it. That keeps the whole path out of the
 		policy of whatever interface it rides - gluon's uplink masquerades,
@@ -68,6 +85,34 @@ if config then
 				netmask = '255.255.255.255',
 			})
 		end
+		--[[
+			What comes out of the tunnel arrives on the tunnel device, which is
+			in no zone, so nothing could be forwarded off it - the packets the
+			gateway sends would be decapsulated and then dropped.
+
+			It gets one here, and it reaches exactly one place: the device the
+			address is forwarded to. Nothing else on the node becomes reachable
+			through the tunnel.
+		]]
+		uci:section('firewall', 'zone', publicip.ZONE, {
+			name = publicip.ZONE,
+			network = { publicip.INTERFACE },
+			input = 'REJECT',
+			output = 'ACCEPT',
+			forward = 'REJECT',
+		})
+
+		for _, pair in ipairs({
+			{ publicip.ZONE, l3routes.ZONE },
+			{ l3routes.ZONE, publicip.ZONE },
+		}) do
+			uci:section('firewall', 'forwarding', ('pubip_%s_%s'):format(pair[1], pair[2]), {
+				src = pair[1],
+				dest = pair[2],
+			})
+		end
+
+		uci:save('firewall')
 	else
 		uci:delete('network', publicip.FORWARD_INTERFACE)
 		uci:delete('network', publicip.FORWARD_DEVICE_SECTION)
