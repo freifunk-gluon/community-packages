@@ -1,7 +1,8 @@
 #!/usr/bin/lua
 
--- The access point onto the private network. The network itself is
--- ffgraz-private-net's, and exists with or without a radio.
+-- gluon-private-wifi puts the private SSID on wan. The network it belongs on
+-- is ffgraz-private-net's, which exists with or without a radio. Runs after
+-- 325-gluon-private-wifi, which is what creates the sections.
 
 local uci = require("simple-uci").cursor()
 local wireless = require 'gluon.wireless'
@@ -11,7 +12,7 @@ local NETWORK = 'private'
 wireless.foreach_radio(uci, function(radio)
 	local radio_name = radio['.name']
 	local suffix = radio_name:match('^radio(%d+)$')
-	local name = 'ap_' .. radio_name
+	local name = 'wan_' .. radio_name
 
 	if not uci:get('wireless', name, 'device') then
 		return

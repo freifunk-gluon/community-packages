@@ -10,7 +10,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-private-ap
   TITLE:=A wifi access point onto the node's private network
-  DEPENDS:=+gluon-core +ffgraz-private-net
+  DEPENDS:=+gluon-core +ffgraz-private-net +gluon-private-wifi
 endef
 
 $(eval $(call BuildPackageGluon,ffgraz-private-ap))
