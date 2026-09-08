@@ -55,6 +55,10 @@ local zone_networks, seen = {}, {}
 ]]
 local UNREACHABLE_METRIC = 2000000000
 
+-- before the main lookup at 32766, and clear of the rules gluon sets up for
+-- the uplink at 10000 and 20000
+local RULE_PRIORITY = 21000
+
 for i, r in ipairs(routes) do
 	uci:section('network', r.family == 4 and 'route' or 'route6', ('l3routes_%d_null'):format(i), {
 		interface = 'loopback',
@@ -97,11 +101,30 @@ for i, r in ipairs(routes) do
 				:format(r.interface, r.gateway, r.cidr))
 		end
 
+		--[[
+			An interface with a table of its own - gluon gives wan ip4table 1 -
+			takes the route there instead of into main, and netifd cannot be
+			told otherwise: it reads "main" as "no table given" and falls back
+			to the interface's own.
+
+			Which would leave the prefix announced and undeliverable, since
+			forwarding looks in main. A rule for that destination sends the
+			lookup to the table the route actually went to. It sits before the
+			main lookup at 32766, and the unreachable route stays behind it as
+			the fallback for when the real one is gone.
+		]]
 		local own_table = uci:get('network', r.interface,
 			r.family == 4 and 'ip4table' or 'ip6table')
 
 		if not r.table and own_table then
-			util.log(('l3routes: %s puts its routes in table %s, so %s is not in the main table')
+			uci:section('network', r.family == 4 and 'rule' or 'rule6',
+				('l3routes_%d_rule'):format(i), {
+					dest = r.cidr,
+					lookup = own_table,
+					priority = RULE_PRIORITY + i,
+				})
+
+			util.log(('l3routes: %s keeps its routes in table %s, so %s is looked up there')
 				:format(r.interface, own_table, r.cidr))
 		end
 	end
@@ -116,17 +139,66 @@ for i, r in ipairs(routes) do
 
 		local zone = l3routes.zone_of(r.interface, zones, ifaces)
 
-		if l3routes.is_gluon_managed(r.interface) then
-			-- Announcing a prefix must not change how the node treats its own
-			-- client bridge or its uplink. Where gluon wants mesh forwarding
-			-- it has already set it up (310-layer3-firewall); where it does
-			-- not - the uplink - opening it would turn the node into a
-			-- gateway, and that is the operator's call.
-			util.log(('l3routes: %s is one of gluon\'s own networks, leaving the firewall alone for it')
-				:format(r.interface))
-		elseif zone then
-			util.log(('l3routes: %s is already in firewall zone %s, leaving the firewall alone for it')
-				:format(r.interface, zone))
+		if zone then
+			--[[
+				The interface is already in a zone - gluon's own uplink or
+				client network, or one another package set up. Its policy is
+				not ours to rewrite: putting br-wan into a second zone, or
+				opening mesh to wan wholesale, would turn the node into a
+				gateway for everything rather than for the prefix it
+				announced.
+
+				So only the announced prefix is let through, in the direction
+				the announcement promises. Replies come back on conntrack.
+			]]
+			for _, peer in ipairs({ 'mesh', 'loc_client' }) do
+				-- towards the prefix
+				uci:section('firewall', 'rule', ('l3routes_%d_%s_in'):format(i, peer), {
+					name = ('l3routes to %s via %s'):format(r.cidr, r.interface),
+					src = peer,
+					dest = zone,
+					dest_ip = r.cidr,
+					-- a rule without this covers tcp and udp only, and an
+					-- announced prefix is reachable or it is not
+					proto = 'all',
+					family = 'ipv' .. r.family,
+					target = 'ACCEPT',
+				})
+
+				--[[
+					And back out of it. Replies ride conntrack, but what the
+					prefix itself starts does not, and the zone it sits in
+					forwards nothing by default - gluon's uplink zone ends in
+					drop_to_wan. Without this the address can be reached and
+					cannot answer for itself.
+				]]
+				uci:section('firewall', 'rule', ('l3routes_%d_%s_out'):format(i, peer), {
+					name = ('l3routes from %s via %s'):format(r.cidr, r.interface),
+					src = zone,
+					src_ip = r.cidr,
+					dest = peer,
+					proto = 'all',
+					family = 'ipv' .. r.family,
+					target = 'ACCEPT',
+				})
+			end
+
+			--[[
+				And it must not be masqueraded on the way through: gluon
+				masquerades everything leaving the uplink, which would hide
+				every mesh client behind the node's own address. An announced
+				prefix is routed, not translated - the device is meant to see
+				who is talking to it.
+			]]
+			if r.family == 4 then
+				uci:section('firewall', 'nat', ('l3routes_%d_nonat'):format(i), {
+					name = ('l3routes no-nat %s'):format(r.cidr),
+					src = zone,
+					dest_ip = r.cidr,
+					proto = 'all',
+					target = 'ACCEPT',
+				})
+			end
 		else
 			table.insert(zone_networks, r.interface)
 		end
