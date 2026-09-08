@@ -18,9 +18,20 @@ uci:delete_all('olsrd6', 'Hna6', { gluon_l3routes = '1' })
 
 local collected = l3routes.collect()
 
+--[[
+	olsr carries IPv4 wherever it is enabled, and IPv6 only on an image without
+	babel: where gluon-mesh-babel is installed, olsrd6 is not started at all and
+	babel announces the v6 prefixes.
+]]
+local families = l3routes.families('olsr')
+
 local n = 0
 
 local function hna(p)
+	if not families[p.family] then
+		return
+	end
+
 	n = n + 1
 
 	if p.family == 4 then

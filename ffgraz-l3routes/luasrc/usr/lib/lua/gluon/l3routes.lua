@@ -167,6 +167,34 @@ function M.is_gluon_managed(interface)
 	return M.GLUON_MANAGED[interface] == true or interface:match('^mesh') ~= nil
 end
 
+local function file_exists(path)
+	local f = io.open(path)
+	if not f then
+		return false
+	end
+	f:close()
+	return true
+end
+
+--[[
+	Which address families a mesh protocol may announce on this node.
+
+	This is gluon's own split, in one place: 300-gluon-mesh-babel-mkconfig keeps
+	babel off IPv4 where olsrd carries it, and 360-gluon-mesh-olsrd-setup-intf
+	does not even run olsrd6 where gluon-mesh-babel is installed. Announcing a
+	prefix through both protocols at once would undo that.
+]]
+function M.families(protocol)
+	local olsr = uci:get_bool('gluon', 'mesh_olsrd', 'enabled')
+	local babel = file_exists('/etc/init.d/gluon-mesh-babel')
+
+	if protocol == 'babel' then
+		return { [4] = not olsr, [6] = true }
+	end
+
+	return { [4] = olsr, [6] = olsr and not babel }
+end
+
 local ROLES = { 'uplink', 'mesh', 'client', 'private' }
 
 -- The role gluon gave each physical interface, keyed by interface name, out of

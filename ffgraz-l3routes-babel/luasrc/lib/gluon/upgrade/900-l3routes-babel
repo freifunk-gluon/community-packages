@@ -21,6 +21,23 @@ local FINISH = '# end gluon.l3routes'
 
 local collected = l3routes.collect()
 
+-- where olsrd carries IPv4, babel must not announce it as well
+local families = l3routes.families('babel')
+
+if not (families[4] or families[6]) then
+	return
+end
+
+--[[
+	babeld filters have no address family clause of their own, so a filter that
+	names no prefix - a protocol-only import - is pinned to the families this
+	node may announce.
+]]
+local ANY = {
+	[4] = { 'ip 0.0.0.0/0', 'le 32' },
+	[6] = { 'ip ::/0', 'le 128' },
+}
+
 local out = { BEGIN }
 
 local function redistribute(clauses)
@@ -29,47 +46,79 @@ end
 
 local tables = {}
 for _, imp in ipairs(collected.imports) do
-	if imp.table and not tables[imp.table] then
+	if imp.table and not tables[imp.table] and families[imp.family or 6] then
 		tables[imp.table] = true
 		-- "can be specified multiple times with a cumulative effect"
 		table.insert(out, 'import-table ' .. imp.table)
 	end
 end
 
-for _, imp in ipairs(collected.imports) do
-	local clauses = {}
+local function emit_import(imp)
+	if imp.family and not families[imp.family] then
+		return
+	end
+
+	local base = {}
 
 	if imp.proto then
-		table.insert(clauses, 'proto ' .. imp.proto)
-	end
-	if imp.prefix then
-		table.insert(clauses, 'ip ' .. imp.prefix.cidr)
-		table.insert(clauses, 'le ' .. imp.le)
-	end
-	if imp.metric then
-		table.insert(clauses, 'metric ' .. imp.metric)
+		table.insert(base, 'proto ' .. imp.proto)
 	end
 
-	redistribute(clauses)
+	if imp.prefix then
+		table.insert(base, 'ip ' .. imp.prefix.cidr)
+		table.insert(base, 'le ' .. imp.le)
+
+		if imp.metric then
+			table.insert(base, 'metric ' .. imp.metric)
+		end
+
+		redistribute(base)
+		return
+	end
+
+	for _, family in ipairs({ 4, 6 }) do
+		if families[family] then
+			local clauses = {}
+
+			for _, clause in ipairs(base) do
+				table.insert(clauses, clause)
+			end
+			for _, clause in ipairs(ANY[family]) do
+				table.insert(clauses, clause)
+			end
+			if imp.metric then
+				table.insert(clauses, 'metric ' .. imp.metric)
+			end
+
+			redistribute(clauses)
+		end
+	end
+end
+
+for _, imp in ipairs(collected.imports) do
+	emit_import(imp)
 end
 
 for _, r in ipairs(collected.routes) do
-	local clauses = {}
+	if families[r.family] then
+		local clauses = {}
 
-	-- babeld's own vocabulary: an address the node carries is redistributed by
-	-- a 'local'-qualified filter, a route behind an interface is not
-	if r.is_local then
-		table.insert(clauses, 'local')
+		-- babeld's own vocabulary: an address the node carries is
+		-- redistributed by a 'local'-qualified filter, a route behind an
+		-- interface is not
+		if r.is_local then
+			table.insert(clauses, 'local')
+		end
+
+		table.insert(clauses, 'ip ' .. r.cidr)
+		table.insert(clauses, 'eq ' .. r.plen)
+
+		if r.metric then
+			table.insert(clauses, 'metric ' .. r.metric)
+		end
+
+		redistribute(clauses)
 	end
-
-	table.insert(clauses, 'ip ' .. r.cidr)
-	table.insert(clauses, 'eq ' .. r.plen)
-
-	if r.metric then
-		table.insert(clauses, 'metric ' .. r.metric)
-	end
-
-	redistribute(clauses)
 end
 
 table.insert(out, FINISH)
