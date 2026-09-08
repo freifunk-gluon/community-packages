@@ -1,17 +1,116 @@
+#, fuzzy
 msgid ""
-msgstr "Content-Type: text/plain; charset=UTF-8"
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
 
 msgid "Public IP"
+msgstr ""
+
+msgid "Configuration for OLSR Public IP. You will get the necessary details from the mesh admins."
 msgstr ""
 
 msgid "Enabled"
 msgstr ""
 
-msgid "IPv4 Address"
+msgid "Use of the address"
+msgstr ""
+
+msgid "Give this node the public IP"
+msgstr ""
+
+msgid "Forward the public IP to another device"
+msgstr ""
+
+msgid "IPv4 address, for example 193.33.151.50"
 msgstr ""
 
 msgid "Peer IP"
 msgstr ""
 
-msgid "Configuration for OLSR Public IP. You will get the necesarry details from your mesh admins."
+msgid "IPv4 address of the other end of the tunnel"
+msgstr ""
+
+msgid "Forwarding"
+msgstr ""
+
+msgid "The device the public IP belongs to. The node announces the address to the mesh, takes the tunnel apart and passes what comes out on to this device, which is where the address is configured."
+msgstr ""
+
+msgid "Device address"
+msgstr ""
+
+msgid "IPv4 address this node reaches the device at"
+msgstr ""
+
+msgid "Interface"
+msgstr ""
+
+msgid "The interface the device is reached over"
+msgstr ""
+
+msgid "%s (%s)"
+msgstr ""
+
+msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
+msgstr ""
+
+msgid "Port %s to %s"
+msgstr ""
+
+msgid "New port forward"
+msgstr ""
+
+msgid "Forward this"
+msgstr ""
+
+msgid "Protocol"
+msgstr ""
+
+msgid "TCP and UDP"
+msgstr ""
+
+msgid "Public port"
+msgstr ""
+
+msgid "The port on the public address, for example 443 or 8000-8010"
+msgstr ""
+
+msgid "IPv4 address of the device the port leads to"
+msgstr ""
+
+msgid "Device port"
+msgstr ""
+
+msgid "Leave empty to use the public port"
+msgstr ""
+
+msgid "Device network"
+msgstr ""
+
+msgid "Where the device sits; nothing outside it becomes reachable"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Action"
+msgstr ""
+
+msgid "Add a port forward"
+msgstr ""
+
+msgid "Remove a port forward"
+msgstr ""
+
+msgid "Port forward"
 msgstr ""

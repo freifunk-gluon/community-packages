@@ -1,0 +1,67 @@
+#!/usr/bin/lua
+
+--[[
+	Ports of the public address handed on to a device behind the node.
+
+	Only where the node holds the address itself. In forward mode the address
+	belongs to another device and everything addressed to it is passed on
+	whole, so there is nothing here to decide.
+
+	001-reset-uci regenerates the firewall, so this only ever writes.
+]]
+
+local uci = require('simple-uci').cursor()
+local publicip = require 'gluon.publicip'
+
+local config = publicip.config()
+
+if not (config and config.mode == 'local') then
+	return
+end
+
+local ports = publicip.ports()
+
+if #ports == 0 then
+	return
+end
+
+--[[
+	What comes out of the tunnel is traffic from the internet, and it arrives on
+	the tunnel device, which is in no zone of its own.
+
+	It gets one here, and that zone forwards nothing: no zone-to-zone
+	forwarding is set up for it at all. Only the ports named below get through,
+	each as the single forward rule firewall4 derives from its redirect, so the
+	mesh and the clients stay out of reach of everything that was not asked
+	for.
+]]
+uci:section('firewall', 'zone', publicip.ZONE, {
+	name = publicip.ZONE,
+	network = { 'olsr_public_ip' },
+	input = 'REJECT',
+	output = 'ACCEPT',
+	forward = 'REJECT',
+})
+
+for i, port in ipairs(ports) do
+	local protocols = port.proto == 'tcpudp' and { 'tcp', 'udp' } or { port.proto }
+
+	for _, proto in ipairs(protocols) do
+		uci:section('firewall', 'redirect', ('public_ip_%d_%s'):format(i, proto), {
+			name = port.comment or ('public ip ' .. port.src_dport .. '/' .. proto),
+			src = publicip.ZONE,
+			-- only what was addressed to the public address, not everything
+			-- that happens to come out of the tunnel
+			src_dip = config.ip4,
+			src_dport = port.src_dport,
+			dest = port.dest_zone,
+			dest_ip = port.dest_ip,
+			dest_port = port.dest_port,
+			proto = proto,
+			family = 'ipv4',
+			target = 'DNAT',
+		})
+	end
+end
+
+uci:save('firewall')

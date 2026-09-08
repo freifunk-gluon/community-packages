@@ -1,30 +1,116 @@
+#, fuzzy
 msgid ""
 msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
 "Project-Id-Version: \n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: \n"
-"Last-Translator: Maciej Krüger <mkg20001@gmail.com>\n"
+"Last-Translator: \n"
 "Language-Team: \n"
-"Language: de_DE\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.1.1\n"
-"X-Poedit-Basepath: ../luasrc/lib/gluon/config-mode/model\n"
-"X-Poedit-SearchPath-0: .\n"
 
 msgid "Public IP"
 msgstr "Öffentliche IP"
 
+msgid "Configuration for OLSR Public IP. You will get the necessary details from the mesh admins."
+msgstr "Konfiguration der öffentlichen OLSR-IP. Die nötigen Angaben bekommst du von den Mesh-Admins."
+
 msgid "Enabled"
 msgstr "Aktiviert"
 
-msgid "IPv4 Address"
-msgstr "IPv4 Addresse"
+msgid "Use of the address"
+msgstr "Verwendung der Adresse"
+
+msgid "Give this node the public IP"
+msgstr "Diesem Knoten die öffentliche IP geben"
+
+msgid "Forward the public IP to another device"
+msgstr "Die öffentliche IP an ein anderes Gerät weiterleiten"
+
+msgid "IPv4 address, for example 193.33.151.50"
+msgstr "IPv4-Adresse, zum Beispiel 193.33.151.50"
 
 msgid "Peer IP"
-msgstr "IP der Gegenstelle"
+msgstr "Gegenstelle"
 
-msgid "Configuration for OLSR Public IP. You will get the necesarry details from the mesh admins."
-msgstr "Konfiguration für OLSR Öffentliche IP. Du bekommst die benötigten Werte von den Mesh-Administratoren."
+msgid "IPv4 address of the other end of the tunnel"
+msgstr "IPv4-Adresse des anderen Tunnelendes"
+
+msgid "Forwarding"
+msgstr "Weiterleitung"
+
+msgid "The device the public IP belongs to. The node announces the address to the mesh, takes the tunnel apart and passes what comes out on to this device, which is where the address is configured."
+msgstr "Das Gerät, dem die öffentliche IP gehört. Der Knoten kündigt die Adresse im Mesh an, packt den Tunnel aus und reicht den Inhalt an dieses Gerät weiter, auf dem die Adresse eingerichtet ist."
+
+msgid "Device address"
+msgstr "Adresse des Geräts"
+
+msgid "IPv4 address this node reaches the device at"
+msgstr "IPv4-Adresse, unter der dieser Knoten das Gerät erreicht"
+
+msgid "Interface"
+msgstr "Schnittstelle"
+
+msgid "The interface the device is reached over"
+msgstr "Die Schnittstelle, über die das Gerät erreicht wird"
+
+msgid "%s (%s)"
+msgstr "%s (%s)"
+
+msgid "This node has no IPv4 address of its own, so it cannot take a tunnel apart on behalf of another device. Forwarding will not work."
+msgstr "Dieser Knoten hat keine eigene IPv4-Adresse und kann den Tunnel daher nicht stellvertretend für ein anderes Gerät auspacken. Die Weiterleitung wird nicht funktionieren."
+
+msgid "Port %s to %s"
+msgstr "Port %s an %s"
+
+msgid "New port forward"
+msgstr "Neue Portweiterleitung"
+
+msgid "Forward this"
+msgstr "Diese weiterleiten"
+
+msgid "Protocol"
+msgstr "Protokoll"
+
+msgid "TCP and UDP"
+msgstr "TCP und UDP"
+
+msgid "Public port"
+msgstr "Öffentlicher Port"
+
+msgid "The port on the public address, for example 443 or 8000-8010"
+msgstr "Der Port auf der öffentlichen Adresse, zum Beispiel 443 oder 8000-8010"
+
+msgid "IPv4 address of the device the port leads to"
+msgstr "IPv4-Adresse des Geräts, zu dem der Port führt"
+
+msgid "Device port"
+msgstr "Port des Geräts"
+
+msgid "Leave empty to use the public port"
+msgstr "Leer lassen, um den öffentlichen Port zu verwenden"
+
+msgid "Device network"
+msgstr "Netz des Geräts"
+
+msgid "Where the device sits; nothing outside it becomes reachable"
+msgstr "Wo das Gerät sitzt; nichts außerhalb wird dadurch erreichbar"
+
+msgid "Description"
+msgstr "Beschreibung"
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Action"
+msgstr "Aktion"
+
+msgid "Add a port forward"
+msgstr "Portweiterleitung hinzufügen"
+
+msgid "Remove a port forward"
+msgstr "Portweiterleitung entfernen"
+
+msgid "Port forward"
+msgstr "Portweiterleitung"
