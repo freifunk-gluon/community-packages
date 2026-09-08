@@ -70,7 +70,7 @@ if config then
 		input = 'REJECT',
 		output = 'ACCEPT',
 		forward = 'REJECT',
-	})
+			})
 
 	-- A public address that does not answer a ping looks dead. The rest of
 	-- what reaches the node stays rejected.

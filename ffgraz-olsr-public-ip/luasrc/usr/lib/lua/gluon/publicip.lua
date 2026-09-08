@@ -41,6 +41,10 @@ M.FORWARD_DEVICE_SECTION = 'pubfwd_dev'
 -- that does not belong there and be dropped as spoofed. A table of its own and
 -- a rule picking it, as the proto handler here once did by hand.
 M.TABLE = 112
+
+-- what netifd gives an ipip tunnel, and what fits in it once the outer header
+-- is on
+M.TUNNEL_MTU = 1280
 M.RULE_PRIORITY = 21100
 
 -- the firewall zone the tunnel is put into, so that what arrives through it
@@ -151,6 +155,24 @@ function M.ports()
 	table.sort(ret, function(a, b) return a.name < b.name end)
 
 	return ret
+end
+
+-- The device the tunnel runs on, and the largest segment that fits through it
+function M.tunnel_device()
+	return 'ipip-' .. M.INTERFACE
+end
+
+function M.tunnel_mss()
+	local f = io.open('/sys/class/net/' .. M.tunnel_device() .. '/mtu')
+	local mtu = M.TUNNEL_MTU
+
+	if f then
+		mtu = tonumber(f:read('*l')) or mtu
+		f:close()
+	end
+
+	-- room for the IPv4 and TCP headers
+	return mtu - 40
 end
 
 return M

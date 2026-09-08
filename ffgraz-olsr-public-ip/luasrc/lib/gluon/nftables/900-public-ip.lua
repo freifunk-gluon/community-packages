@@ -63,6 +63,40 @@ if config and config.mode == 'forward' then
 	end
 end
 
+--[[
+	The tunnel takes 1280 bytes and the networks either side take 1500, so a
+	full sized segment does not fit and neither end knows why: the host just
+	sends it again until it gives up. Ping and anything small gets through,
+	which makes the forward look fine.
+
+	firewall4's mtu_fix clamps to the route's MTU, which for a packet on its way
+	to the device is the 1500 of the network it sits on - so the size that
+	matters, the tunnel's, has to be named here.
+]]
+if config then
+	local device = publicip.tunnel_device()
+	local mss = publicip.tunnel_mss()
+
+	table.insert(out, '')
+	table.insert(out, 'table inet gluon_public_ip')
+	table.insert(out, 'delete table inet gluon_public_ip')
+	table.insert(out, 'table inet gluon_public_ip {')
+	table.insert(out, '	chain mss {')
+	table.insert(out, '		type filter hook forward priority mangle; policy accept;')
+
+	for _, dir in ipairs({ 'iifname', 'oifname' }) do
+		table.insert(out, ('		%s "%s" tcp flags & (syn|rst) == syn counter tcp option maxseg size set %d')
+			:format(dir, device, mss))
+	end
+
+	table.insert(out, '	}')
+	table.insert(out, '}')
+else
+	table.insert(out, '')
+	table.insert(out, 'table inet gluon_public_ip')
+	table.insert(out, 'delete table inet gluon_public_ip')
+end
+
 local file = assert(io.open(PATH, 'w'))
 for _, line in ipairs(out) do
 	file:write(line, '\n')
