@@ -7,9 +7,9 @@ local primary_iface = 'ap_radio0'
 local f = Form(translate("Private AP"))
 
 local s = f:section(Section, nil, translate(
-	'Your node can additionally offer a private client access point '
-	.. 'which allows you to use the mesh like regular private wifi '
-	.. 'with your own network, LAN addresses, password, etc.'
+	'A wifi network of your own on this node. It reaches the same private '
+	.. 'network as the ports set aside for it, which is configured under '
+	.. 'Private network.'
 ))
 
 local enabled = s:option(Flag, "enabled", translate("Enabled"))
@@ -43,24 +43,7 @@ if wireless.device_supports_mfp(uci) then
 end
 mfp.default = uci:get('wireless', primary_iface, 'ieee80211w') or "0"
 
-local subnet4 = s:option(Value, "subnet4", translate("Subnet IPv4 (NAT)"), translate("IPv4 CIDR"))
-subnet4:depends(enabled, true)
-subnet4.datatype = "maxlength(32)"
-subnet4.default = uci:get('network', 'ap', 'ipaddr')
-
-local subnet6 = s:option(Value, "subnet6", translate("ULA IPv6"), translate("IPv6 CIDR or 'auto'"))
-subnet6:depends(enabled, true)
-subnet6.datatype = "maxlength(128)"
-subnet6.default = uci:get('network', 'globals', 'ula_prefix')
-
--- TODO: ipv4 when prefix4() set? or always? allow custom cidr
--- TODO: allow mesh (regular meshing) on private net?
-
 function f:write()
-	uci:set('network', 'globals', 'ula_prefix', subnet6.data)
-
-	uci:set('network', 'ap', 'ipaddr', subnet4.data)
-
 	wireless.foreach_radio(uci, function(radio, index)
 		local radio_name = radio['.name']
 		local suffix = radio_name:match('^radio(%d+)$')
@@ -71,7 +54,7 @@ function f:write()
 
 			uci:section('wireless', 'wifi-iface', name, {
 				device     = radio_name,
-				network    = 'ap',
+				network    = 'private',
 				mode       = 'ap',
 				encryption = encryption.data,
 				ssid       = ssid.data,
@@ -92,7 +75,6 @@ function f:write()
 		end
 	end)
 
-	uci:commit('network')
 	uci:commit('wireless')
 end
 

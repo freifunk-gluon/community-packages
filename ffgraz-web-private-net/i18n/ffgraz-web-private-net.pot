@@ -1,0 +1,29 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Private network"
+msgstr ""
+
+msgid "A network of your own behind the node, with its own addresses. Whatever you plug into the ports set aside for it lands here, and reaches the internet through the mesh."
+msgstr ""
+
+msgid "IPv4 range"
+msgstr ""
+
+msgid "The node takes the first address, for example 192.168.178.1/24"
+msgstr ""
+
+msgid "IPv6 range"
+msgstr ""
+
+msgid "An address range of your own, or \"auto\" to have one made up"
+msgstr ""

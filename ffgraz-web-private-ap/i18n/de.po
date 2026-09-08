@@ -1,59 +1,53 @@
+#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
-"PO-Revision-Date: 2015-05-04 02:25+0200\n"
-"Last-Translator:  <mschiffer@universe-factory.net>\n"
-"Language-Team: German\n"
-"Language: de\n"
-"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
-
-msgid "8-63 characters"
-msgstr "8-63 Zeichen"
-
-msgid "Disabled"
-msgstr "Deaktiviert"
-
-msgid "Enabled"
-msgstr "Aktiviert"
-
-msgid "Encryption"
-msgstr "Verschlüsselung"
-
-msgid "Key"
-msgstr "Schlüssel"
-
-msgid "Management Frame Protection"
-msgstr ""
-
-msgid "Name (SSID)"
-msgstr "Name (SSID)"
-
-msgid "Optional"
-msgstr ""
 
 msgid "Private AP"
 msgstr "Privater AP"
 
-msgid "Required"
+msgid "A wifi network of your own on this node. It reaches the same private network as the ports set aside for it, which is configured under Private network."
+msgstr "Ein eigenes WLAN auf diesem Knoten. Es erreicht dasselbe private Netz wie die dafür vorgesehenen Ports, das unter \"Privates Netz\" eingerichtet wird."
+
+msgid "Enabled"
 msgstr "Aktiviert"
 
+msgid "Name (SSID)"
+msgstr "Name (SSID)"
+
+msgid "Key"
+msgstr "Schlüssel"
+
+msgid "8-63 characters"
+msgstr "8-63 Zeichen"
+
+msgid "Encryption"
+msgstr "Verschlüsselung"
+
 msgid "WPA2"
-msgstr ""
+msgstr "WPA2"
 
 msgid "WPA2 / WPA3"
-msgstr ""
+msgstr "WPA2 / WPA3"
 
 msgid "WPA3"
-msgstr ""
+msgstr "WPA3"
 
-msgid ""
-"Your node can additionally offer a private client access point "
-"which allows you to use the mesh like regular private wifi "
-"with your own network, LAN addresses, password, etc."
-msgstr ""
-"Dein Knoten kann zusätzlich einen privaten Klient Zugangspunkt anbieten. "
-"Das erlaubt dir das mesh wie ein normales Privat-WLAN zu verwenden, "
-"das ein eigenes Netz, eigene LAN-Addressesn, ein eigens Passwort, etc hat."
+msgid "Management Frame Protection"
+msgstr "Management Frame Protection"
+
+msgid "Disabled"
+msgstr "Deaktiviert"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Required"
+msgstr "Erforderlich"

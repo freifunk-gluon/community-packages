@@ -1,0 +1,79 @@
+#!/usr/bin/lua
+
+-- The private network itself: a bridge over the interfaces gluon gave the
+-- private role, with addresses, DHCP and a way out through the mesh.
+--
+-- Nothing here needs a radio. ffgraz-private-ap puts an access point onto it
+-- where the node has one, and on a node without wifi the network is still
+-- there for whatever is plugged into those ports.
+
+local uci = require("simple-uci").cursor()
+local util = require 'gluon.util'
+
+local NETWORK = 'private'
+local LEGACY = 'ap'
+
+-- what the node was configured with before, including under the old name
+local function previous(option)
+	return uci:get('network_gluon-old', NETWORK, option)
+		or uci:get('network_gluon-old', LEGACY, option)
+end
+
+uci:set('network', 'globals', 'ula_prefix',
+	uci:get('network_gluon-old', 'globals', 'ula_prefix'))
+
+uci:section('network', 'interface', NETWORK, {
+	type = 'bridge',
+	ifname = util.get_role_interfaces(uci, 'private'),
+	proto = 'static',
+	-- not 192.168.178.1/24: that is the default of the router most people
+	-- have upstream, so the private network would land on the same subnet as
+	-- the uplink and neither would be reachable from the other
+	ipaddr = previous('ipaddr') or '192.168.66.1/24',
+	ip6assign = '64',
+})
+
+-- dhcp is not regenerated on reconfigure, so the section under the old name
+-- has to go or two servers end up on one bridge
+uci:delete('dhcp', LEGACY)
+
+uci:section('dhcp', 'dhcp', NETWORK, {
+	interface = NETWORK,
+	start = '100',
+	limit = '150',
+	leasetime = '12h',
+	dhcpv4 = 'server',
+	dhcpv6 = 'server',
+	ra = 'server',
+	ra_slaac = '1',
+	ra_flags = {
+		'managed-config',
+		'other-config',
+	},
+})
+
+uci:section('firewall', 'zone', NETWORK, {
+	name = NETWORK,
+	network = { NETWORK },
+	input = 'ACCEPT',
+	output = 'ACCEPT',
+	forward = 'ACCEPT',
+})
+
+-- the mesh knows nothing of this network, so it leaves behind the node
+uci:section('firewall', 'nat', 'private_masq', {
+	name = 'private_masq',
+	src = 'mesh',
+	src_ip = uci:get('network', NETWORK, 'ipaddr'),
+	proto = 'all',
+	target = 'MASQUERADE',
+})
+
+uci:section('firewall', 'forwarding', 'private_to_mesh', {
+	src = NETWORK,
+	dest = 'mesh',
+})
+
+uci:save('firewall')
+uci:save('network')
+uci:save('dhcp')
