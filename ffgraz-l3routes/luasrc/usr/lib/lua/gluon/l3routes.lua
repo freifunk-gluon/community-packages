@@ -325,7 +325,15 @@ function M.zones()
 
 	uci:foreach('firewall', 'zone', function(zone)
 		for _, network in ipairs(zone.network or {}) do
-			ret[devices[network] or network] = zone.name or zone['.name']
+			local name = zone.name or zone['.name']
+
+			-- by device, so that two zones naming different interfaces of one
+			-- bridge are seen to overlap, and by network name as well: a route
+			-- may name an interface directly rather than through a role, and
+			-- looking only by device left those looking unzoned - which put
+			-- them in a second zone of our own alongside the one they had
+			ret[devices[network] or network] = name
+			ret[network] = name
 		end
 	end)
 
