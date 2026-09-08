@@ -16,6 +16,9 @@ local SNIPPET_DIR = '/lib/gluon/l3routes'
 
 local M = {}
 
+-- the firewall zone the announced prefixes that need one are put into
+M.ZONE = 'l3routes'
+
 -- A prefix, normalised. Returns nil for anything that is not one - a bare
 -- address included, so that a typo'd host does not silently become a /32.
 function M.parse(str)

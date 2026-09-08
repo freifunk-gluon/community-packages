@@ -210,8 +210,8 @@ uci:save('network')
 if #zone_networks > 0 then
 	table.sort(zone_networks)
 
-	uci:section('firewall', 'zone', 'l3routes', {
-		name = 'l3routes',
+	uci:section('firewall', 'zone', l3routes.ZONE, {
+		name = l3routes.ZONE,
 		network = zone_networks,
 		input = 'REJECT',
 		output = 'ACCEPT',
