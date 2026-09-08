@@ -9,7 +9,7 @@ PKG_LICENSE:=MIT
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-web-olsr-public-ip
-  DEPENDS:=+gluon-web-admin +ffgraz-olsr-public-ip
+  DEPENDS:=+gluon-web-admin +ffgraz-olsr-public-ip +ffgraz-l3routes
   TITLE:=UI for setting up olsr public ips
 endef
 

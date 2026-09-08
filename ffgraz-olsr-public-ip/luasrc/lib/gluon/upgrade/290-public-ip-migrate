@@ -1,0 +1,25 @@
+#!/usr/bin/lua
+
+--[[
+	The public address used to live in gluon-static-ip, which ffgraz-static-ip
+	has since taken over: 310-static-ip deletes every section there that is not
+	the loopback one, so the address was wiped on each gluon-reconfigure and the
+	web page looked like it never saved anything.
+
+	It belongs next to the rest of the configuration of this package, so it is
+	moved there. This has to run before 310-static-ip gets to delete it.
+]]
+
+local uci = require('simple-uci').cursor()
+
+local old = uci:get('gluon-static-ip', 'olsr_public_ip', 'ip4')
+
+if old then
+	if not uci:get('gluon', 'olsr_public_ip', 'ip4') then
+		uci:section('gluon', 'olsr_public_ip', 'olsr_public_ip', { ip4 = old })
+		uci:save('gluon')
+	end
+
+	uci:delete('gluon-static-ip', 'olsr_public_ip')
+	uci:save('gluon-static-ip')
+end

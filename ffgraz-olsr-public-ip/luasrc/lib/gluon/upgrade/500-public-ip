@@ -1,16 +1,37 @@
 #!/usr/bin/lua
 
-local uci = require('simple-uci').cursor()
+--[[
+	The tunnel the public address arrives through.
 
--- The announcement of the address is declared in
--- /lib/gluon/l3routes/300-public-ip.lua; this only sets up the tunnel it
--- lives on.
-if uci:get_bool('gluon', 'olsr_public_ip', 'enabled') then
-  uci:section('network', 'interface', 'olsr_public_ip', {
-    proto = 'ipip',
-    peeraddr = uci:get('gluon', 'olsr_public_ip', 'peeraddr'),
-    ipaddr = uci:get('gluon-static-ip', 'olsr_public_ip', 'ip4')
-  })
+	Announcing the address is declared in /lib/gluon/l3routes/300-public-ip.lua,
+	and rewriting the encapsulated packets in forward mode is done by
+	/lib/gluon/nftables/900-public-ip.lua.
+]]
+
+local uci = require('simple-uci').cursor()
+local publicip = require 'gluon.publicip'
+
+local config = publicip.config()
+
+if config then
+	uci:section('network', 'interface', 'olsr_public_ip', {
+		proto = 'ipip',
+		peeraddr = config.peeraddr,
+		--[[
+			In local mode the node carries the public address itself, so the
+			tunnel terminates on it directly.
+
+			In forward mode the address belongs to another device, so the
+			encapsulated packets are addressed to something this node does not
+			have and the kernel would not decapsulate them. The tunnel
+			terminates on the node's own address instead, and the nftables rule
+			rewrites the outer destination to match; what comes out is then
+			routed on to the device that holds the address.
+		]]
+		ipaddr = config.mode == 'forward' and config.node_ip4 or config.ip4,
+	})
+else
+	uci:delete('network', 'olsr_public_ip')
 end
 
 uci:save('network')
