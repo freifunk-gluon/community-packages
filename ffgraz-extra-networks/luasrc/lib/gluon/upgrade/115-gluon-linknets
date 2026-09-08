@@ -25,6 +25,12 @@ for _, link in ipairs(extranets.links()) do
 			type = 'bridge',
 			ifname = { link.device },
 			proto = 'gluon_wired',
+			-- A link is a point to point run to one device, not a segment
+			-- several nodes share, so there is nothing for the vxlan overlay
+			-- to keep apart. Without it olsrd meshes on the interface itself,
+			-- which is also what the far end has to be for it to work at all
+			-- when that end is not a gluon node.
+			vxlan = false,
 		})
 
 		-- the mesh address of the node goes on this interface as it does on
