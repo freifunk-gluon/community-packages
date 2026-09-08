@@ -70,12 +70,40 @@ for i, r in ipairs(routes) do
 			interface = r.interface,
 			target = r.cidr,
 			gateway = r.gateway,
+			--[[
+				A next hop the kernel cannot place on the interface is refused
+				with "Network unreachable"; naming both the interface and the
+				next hop says where it is, which is what onlink means, and is
+				how olsrd installs its own routes here.
+			]]
+			onlink = r.gateway and true or nil,
 			metric = r.metric,
-			-- gluon puts wan in ip4table 1 and wan6 in ip6table 1; babeld only
-			-- redistributes from its import-tables, and the mesh forwards out
-			-- of main
+			--[[
+				Left unset unless something was asked for: netifd reads "main"
+				as "no table given" and then puts the route in the table the
+				interface itself uses, so naming it would not mean what it says.
+			]]
 			table = r.table,
 		})
+
+		--[[
+			netifd installs a route through a next hop only where it has an
+			address that covers it - onlink or not. A mesh interface carries a
+			/32, so nothing is ever within it and the route is quietly dropped.
+		]]
+		if r.gateway and l3routes.reaches(r.interface, r.gateway, ifaces) == false then
+			util.log(('l3routes: %s has no address covering %s, so %s cannot be routed through it; '
+				.. 'leave the next hop out to route onto the interface instead')
+				:format(r.interface, r.gateway, r.cidr))
+		end
+
+		local own_table = uci:get('network', r.interface,
+			r.family == 4 and 'ip4table' or 'ip6table')
+
+		if not r.table and own_table then
+			util.log(('l3routes: %s puts its routes in table %s, so %s is not in the main table')
+				:format(r.interface, own_table, r.cidr))
+		end
 	end
 
 	if r.family == 6 and ipv6_disabled(device_of(r.interface)) then

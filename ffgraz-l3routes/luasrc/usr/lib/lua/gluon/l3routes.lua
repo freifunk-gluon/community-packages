@@ -75,7 +75,9 @@ function M.collect()
 		end
 
 		p.metric = tonumber(spec.metric)
-		p.table = spec.table or 'main'
+		-- netifd reads "main" as "no table given" anyway, and then uses the
+		-- table the interface itself is configured with
+		p.table = spec.table
 		p.is_local = spec.is_local == true or spec.is_local == '1'
 		-- a local address needs no route and no zone; putting the interface it
 		-- lives on into a REJECT-input zone would break the address itself
@@ -289,6 +291,14 @@ function M.interfaces()
 			if entry then
 				entry.device = iface.l3_device or iface.device or entry.device
 				entry.up = iface.up
+				entry.addresses = {}
+
+				for _, key in ipairs({ 'ipv4-address', 'ipv6-address' }) do
+					for _, addr in ipairs(iface[key] or {}) do
+						table.insert(entry.addresses,
+							addr.address .. '/' .. addr.mask)
+					end
+				end
 			end
 		end
 	end
@@ -369,6 +379,34 @@ function M.zone_of(interface, zones, ifaces)
 	local iface = ifaces[interface]
 
 	return zones[(iface and iface.device) or interface]
+end
+
+--[[
+	Whether an interface has an address that covers the given one.
+
+	netifd only installs a route through a next hop it can place on the
+	interface, and a mesh interface is addressed with a /32, so nothing is ever
+	within it. Returns nil where it cannot be told - without ubus there are no
+	addresses to compare against.
+]]
+function M.reaches(interface, address, ifaces)
+	local iface = (ifaces or M.interfaces())[interface]
+
+	if not (iface and iface.addresses) then
+		return nil
+	end
+
+	local target = ip.new(address)
+
+	for _, own in ipairs(iface.addresses) do
+		local prefix = ip.new(own)
+
+		if prefix and target and prefix:network(prefix:prefix()):contains(target) then
+			return true
+		end
+	end
+
+	return false
 end
 
 -- How an interface is named in the config mode: "wan (br-wan, uplink)"
