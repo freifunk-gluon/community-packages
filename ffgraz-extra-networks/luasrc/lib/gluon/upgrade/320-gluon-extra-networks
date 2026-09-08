@@ -1,0 +1,128 @@
+#!/usr/bin/lua
+
+-- The node's own networks: a bridge each over the interfaces gluon gave the
+-- matching role, with addresses, DHCP and a way out.
+--
+-- Neither needs a radio. ffgraz-private-ap puts an access point onto the
+-- private one where the node has one, and on a node without wifi the networks
+-- are still there for whatever is plugged into those ports.
+
+local uci = require("simple-uci").cursor()
+local util = require 'gluon.util'
+local extranets = require 'gluon.extranets'
+
+-- what the private network was called before it was split out of the private AP
+local LEGACY = 'ap'
+
+uci:set('network', 'globals', 'ula_prefix',
+	uci:get('network_gluon-old', 'globals', 'ula_prefix'))
+
+-- what the node was configured with before, including under the old name
+local function previous(network, option)
+	local value = uci:get('network_gluon-old', network, option)
+
+	if value == nil and network == 'private' then
+		value = uci:get('network_gluon-old', LEGACY, option)
+	end
+
+	return value
+end
+
+-- dhcp is not regenerated on reconfigure, so the section under the old name
+-- has to go or two servers end up on one bridge
+uci:delete('dhcp', LEGACY)
+
+local function configure(network, address4, routed4, address6, routed6)
+	local name = network.name
+
+	--[[
+		An assigned IPv6 range goes on the bridge as it was given, and
+		300-extra-networks.lua hands it to l3routes so the mesh routes it here.
+		A made up one is left to ip6assign, which carves a piece off the node's
+		own unique-local prefix - nothing outside the node knows it, so it is
+		translated on the way out rather than announced. An exposed network has
+		nothing to be translated onto, so it is left without IPv6 instead.
+	]]
+	local assign6 = not routed6 and not network.routed_only
+
+	uci:section('network', 'interface', name, {
+		type = 'bridge',
+		ifname = util.get_role_interfaces(uci, network.role),
+		proto = 'static',
+		-- not 192.168.178.1/24: that is the default of the router most people
+		-- have upstream, so the private network would land on the same subnet
+		-- as the uplink and neither would be reachable from the other
+		ipaddr = address4,
+		ip6addr = routed6 and address6 or nil,
+		ip6assign = assign6 and '64' or nil,
+	})
+
+	-- a pool that does not fit inside the range leaves dnsmasq unable to hand
+	-- out a single address, so a range too small for one serves IPv6 only
+	local pool_start, pool_limit = extranets.pool4(address4)
+
+	uci:section('dhcp', 'dhcp', name, {
+		interface = name,
+		start = pool_start and tostring(pool_start) or nil,
+		limit = pool_limit and tostring(pool_limit) or nil,
+		ignore = not pool_start and '1' or nil,
+		leasetime = '12h',
+		dhcpv4 = pool_start and 'server' or nil,
+		dhcpv6 = 'server',
+		ra = 'server',
+		ra_slaac = '1',
+		ra_flags = {
+			'managed-config',
+			'other-config',
+		},
+	})
+
+	uci:section('firewall', 'zone', name, {
+		name = name,
+		network = { name },
+		input = 'ACCEPT',
+		output = 'ACCEPT',
+		forward = 'ACCEPT',
+	})
+
+	uci:section('firewall', 'forwarding', name .. '_to_mesh', {
+		src = name,
+		dest = 'mesh',
+	})
+
+	-- A range out of the mesh's own prefix is announced by
+	-- 300-extra-networks.lua and routed back here, so translating it would
+	-- only hide it. Anything else means nothing to the other nodes and has to
+	-- leave behind the node's address.
+	if not routed4 then
+		uci:section('firewall', 'nat', name .. '_masq', {
+			name = name .. '_masq',
+			src = 'mesh',
+			src_ip = address4,
+			proto = 'all',
+			target = 'MASQUERADE',
+		})
+	end
+end
+
+for _, network in ipairs(extranets.NETWORKS) do
+	local address4 = previous(network.name, 'ipaddr') or network.default4
+	local routed4 = extranets.routed4(address4)
+	local address6 = previous(network.name, 'ip6addr')
+	local routed6 = extranets.public6(address6)
+
+	if network.routed_only and not routed4 then
+		-- nothing to announce means nothing can reach it, and there is no
+		-- address of the node's to fall back to
+		if address4 then
+			util.log(('extra-networks: %s is not a range the mesh routes, leaving %s unconfigured')
+				:format(address4, network.name))
+		end
+	elseif address4 then
+		configure(network, address4, routed4, address6, routed6)
+	end
+end
+
+uci:save('firewall')
+uci:save('network')
+uci:save('dhcp')

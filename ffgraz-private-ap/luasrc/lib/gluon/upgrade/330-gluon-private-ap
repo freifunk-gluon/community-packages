@@ -1,7 +1,7 @@
 #!/usr/bin/lua
 
 -- gluon-private-wifi puts the private SSID on wan. The network it belongs on
--- is ffgraz-private-net's, which exists with or without a radio. Runs after
+-- is ffgraz-extra-networks', which exists with or without a radio. Runs after
 -- 325-gluon-private-wifi, which is what creates the sections.
 
 local uci = require("simple-uci").cursor()

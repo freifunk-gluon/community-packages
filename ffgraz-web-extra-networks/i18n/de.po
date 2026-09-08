@@ -1,0 +1,53 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Network ranges"
+msgstr "Netzwerkbereiche"
+
+msgid "Private network"
+msgstr "Privates Netz"
+
+msgid "A network of your own behind the node, with its own addresses. Whatever you plug into the ports set aside for it lands here, and reaches the internet through the mesh."
+msgstr "Ein eigenes Netz hinter dem Knoten, mit eigenen Adressen. Was du an die dafür vorgesehenen Ports steckst, landet hier und kommt über das Mesh ins Internet."
+
+msgid "Exposed network"
+msgstr "Offenes Netz"
+
+msgid "A network the rest of the mesh reaches directly, without going through the node's own address. It takes only ranges the mesh routes, so ask for one before setting this up. Leave the IPv4 range empty to do without it."
+msgstr "Ein Netz, das der Rest des Mesh direkt erreicht, ohne den Umweg über die Adresse des Knotens. Es nimmt nur Bereiche, die das Mesh routet - besorg dir also vorher einen. Den IPv4-Bereich leer lassen, wenn du es nicht brauchst."
+
+msgid "IPv4 range"
+msgstr "IPv4-Bereich"
+
+msgid "IPv6 range"
+msgstr "IPv6-Bereich"
+
+msgid "The node takes the first address, for example 192.168.66.1/24. A range out of the mesh's own is announced and reachable from the other nodes; any other stays behind this one."
+msgstr "Der Knoten nimmt die erste Adresse, zum Beispiel 192.168.66.1/24. Ein Bereich aus dem des Mesh wird angekündigt und ist von den anderen Knoten erreichbar; jeder andere bleibt hinter diesem."
+
+msgid "Paste the range you were assigned, with the node's address in it, for example 2001:db8:1234::1/64. The mesh is told to route it here. Leave empty for one made up locally, which stays behind the node."
+msgstr "Den dir zugewiesenen Bereich einfügen, mit der Adresse des Knotens darin, zum Beispiel 2001:db8:1234::1/64. Dem Mesh wird gesagt, dass es ihn hierher routen soll. Leer lassen für einen lokal erzeugten, der hinter dem Knoten bleibt."
+
+msgid "A range out of the mesh's own, with the node's address in it, for example 10.12.232.57/29."
+msgstr "Ein Bereich aus dem des Mesh, mit der Adresse des Knotens darin, zum Beispiel 10.12.232.57/29."
+
+msgid "Optional, and likewise a range you were assigned, for example 2001:db8:1234::1/64."
+msgstr "Optional, und ebenfalls ein dir zugewiesener Bereich, zum Beispiel 2001:db8:1234::1/64."
+
+msgid "Shared with the mesh as %s."
+msgstr "Mit dem Mesh geteilt als %s."
+
+msgid "Kept behind this node, reached through its own address."
+msgstr "Bleibt hinter diesem Knoten, erreichbar über dessen eigene Adresse."
+
+msgid "Not set up."
+msgstr "Nicht eingerichtet."

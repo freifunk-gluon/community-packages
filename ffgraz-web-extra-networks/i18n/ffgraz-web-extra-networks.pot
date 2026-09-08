@@ -1,0 +1,44 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+msgid "A network of your own behind the node, with its own addresses. Whatever you plug into the ports set aside for it lands here, and reaches the internet through the mesh."
+msgstr ""
+
+msgid "A network the rest of the mesh reaches directly, without going through the node's own address. It takes only ranges the mesh routes, so ask for one before setting this up. Leave the IPv4 range empty to do without it."
+msgstr ""
+
+msgid "A range out of the mesh's own, with the node's address in it, for example 10.12.232.57/29."
+msgstr ""
+
+msgid "Exposed network"
+msgstr ""
+
+msgid "IPv4 range"
+msgstr ""
+
+msgid "IPv6 range"
+msgstr ""
+
+msgid "Kept behind this node, reached through its own address."
+msgstr ""
+
+msgid "Network ranges"
+msgstr ""
+
+msgid "Optional, and likewise a range you were assigned, for example 2001:db8:1234::1/64."
+msgstr ""
+
+msgid "Paste the range you were assigned, with the node's address in it, for example 2001:db8:1234::1/64. The mesh is told to route it here. Leave empty for one made up locally, which stays behind the node."
+msgstr ""
+
+msgid "Private network"
+msgstr ""
+
+msgid "Shared with the mesh as %s."
+msgstr ""
+
+msgid "The node takes the first address, for example 192.168.66.1/24. A range out of the mesh's own is announced and reachable from the other nodes; any other stays behind this one."
+msgstr ""
+
+msgid "Not set up."
+msgstr ""
