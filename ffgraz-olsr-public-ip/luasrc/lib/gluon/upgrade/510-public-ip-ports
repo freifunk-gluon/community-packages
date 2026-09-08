@@ -11,6 +11,8 @@
 ]]
 
 local uci = require('simple-uci').cursor()
+local util = require 'gluon.util'
+local l3routes = require 'gluon.l3routes'
 local publicip = require 'gluon.publicip'
 
 local config = publicip.config()
@@ -37,30 +39,47 @@ end
 ]]
 uci:section('firewall', 'zone', publicip.ZONE, {
 	name = publicip.ZONE,
-	network = { 'olsr_public_ip' },
+	network = { publicip.INTERFACE },
 	input = 'REJECT',
 	output = 'ACCEPT',
 	forward = 'REJECT',
 })
 
-for i, port in ipairs(ports) do
-	local protocols = port.proto == 'tcpudp' and { 'tcp', 'udp' } or { port.proto }
+local zones = l3routes.zones()
+local ifaces = l3routes.interfaces()
 
-	for _, proto in ipairs(protocols) do
-		uci:section('firewall', 'redirect', ('public_ip_%d_%s'):format(i, proto), {
-			name = port.comment or ('public ip ' .. port.src_dport .. '/' .. proto),
-			src = publicip.ZONE,
-			-- only what was addressed to the public address, not everything
-			-- that happens to come out of the tunnel
-			src_dip = config.ip4,
-			src_dport = port.src_dport,
-			dest = port.dest_zone,
-			dest_ip = port.dest_ip,
-			dest_port = port.dest_port,
-			proto = proto,
-			family = 'ipv4',
-			target = 'DNAT',
-		})
+for i, port in ipairs(ports) do
+	--[[
+		The forward rule firewall4 derives from a redirect is what lets the
+		port through, and it needs the zone the device sits in. An interface
+		that is in none has nothing to forward into, so the redirect is left
+		out: a DNAT with nowhere to go would swallow the traffic without
+		saying why.
+	]]
+	local zone = port.dest_interface and l3routes.zone_of(port.dest_interface, zones, ifaces)
+
+	if not zone then
+		util.log(('public-ip: %s is in no firewall zone, not forwarding %s to %s')
+			:format(tostring(port.dest_interface), port.src_dport, port.dest_ip))
+	else
+		local protocols = port.proto == 'tcpudp' and { 'tcp', 'udp' } or { port.proto }
+
+		for _, proto in ipairs(protocols) do
+			uci:section('firewall', 'redirect', ('public_ip_%d_%s'):format(i, proto), {
+				name = port.comment or ('public ip ' .. port.src_dport .. '/' .. proto),
+				src = publicip.ZONE,
+				-- only what was addressed to the public address, not everything
+				-- that happens to come out of the tunnel
+				src_dip = config.ip4,
+				src_dport = port.src_dport,
+				dest = zone,
+				dest_ip = port.dest_ip,
+				dest_port = port.dest_port,
+				proto = proto,
+				family = 'ipv4',
+				target = 'DNAT',
+			})
+		end
 	end
 end
 

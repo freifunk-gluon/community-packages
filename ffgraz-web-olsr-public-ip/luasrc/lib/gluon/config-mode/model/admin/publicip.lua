@@ -7,6 +7,9 @@ local f = Form(translate("Public IP"))
 -- adding and removing port forwards changes which sections the page has
 f.reload = true
 
+-- the interfaces gluon knows, the same list the routes page offers
+local devices = l3routes.devices()
+
 local s = f:section(Section, nil, translate(
 	'Configuration for OLSR Public IP. You will get the necessary details from '
 	.. 'the mesh admins.'
@@ -48,9 +51,8 @@ target.default = uci:get('gluon', 'olsr_public_ip', 'target')
 
 local target_interface = fs:option(ListValue, "target_interface", translate("Interface"),
 	translate("The interface the device is reached over"))
-for _, dev in ipairs(l3routes.devices()) do
-	target_interface:value(dev.interface,
-		dev.device and translatef('%s (%s)', dev.interface, dev.device) or dev.interface)
+for _, dev in ipairs(devices) do
+	target_interface:value(dev.interface, l3routes.device_label(dev))
 end
 target_interface.default = uci:get('gluon', 'olsr_public_ip', 'target_interface')
 target_interface:depends(mode, 'forward')
@@ -72,18 +74,6 @@ end
 	forwards nothing on its own - only the ports listed here get through, each
 	as the one forward rule firewall4 derives from its redirect.
 ]]
-
--- the zones a forwarded port may lead into; the tunnel's own is not one of
--- them, and neither is the uplink
-local zones = {}
-uci:foreach('firewall', 'zone', function(zone)
-	local name = zone.name or zone['.name']
-
-	if name ~= publicip.ZONE and name ~= 'wan' and name ~= 'drop' then
-		table.insert(zones, name)
-	end
-end)
-table.sort(zones)
 
 -- a single port or a range, the way firewall4 spells them; there is no
 -- datatype for this in gluon-web-model
@@ -159,12 +149,13 @@ for _, entry in ipairs(entries) do
 		return self.data == nil or is_port(self.data)
 	end
 
-	local dzone = ps:option(ListValue, name .. '_dest_zone', translate('Device network'),
-		translate('Where the device sits; nothing outside it becomes reachable'))
-	for _, zone in ipairs(zones) do
-		dzone:value(zone, zone)
+	local dzone = ps:option(ListValue, name .. '_dest_interface', translate('Device network'),
+		translate('The interface the device is reached over; nothing beyond it '
+			.. 'becomes reachable'))
+	for _, dev in ipairs(devices) do
+		dzone:value(dev.interface, l3routes.device_label(dev))
 	end
-	dzone.default = entry.dest_zone or 'loc_client'
+	dzone.default = entry.dest_interface or 'local_node'
 
 	local comment = ps:option(Value, name .. '_comment', translate('Description'))
 	comment.optional = true
@@ -177,13 +168,13 @@ for _, entry in ipairs(entries) do
 		src_dport = sport,
 		dest_ip = dip,
 		dest_port = dport,
-		dest_zone = dzone,
+		dest_interface = dzone,
 		comment = comment,
 	})
 end
 
 local PORT_KEYS = {
-	'enabled', 'proto', 'src_dport', 'dest_ip', 'dest_port', 'dest_zone', 'comment',
+	'enabled', 'proto', 'src_dport', 'dest_ip', 'dest_port', 'dest_interface', 'comment',
 }
 
 function f:write()
@@ -203,7 +194,7 @@ function f:write()
 			src_dport = forward.src_dport.data,
 			dest_ip = forward.dest_ip.data,
 			dest_port = forward.dest_port.data,
-			dest_zone = forward.dest_zone.data,
+			dest_interface = forward.dest_interface.data,
 			comment = forward.comment.data,
 		}
 
