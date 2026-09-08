@@ -1,28 +1,55 @@
 #!/usr/bin/lua
 
--- gluon-private-wifi puts the private SSID on wan. The network it belongs on
--- is ffgraz-extra-networks', which exists with or without a radio. Runs after
--- 325-gluon-private-wifi, which is what creates the sections.
+--[[
+	The access point onto the node's private network.
+
+	Gluon's own private wifi is a different thing: that one is an extender,
+	bridged to the uplink, and it keeps its own SSID and its own interfaces.
+	This builds interfaces of its own rather than moving those over.
+
+	The settings live in uci gluon, not in the wireless sections they end up
+	in: wireless is not regenerated on reconfigure, so a page writing straight
+	into it had nowhere to put the values that would survive one.
+]]
 
 local uci = require("simple-uci").cursor()
 local wireless = require 'gluon.wireless'
 
 local NETWORK = 'private'
+local CONFIG = 'private_ap'
+
+local enabled = uci:get_bool('gluon', CONFIG, 'enabled')
+local ssid = uci:get('gluon', CONFIG, 'ssid')
+local key = uci:get('gluon', CONFIG, 'key')
+local encryption = uci:get('gluon', CONFIG, 'encryption') or 'psk2'
+local mfp = uci:get('gluon', CONFIG, 'mfp')
 
 wireless.foreach_radio(uci, function(radio)
 	local radio_name = radio['.name']
 	local suffix = radio_name:match('^radio(%d+)$')
-	local name = 'wan_' .. radio_name
+	local name = 'ap_' .. radio_name
 
-	if not uci:get('wireless', name, 'device') then
+	if not (enabled and ssid and key and suffix) then
+		uci:delete('wireless', name)
 		return
 	end
 
-	uci:set('wireless', name, 'ifname', suffix and 'ap' .. suffix)
-
-	-- wireless is not regenerated on reconfigure, so an interface set up
-	-- against the old network name is moved over
-	uci:set('wireless', name, 'network', NETWORK)
+	uci:section('wireless', 'wifi-iface', name, {
+		device = radio_name,
+		network = NETWORK,
+		mode = 'ap',
+		ssid = ssid,
+		key = key,
+		encryption = encryption,
+		ifname = 'ap' .. suffix,
+		disabled = false,
+		-- No macaddr of our own: gluon derives one as 4*index + offset and
+		-- every offset below four is taken already, so the address is left to
+		-- mac80211, which gives each further interface one.
+		--
+		-- hostapd-mini will not start when 802.11w is configured at all
+		ieee80211w = wireless.device_supports_mfp(uci) and mfp or nil,
+	})
 end)
 
 uci:save('wireless')
