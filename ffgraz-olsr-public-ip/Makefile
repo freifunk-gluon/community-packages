@@ -10,7 +10,7 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/ffgraz-olsr-public-ip
   TITLE:=olsr public ip support
-  DEPENDS:= +gluon-mesh-olsrd +kmod-ipip +ipip
+  DEPENDS:= +ffgraz-l3routes +kmod-ipip +ipip
 endef
 
 $(eval $(call BuildPackageGluon,ffgraz-olsr-public-ip))
