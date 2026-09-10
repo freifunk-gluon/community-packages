@@ -33,5 +33,25 @@ if not cert then
 	os.exit(1)
 end
 
--- lowercase hex of the DER, which is what the proxy compares against
-print((cert:digest('sha256'):lower():gsub('[^%x]', '')))
+--[[
+	Lowercase hex of the DER, which is what the proxy compares against.
+
+	x509:digest returns the raw 32 bytes on lua-openssl 0.9.2 and hex on some
+	later builds, so both are accepted rather than assuming one - printing raw
+	bytes as if they were hex is silent nonsense, and the proxy would just
+	refuse to connect with no clue why.
+]]
+local digest = cert:digest('sha256')
+
+if #digest == 32 then
+	digest = (digest:gsub('.', function(byte) return string.format('%02x', byte:byte()) end))
+end
+
+digest = digest:lower():gsub('[^%x]', '')
+
+if #digest ~= 64 then
+	io.stderr:write('unexpected digest length: ' .. #digest .. '\n')
+	os.exit(1)
+end
+
+print(digest)

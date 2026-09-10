@@ -15,8 +15,11 @@ define Package/ffgraz-config-mode-remote
 	# lua-openssl for verifying the capability - it must be 0.11.1 or newer,
 	# which is what the packages feed pins; 0.9.2 has no Ed25519 case and
 	# answers "invalid digest" instead of checking the signature.
-	# px5g so uhttpd can generate the certificate the proxy pins to.
-	DEPENDS:=+ffgraz-config-mode-at-runtime +lua-openssl +px5g-mbedtls
+	# px5g so uhttpd can generate the certificate the proxy pins to, and
+	# libustream-ssl because uhttpd loads its TLS provider at runtime - without
+	# it listen_https is accepted and then silently never listens.
+	DEPENDS:=+ffgraz-config-mode-at-runtime +lua-openssl +px5g-mbedtls \
+		+libustream-ssl
 endef
 
 define Package/ffgraz-config-mode-remote/description
