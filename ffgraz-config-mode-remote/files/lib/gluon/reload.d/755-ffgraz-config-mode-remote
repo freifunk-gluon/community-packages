@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# 510 puts listen_https back into uhttpd's config, but uhttpd is already
+# running by then and keeps serving with the arguments it started with - so a
+# freshly flashed node had the certificate, the config and nothing on 443, and
+# the proxy could not reach it. gluon has no reload hook for uhttpd of its own,
+# since it turns TLS off.
+#
+# 7xx-start, after 719-firewall-start, matching the stop/start split the other
+# packages use.
+/etc/init.d/uhttpd restart
