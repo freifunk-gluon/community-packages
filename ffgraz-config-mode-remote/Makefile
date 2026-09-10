@@ -16,10 +16,13 @@ define Package/ffgraz-config-mode-remote
 	# which is what the packages feed pins; 0.9.2 has no Ed25519 case and
 	# answers "invalid digest" instead of checking the signature.
 	# px5g so uhttpd can generate the certificate the proxy pins to, and
-	# libustream-ssl because uhttpd loads its TLS provider at runtime - without
-	# it listen_https is accepted and then silently never listens.
+	# libustream-mbedtls because uhttpd loads its TLS provider at runtime -
+	# without one, listen_https is accepted and then silently never listens.
+	# mbedtls rather than openssl or wolfssl: it is ustream-ssl's default
+	# variant and the one px5g-mbedtls already pulls, so the image carries a
+	# single TLS library. There is no virtual "libustream-ssl" to depend on.
 	DEPENDS:=+ffgraz-config-mode-at-runtime +lua-openssl +px5g-mbedtls \
-		+libustream-ssl
+		+libustream-mbedtls
 endef
 
 define Package/ffgraz-config-mode-remote/description
