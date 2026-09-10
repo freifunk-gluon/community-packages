@@ -124,7 +124,7 @@ function http:getheader(name) return self.headers[name] end
 function http:hasheader(name) return self:getheader(name) ~= nil end
 
 local function ask(capability)
-	http.headers = { X_GLUON_CONFIG_ACCESS = capability }
+	http.headers = { AUTHORIZATION = capability and ('Bearer ' .. capability) or nil }
 	return method.authorize(http)
 end
 
@@ -170,6 +170,8 @@ accept = true
 -- nothing presented at all
 eq(method.detect(setmetatable({ headers = {} }, { __index = http })), false,
 	'no header means this method does not apply')
+eq(method.detect(setmetatable({ headers = { AUTHORIZATION = 'Basic dXNlcg==' } },
+	{ __index = http })), false, 'another scheme is not ours to handle')
 err = ask(nil)
 assert(err and err:match('no capability'), 'a missing capability was accepted')
 

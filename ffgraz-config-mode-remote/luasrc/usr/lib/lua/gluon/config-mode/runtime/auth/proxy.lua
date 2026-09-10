@@ -18,7 +18,14 @@ local openssl = require 'openssl'
 local uci = require('simple-uci').cursor()
 local util = require 'gluon.util'
 
-local HEADER = 'X_GLUON_CONFIG_ACCESS'
+--[[
+	The capability travels in Authorization, not a header of our own: uhttpd
+	hands a CGI a fixed list of headers (proc.c) and anything outside it never
+	arrives at all - so a header of ours would simply be absent, and this would
+	answer "no auth method could be used" with nothing to say why.
+]]
+local HEADER = 'AUTHORIZATION'
+local BEARER = 'Bearer '
 local VERSION = 'v1'
 
 -- A node with no battery can boot believing it is 1970, so a capability from
@@ -91,8 +98,18 @@ local function verify(capability)
 	return nil, { identity = claim.identity or 'unknown' }
 end
 
+local function presented(http)
+	local value = http:getheader(HEADER)
+
+	if not value or value:sub(1, #BEARER) ~= BEARER then
+		return nil
+	end
+
+	return value:sub(#BEARER + 1)
+end
+
 local function authorize(http)
-	local capability = http:getheader(HEADER)
+	local capability = presented(http)
 
 	if not capability then
 		return 'no capability was presented'
@@ -109,7 +126,7 @@ local function authorize(http)
 end
 
 local function detect(http)
-	return http:hasheader(HEADER) and pubkey() ~= nil
+	return presented(http) ~= nil and pubkey() ~= nil
 end
 
 return {
