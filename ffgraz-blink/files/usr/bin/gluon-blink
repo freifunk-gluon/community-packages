@@ -5,8 +5,10 @@
 # shellcheck source=/dev/null
 . /etc/diag.sh
 
+MAC=$(cat /lib/gluon/core/sysconfig/primary_mac)
+
 start() {
-	set_led_state preinit
+	set_state preinit
 }
 
 stop() {
@@ -16,6 +18,6 @@ stop() {
 trap stop EXIT SIGTERM SIGINT
 start
 
-echo "Blinking on $(pretty-hostname) ($(cat /lib/gluon/core/sysconfig/primary_mac)) ... (ctrl-c to stop)"
+echo "Blinking on $(pretty-hostname) ($MAC) ... (ctrl-c to stop)"
 
 sleep infinity
