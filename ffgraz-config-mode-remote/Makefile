@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffgraz-config-mode-remote
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
 PKG_LICENSE:=MIT
@@ -12,11 +12,17 @@ define Package/ffgraz-config-mode-remote
 	SECTION:=admin
 	CATEGORY:=Administration
 	TITLE:=ffgraz-config-mode-remote
-	DEPENDS:=+ffgraz-config-mode-at-runtime +ffgraz-signed-request
+	# lua-openssl for verifying the capability - it must be 0.11.1 or newer,
+	# which is what the packages feed pins; 0.9.2 has no Ed25519 case and
+	# answers "invalid digest" instead of checking the signature.
+	# px5g so uhttpd can generate the certificate the proxy pins to.
+	DEPENDS:=+ffgraz-config-mode-at-runtime +lua-openssl +px5g-mbedtls
 endef
 
 define Package/ffgraz-config-mode-remote/description
-	Allow accessing the config mode remotely via simple token auth
+	Reach a node's config mode through the gluon-provisioning proxy, which
+	decides who may open which node and proves it with a signed capability
+	naming this node.
 endef
 
 define Package/ffgraz-config-mode-remote/install

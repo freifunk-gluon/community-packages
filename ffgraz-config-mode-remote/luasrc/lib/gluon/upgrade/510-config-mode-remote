@@ -1,0 +1,34 @@
+#!/usr/bin/lua
+
+--[[
+	Serve the config mode over TLS as well as plain HTTP.
+
+	gluon-status-page's 500 deliberately clears listen_https, which is right for
+	a status page anyone on the mesh may read. The config mode is not that: the
+	proxy carries a session that changes this node's settings, so the hop it
+	travels over is encrypted, and the proxy pins the certificate so it knows it
+	reached this node and not something answering in its place.
+
+	Runs after 500 on purpose - it is putting back what that one takes away.
+
+	uhttpd generates the certificate itself, with px5g, the first time it starts
+	with listen_https set and no certificate on disk.
+]]
+
+local uci = require('simple-uci').cursor()
+
+uci:section('gluon-config-mode-remote', 'remote', 'remote', {})
+uci:save('gluon-config-mode-remote')
+
+uci:set_list('uhttpd', 'main', 'listen_https', { '0.0.0.0:443', '[::]:443' })
+
+-- the defaults uhttpd generates a certificate from; without them it makes one
+-- for "OpenWrt", which says nothing about which node answered
+uci:section('uhttpd', 'cert', 'defaults', {
+	days = '3650',
+	key_type = 'ec',
+	ec_curve = 'P-256',
+	commonname = require('pretty_hostname').get(uci),
+})
+
+uci:save('uhttpd')

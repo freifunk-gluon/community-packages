@@ -1,0 +1,11 @@
+{
+  "capability": "v1.eyJleHAiOjIxMDQzNjQxMTMsImlhdCI6MTc4OTAwNDExMywiaWRlbnRpdHkiOiJta2cyMDAwMSIsIm5vZGUiOiJkODg0NjY0ZmZlMDEifQ.Ir_WNL--vz5jFD6kx1XFDGpVFlM4Iy9okyIBixWqh5nHHMjcHP_GYCf7eu1dyChSrI0ZTwOqh4HodVCHjRnJBQ",
+  "identity": "mkg20001",
+  "issued_at": 1789004113,
+  "node_id": "d884664ffe01",
+  "other_node": "d884664ffe02",
+  "pubkey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoZFNDMhGFQJCpsh6KaaIHzpu5px2RK+GaUkDGso4TXE=\n-----END PUBLIC KEY-----\n",
+  "signature_bytes": 64,
+  "signed_payload": "eyJleHAiOjIxMDQzNjQxMTMsImlhdCI6MTc4OTAwNDExMywiaWRlbnRpdHkiOiJta2cyMDAwMSIsIm5vZGUiOiJkODg0NjY0ZmZlMDEifQ",
+  "wrong_key_capability": "v1.eyJleHAiOjE3ODkwMDQxNzMsImlhdCI6MTc4OTAwNDExMywiaWRlbnRpdHkiOiJzb21lb25lLWVsc2UiLCJub2RlIjoiZDg4NDY2NGZmZTAxIn0.ApW0wKhqMs1wDfYtuV2zTGQ4PzwXlbCymivbUnTLV9SGIN1e4-N_OZM00nXzxmdsCgroGvZDzGkDFTHJ4UicCA"
+}

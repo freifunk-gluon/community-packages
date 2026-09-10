@@ -1,0 +1,4 @@
+package gluon-config-mode-remote
+
+config remote 'remote'
+	option pubkey ''

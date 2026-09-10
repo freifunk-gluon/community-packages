@@ -1,0 +1,37 @@
+#!/usr/bin/lua
+
+--[[
+	Print the SHA-256 fingerprint of this node's own web certificate.
+
+	The provisioning client reports it, and the config-mode proxy pins to it -
+	the certificate is self-signed, so its fingerprint is the only thing there
+	is to check it against.
+
+	It lives here rather than in gluon-provisioning so that reporting it costs
+	that package no dependency: it runs this if it is installed, and reports
+	nothing if it is not.
+]]
+
+local openssl = require 'openssl'
+
+local CERT = '/etc/uhttpd.crt'
+
+local f = io.open(CERT)
+
+if not f then
+	io.stderr:write(CERT .. ' does not exist yet\n')
+	os.exit(1)
+end
+
+local pem = f:read('*a')
+f:close()
+
+local cert = openssl.x509.read(pem)
+
+if not cert then
+	io.stderr:write(CERT .. ' is not a certificate we can read\n')
+	os.exit(1)
+end
+
+-- lowercase hex of the DER, which is what the proxy compares against
+print((cert:digest('sha256'):lower():gsub('[^%x]', '')))
