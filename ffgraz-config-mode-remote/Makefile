@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffgraz-config-mode-remote
-PKG_RELEASE:=3
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
 PKG_LICENSE:=MIT
@@ -29,14 +29,6 @@ define Package/ffgraz-config-mode-remote/description
 	Reach a node's config mode through the gluon-provisioning proxy, which
 	decides who may open which node and proves it with a signed capability
 	naming this node.
-endef
-
-# The public half of the proxy's signing key lands here when the node
-# provisions itself. Without this, sysupgrade drops it - the file belongs to
-# this package, and package files are only kept when they are conffiles - and
-# the node refuses every capability until its next provisioning run.
-define Package/ffgraz-config-mode-remote/conffiles
-/etc/config/gluon-config-mode-remote
 endef
 
 define Package/ffgraz-config-mode-remote/install
