@@ -1,0 +1,12 @@
+# The node's own web certificate, and the key under it.
+#
+# The proxy pins to its fingerprint, so a new certificate is a node the proxy
+# does not recognise - no config mode until the node has provisioned itself
+# again and reported the new one.
+#
+# uhttpd lists both in its conffiles, but apk only records conffiles the
+# package actually ships, and these are made at runtime by px5g - so they are
+# in no conffiles_static and sysupgrade would leave them behind. Saying so here
+# is what keeps them.
+/etc/uhttpd.crt
+/etc/uhttpd.key
