@@ -32,3 +32,34 @@ uci:section('uhttpd', 'cert', 'defaults', {
 })
 
 uci:save('uhttpd')
+
+--[[
+	443 wherever 80 already is.
+
+	uhttpd was told to listen and nothing was told to let anyone in, so the
+	proxy's TLS hop was refused in every zone - the port was open on the node
+	and shut in the firewall. Which zones may reach the web server is the
+	status page's decision (500-status-page writes a <zone>_http rule for
+	each), so this follows it rather than having an opinion of its own: a site
+	that opens 80 to the uplink gets 443 there too, and one that does not,
+	does not.
+]]
+local zones = {}
+
+uci:foreach('firewall', 'rule', function(rule)
+	local zone = (rule['.name'] or ''):match('^(.+)_http$')
+	if zone then
+		table.insert(zones, zone)
+	end
+end)
+
+for _, zone in ipairs(zones) do
+	uci:section('firewall', 'rule', zone .. '_https', {
+		src = zone,
+		dest_port = '443',
+		proto = 'tcp',
+		target = 'ACCEPT',
+	})
+end
+
+uci:save('firewall')

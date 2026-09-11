@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffgraz-config-mode-remote
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_MAINTAINER:=Maciej Krüger <maciej@xeredo.it>
 PKG_LICENSE:=MIT
