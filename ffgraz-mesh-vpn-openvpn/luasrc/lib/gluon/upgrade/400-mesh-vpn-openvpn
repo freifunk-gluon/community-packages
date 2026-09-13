@@ -27,7 +27,9 @@ local vpn = {
 	-- the tunnel that carries the mesh depends on the mesh already working
 	group = 'gluon-mesh-vpn',
 	-- SO_MARK on the transport socket; wan4_lookup/wan6_lookup route it out
-	-- the wan. openvpn parses this as an integer, not as a mark/mask pair
+	-- the wan. openvpn parses this as an integer, not as a mark/mask pair.
+	-- silently dropped by the openvpn.options the images still ship, which
+	-- is why the firewall rule below marks the transport as well
 	mark = '1'
 }
 
@@ -75,9 +77,35 @@ if vpn.enabled then
 	uci:section('openvpn', 'openvpn', 'mesh_vpn', vpn)
 end
 
--- superseded by the mark above: that one is set on the socket itself, so it
--- does not have to guess the port the site dials out on
+-- stands in for the mark above until the image ships an openvpn.options that
+-- knows the option. the port comes from the site's remotes, not a hardcoded
+-- 1194: a site dialling out elsewhere would go unmarked and take the mesh
+local remotes = vpn.remote or {}
+if type(remotes) == 'string' then
+	remotes = { remotes }
+end
+
+local ports = {}
+local seen = {}
+for _, remote in ipairs(remotes) do
+	-- "host port", or just "host" for openvpn's default
+	local port = tostring(remote):match('%s(%d+)%s*$') or '1194'
+	if not seen[port] then
+		seen[port] = true
+		ports[#ports + 1] = port
+	end
+end
+
 uci:delete('firewall', 'openvpn_mark')
+if vpn.enabled and #ports > 0 then
+	uci:section('firewall', 'rule', 'openvpn_mark', {
+		name = 'Mark packets to/from VPN clients',
+		target = 'MARK',
+		proto = 'udp',
+		dest_port = ports,
+		set_mark = '0x01/0x01',
+	})
+end
 
 uci:save('openvpn')
 uci:save('firewall')
