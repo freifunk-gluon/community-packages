@@ -90,6 +90,52 @@ local function configure(network, address4, routed4, address6, routed6)
 		dest = 'mesh',
 	})
 
+	--[[
+		The node itself, as seen from its own networks.
+
+		gluon opens the status page and respondd to the client network
+		(500-status-page's <zone>_http, 400-respondd-firewall's
+		client_respondd) - whoever is on a node's network can look at it and
+		ask it how it is. These networks are the same kind of place, so they
+		get the same three rules rather than relying on the zone policy to be
+		open: the policy says what is allowed by default, these say what is
+		meant to be reachable, and only the second survives someone tightening
+		the first.
+
+		ffgraz-config-mode-remote turns each <zone>_http into a <zone>_https,
+		so the config mode over TLS follows without being named again here.
+	]]
+	uci:section('firewall', 'rule', name .. '_http', {
+		name = name .. '_http',
+		src = name,
+		dest_port = '80',
+		proto = 'tcp',
+		target = 'ACCEPT',
+	})
+
+	uci:section('firewall', 'rule', name .. '_respondd', {
+		name = name .. '_respondd',
+		src = name,
+		src_ip = 'fe80::/64',
+		dest_port = '1001',
+		proto = 'udp',
+		target = 'ACCEPT',
+	})
+
+	-- and the answers to the node's own queries into this network: a reply to
+	-- a multicast query comes from an address nothing sent anything to, so it
+	-- is not RELATED and needs saying (gluon-neighbour-info does the same for
+	-- wan and mesh)
+	uci:section('firewall', 'rule', name .. '_respondd_reply', {
+		name = name .. '_respondd_reply',
+		src = name,
+		src_ip = 'fe80::/64',
+		src_port = '1001',
+		dest_port = '32768:61000',
+		proto = 'udp',
+		target = 'ACCEPT',
+	})
+
 	-- A range out of the mesh's own prefix is announced by
 	-- 300-extra-networks.lua and routed back here, so translating it would
 	-- only hide it. Anything else means nothing to the other nodes and has to
