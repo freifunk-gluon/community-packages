@@ -1,0 +1,104 @@
+#!/usr/bin/lua
+
+--[[
+	One DHCP server in the mesh serves the client network and every node
+	relays into it. ddhcpd and dnsmasq both want 0.0.0.0:67 and only one of
+	them can have it; the node's own networks need dnsmasq, so the client
+	network is served through dnsmasq too.
+
+	It has to be a *split* relay. A plain relay puts one address in giaddr
+	and the server uses it for two things: to pick the network to allocate
+	from, and as the address to send the answer to. The only address this
+	node has on the client link is the next_node one, and every other node
+	has it as well - an answer sent there comes back to whichever node is
+	nearest the server, not to the one the client is on. The split relay
+	separates the two: the node's own address goes into giaddr, so the
+	answer comes back here, and next_node travels next to it as an RFC 3527
+	link selection, so the server still allocates out of the client range.
+]]
+
+local iputil = require 'gluon.iputil'
+local site = require 'gluon.site'
+local sysconfig = require 'gluon.sysconfig'
+
+local uci = require('simple-uci').cursor()
+
+local LOOPBACK4 = '127.0.0.1/8'
+
+-- The node's own IPv4, which is what the server answers to. It lives on
+-- loopback, put there by gluon-mesh-olsrd (350-gluon-mesh-olsrd-node-address)
+-- and overridden by ffgraz-static-ip.
+local function configured_address()
+	for _, address in ipairs(uci:get_list('network', 'loopback', 'ipaddr')) do
+		if not address:match('^127%.') then
+			return address
+		end
+	end
+end
+
+-- A node that meshes with babel alone has no gluon-mesh-olsrd and so no
+-- address yet. Derive one the same way that package does rather than leave
+-- the node without a relay - where both run, this sees what 350 already set.
+local function generate_address()
+	local prefix = site.node_prefix4()
+	local range = prefix and site.node_prefix4_range()
+
+	prefix = prefix or site.prefix4()
+	if not prefix then
+		return
+	end
+
+	return iputil.mac_to_ip4(prefix, uci:get('network', 'loopback', 'macaddr') or sysconfig.primary_mac, range)
+end
+
+local address = configured_address()
+
+if not address then
+	address = generate_address()
+
+	if address then
+		print('[dnsmasq-dhcp-relay] no node address, generated ' .. address)
+		uci:set_list('network', 'loopback', 'ipaddr', { LOOPBACK4, address })
+		uci:delete('network', 'loopback', 'netmask')
+		uci:save('network')
+	end
+end
+
+-- dnsmasq refuses to relay from an interface it was told to keep its hands
+-- off, and gluon-client-bridge marks local-node as one of those to stop it
+-- serving DHCP there. Let it see the interface again, and take the server
+-- role away by the narrower switch instead.
+uci:set('dhcp', 'local_node', 'ignore', false)
+uci:set('dhcp', 'local_node', 'dhcpv4', 'disabled')
+uci:save('dhcp')
+
+local dnsmasq = uci:get_first('dhcp', 'dnsmasq')
+
+-- dhcp-split-relay is not one of the options the distribution's init script
+-- writes from uci, so it goes in as extra config. This is the only thing in
+-- the image that uses extraconftext.
+if address then
+	uci:set('dhcp', dnsmasq, 'extraconftext', string.format(
+		'dhcp-split-relay=%s,%s,%s',
+		site.next_node.ip4(),
+		site.dnsmasq_dhcp_relay.server(),
+		address:match('^[^/]+')
+	))
+else
+	print('E: dnsmasq-dhcp-relay: no node address to answer to, not relaying')
+	uci:delete('dhcp', dnsmasq, 'extraconftext')
+end
+
+uci:save('dhcp')
+
+-- clients have to be able to reach the relay
+uci:section('firewall', 'rule', 'client_dhcp', {
+	name = 'client_dhcp',
+	src = 'loc_client',
+	family = 'ipv4',
+	dest_port = '67',
+	proto = 'udp',
+	target = 'ACCEPT',
+})
+
+uci:save('firewall')
