@@ -23,3 +23,6 @@ msgstr ""
 "es derzeit keine nutzbare Internetverbindung gibt.<br />"
 "(Wenn in dieser Firmware der Suffix auf 'nodename' gestellt ist, kann man "
 "anhand der dann gesendeten Offline-SSID nach einem fehlerhaften Gerät suchen.)"
+
+msgid "Offline-SSID"
+msgstr "Offline-SSID"

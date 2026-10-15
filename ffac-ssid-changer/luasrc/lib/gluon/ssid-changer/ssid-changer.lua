@@ -38,16 +38,13 @@ end
 -- Read uptime
 local function get_uptime()
 	local file = io.open('/proc/uptime', 'r')
-	local uptime = file:read("*n")  -- Read only the first number (uptime in seconds)
+	if not file then return 0 end
+	local uptime = file:read("*n")
 	file:close()
-	return uptime
+	return uptime or 0
 end
 
 local uptime = get_uptime()
-local uptime_minutes = math.floor(uptime / 60)
-local monitor_duration = tonumber(uci:get('ssid-changer', 'settings', 'switch_timeframe') or 30)
-local is_switch_time = uptime_minutes % monitor_duration
-
 if uptime < 60 then
 	safety_exit('uptime less than one minute')
 end
@@ -89,64 +86,28 @@ end
 
 local offline_ssid = calculate_offline_ssid()
 
--- Count offline incidents
-local tmp = '/tmp/ssid-changer-count'
+-- Read State
+local tmp_count = '/tmp/ssid-changer-count'
 local tmp_state = '/tmp/ssid-changer-offline'
-local off_count = 0
-local file = io.open(tmp, 'r')
 
-local is_offline = 0
+local offline_minutes = 0
+local count_file = io.open(tmp_count, 'r')
+if count_file then
+	offline_minutes = tonumber(count_file:read("*a")) or 0
+	count_file:close()
+end
+
+local ssid_state = 'ONLINE'
 local state_file = io.open(tmp_state, 'r')
-
 if state_file then
-	is_offline = tonumber(state_file:read("*a")) or 0
+	local content = state_file:read("*a")
+	if (tonumber(content) or 0) == 1 then
+		ssid_state = 'OFFLINE'
+	end
 	state_file:close()
-else
-	state_file = io.open(tmp_state, 'w')
-	state_file:write("0")
-	state_file:close()
 end
 
-if file then
-	off_count = tonumber(file:read("*a")) or 0
-	file:close()
-else
-	file = io.open(tmp, 'w')
-	file:write("0")
-	file:close()
-end
-
-local function calculate_tq_limit()
-	local tq_limit_max = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_max') or 45)
-	local tq_limit_min = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_min') or 35)
-	local gateway_tq
-
-	local handle = io.popen('batctl gwl -H | grep -e "^\\*" | awk -F"[()]" "{print $2}" | tr -d " "')
-	gateway_tq = tonumber(handle:read("*a"))
-	handle:close()
-
-	if not gateway_tq then
-		safety_exit('tq_limit can not be calculated without gateway')
-	end
-	local is_online
-
-	if gateway_tq >= tq_limit_max then
-		is_online = true
-	elseif gateway_tq < tq_limit_min then
-		is_online = false
-	else
-		-- in the middle part we consider us offline if there was at least one offline incidents
-		-- or we were offline before the current monitor interval
-		is_online = off_count > 0
-	end
-
-	if is_online then
-		return 'online'
-	else
-		return 'offline'
-	end
-end
-
+-- Determine Link State
 local function has_default_gw4()
 	local default_gw4 = io.open('/var/gluon/state/has_default_gw4', 'r')
 	if default_gw4 then
@@ -156,72 +117,101 @@ local function has_default_gw4()
 	return false
 end
 
-local status
+local function get_gateway_tq()
+	local handle = io.popen('batctl gwl -H | grep -e "^\\*" | awk -F"[()]" "{print $2}" | tr -d " "')
+	local result = handle:read("*a")
+	handle:close()
+	return tonumber(result)
+end
+
+local link_state = 'OFFLINE'
+
 if has_default_gw4() then
 	local tq_limit_enabled = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_enabled') or 0)
 
 	if tq_limit_enabled == 1 then
-		status = calculate_tq_limit()
+		local gateway_tq = get_gateway_tq()
+		if not gateway_tq then
+			safety_exit('tq_limit can not be calculated without gateway')
+		end
+
+		local tq_limit_max = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_max') or 45)
+		local tq_limit_min = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_min') or 35)
+
+		if gateway_tq >= tq_limit_max then
+			link_state = 'ONLINE'
+		elseif gateway_tq < tq_limit_min then
+			link_state = 'OFFLINE'
+		else
+			-- Hysteresis: in between both limits neither the counter nor the
+			-- SSID is touched, so the SSID only changes once the TQ crosses
+			-- tq_limit_min or tq_limit_max
+			link_state = 'UNCHANGED'
+		end
 	else
-		status = 'online'
+		link_state = 'ONLINE'
 	end
-else
-	status = 'offline'
 end
 
-if status == 'online' then
+-- State Machine Logic
+local monitor_duration = tonumber(uci:get('ssid-changer', 'settings', 'switch_timeframe') or 30)
+local threshold = math.floor(monitor_duration / 2)
+
+if link_state == 'ONLINE' then
 	log_debug("node is online")
-	-- only revert and reconf if we were offline in the current monitoring timeframe or before
-	-- to reduce impact
-	if off_count > 0 then
+	if ssid_state == 'OFFLINE' then
 		log("reverting offline ssid back to default wireless config")
 		uci:revert('wireless')
 		os.execute('wifi reconf')
+		ssid_state = 'ONLINE'
+		-- start over, so that another switch_timeframe/2 offline minutes are
+		-- required before the offline SSID is set again
+		offline_minutes = 0
+	elseif offline_minutes > 0 then
+		offline_minutes = offline_minutes - 1
 	end
-elseif status == 'offline' then
+elseif link_state == 'OFFLINE' then
 	log_debug("node is considered offline")
-	local first = tonumber(uci:get('ssid-changer', 'settings', 'first') or 5)
-	-- set SSID offline, only if uptime is less than FIRST or exactly a multiplicative of switch_timeframe
-	if uptime_minutes < first or is_switch_time == 0 then
-
-		-- check if off_count is more than half of the monitor duration
-		if is_offline == 0 and off_count >= math.floor(monitor_duration / 2) then
-			-- if has been offline for at least half checks in monitor duration
-			-- set the SSID to the offline SSID
-			-- and disable owe client radios
-			for i = 0, 2 do
-				local client_ssid = uci:get('wireless', 'client_radio' .. i, 'ssid')
-				if client_ssid then
-					uci:set('wireless', 'client_radio' .. i, 'ssid', offline_ssid)
-				end
-
-				local owe_ssid = uci:get('wireless', 'owe_radio' .. i, 'ssid')
-				if owe_ssid then
-					uci:set('wireless', 'owe_radio' .. i, 'disabled', 1)
-				end
-				-- save does not commit
-				uci:save('wireless')
-			end
-			log("reconfiguring wifi to offline ssid")
-			os.execute('wifi reconf')
-		end
+	if offline_minutes < monitor_duration then
+		offline_minutes = offline_minutes + 1
 	end
-	off_count = off_count + 1
-	file = io.open(tmp, 'w')
-	file:write(tostring(off_count))
-	file:close()
+
+	if ssid_state == 'ONLINE' and offline_minutes >= threshold then
+		log("reconfiguring wifi to offline ssid")
+
+		for i = 0, 2 do
+			local client_ssid = uci:get('wireless', 'client_radio' .. i, 'ssid')
+			if client_ssid then
+				uci:set('wireless', 'client_radio' .. i, 'ssid', offline_ssid)
+			end
+
+			local owe_ssid = uci:get('wireless', 'owe_radio' .. i, 'ssid')
+			if owe_ssid then
+				uci:set('wireless', 'owe_radio' .. i, 'disabled', 1)
+			end
+		end
+		-- save does not commit
+		uci:save('wireless')
+		os.execute('wifi reconf')
+		ssid_state = 'OFFLINE'
+	end
+else
+	log_debug("node tq is in between both limits, keeping the current state")
 end
 
-if is_switch_time == 0 then
-	file = io.open(tmp, 'w')
-	state_file = io.open(tmp_state, 'w')
+-- Save State
+count_file = io.open(tmp_count, 'w')
+if count_file then
+	count_file:write(tostring(offline_minutes))
+	count_file:close()
+end
 
-	if status == 'offline' then
-		file:write("1")
+state_file = io.open(tmp_state, 'w')
+if state_file then
+	if ssid_state == 'OFFLINE' then
 		state_file:write("1")
 	else
-		file:write("0")
 		state_file:write("0")
 	end
-	file:close()
+	state_file:close()
 end
