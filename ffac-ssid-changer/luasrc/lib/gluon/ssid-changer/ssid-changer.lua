@@ -1,6 +1,7 @@
 #!/usr/bin/lua
 
 local uci = require('simple-uci').cursor()
+local wireless = require 'gluon.wireless'
 
 -- Safety check functions
 local function log_debug(...)
@@ -189,19 +190,21 @@ elseif status == 'offline' then
 			-- if has been offline for at least half checks in monitor duration
 			-- set the SSID to the offline SSID
 			-- and disable owe client radios
-			for i = 0, 2 do
-				local client_ssid = uci:get('wireless', 'client_radio' .. i, 'ssid')
+			wireless.foreach_radio(uci, function(radio)
+				local radio_name = radio['.name']
+
+				local client_ssid = uci:get('wireless', 'client_' .. radio_name, 'ssid')
 				if client_ssid then
-					uci:set('wireless', 'client_radio' .. i, 'ssid', offline_ssid)
+					uci:set('wireless', 'client_' .. radio_name, 'ssid', offline_ssid)
 				end
 
-				local owe_ssid = uci:get('wireless', 'owe_radio' .. i, 'ssid')
+				local owe_ssid = uci:get('wireless', 'owe_' .. radio_name, 'ssid')
 				if owe_ssid then
-					uci:set('wireless', 'owe_radio' .. i, 'disabled', 1)
+					uci:set('wireless', 'owe_' .. radio_name, 'disabled', 1)
 				end
 				-- save does not commit
 				uci:save('wireless')
-			end
+			end)
 			log("reconfiguring wifi to offline ssid")
 			os.execute('wifi reconf')
 		end
