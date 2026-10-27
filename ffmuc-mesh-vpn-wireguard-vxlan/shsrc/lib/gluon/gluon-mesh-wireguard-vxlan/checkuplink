@@ -69,6 +69,7 @@ combine_ip_port() {
 
 resolve_host() {
 	local host_to_resolve="$1"
+	local family="$2"
 
 	# older versions of nslookup use "Address 1:" with increasing numbers, newer just use "Address:"
 	if ! all_ips="$(gluon-wan-dns nslookup "$host_to_resolve" | grep '^Address \?[0-9]*:\? ' | sed 's/^Address \?[0-9]*:\? //')"; then
@@ -76,8 +77,7 @@ resolve_host() {
 		return 5
 	fi
 
-	# Check if we have a default route for v6 if not fallback to v4
-	if ip -6 route show table 1 | grep -q 'default via'
+	if [ "$family" -eq 6 ]
 	then
 		local ipv6s
 		# We need to match a few special cases for IPv6 here:
@@ -104,6 +104,20 @@ resolve_host() {
 
 force_wan_connection() {
 	LD_PRELOAD=libpacketmark.so LIBPACKETMARK_MARK=1 gluon-wan-dns "$@"
+}
+
+ntp_sync() {
+	local family="$1"
+	local ntp_server ntp_ips ntp_args=""
+
+	for ntp_server in $NTP_SERVERS; do
+		# set -e is not effective within conditions, so exit with the error code of resolve_host explicitly
+		ntp_ips="$(resolve_host "$ntp_server" "$family")" || exit
+		ntp_args="$(for ip in $ntp_ips; do echo -n "-p $ip "; done)${ntp_args}"
+	done
+
+	# shellcheck disable=SC2086 # otherwise ntpd cries
+	force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${ntp_args} -q
 }
 
 is_loadbalancing_enabled() {
@@ -184,6 +198,11 @@ get_wgkex_data() {
 	fi
 }
 
+set_peer_endpoint() {
+	PEER_ADDRESS="$(resolve_host "$PEER_HOST" "$WAN_FAMILY" | head -n 1)" # use the first resolved address of the peer
+	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+}
+
 use_api_v1() {
 	WGKEX_DATA=$(get_wgkex_data v1)
 
@@ -207,8 +226,7 @@ use_api_v1() {
 	PEER_PORT="$(extract_port "$PEER_HOSTPORT")"
 	PEER_PUBLICKEY="$(uci get wireguard.peer_"$PEER".publickey)"
 	PEER_LINKADDRESS="$(uci get wireguard.peer_"$PEER".link_address)"
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST" | head -n 1)" # use the first resolved address of the peer
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+	set_peer_endpoint
 }
 
 use_api_v2() {
@@ -228,8 +246,7 @@ use_api_v2() {
 	PEER_PORT="$(echo "$data" | sed -n 2p)"
 	PEER_PUBLICKEY="$(echo "$data" | sed -n 3p)"
 	PEER_LINKADDRESS=$(echo "$data" | sed -n 4p)
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST" | head -n 1)" # use the first resolved address of the peer
-	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+	set_peer_endpoint
 }
 
 is_connected() {
@@ -262,16 +279,18 @@ if is_connected; then
 fi
 
 logger -t checkuplink "Reconnecting ..."
+
+# Check if we have a default route for v6 if not fallback to v4
+if ip -6 route show table 1 | grep -q 'default via'
+then
+	WAN_FAMILY=6
+else
+	WAN_FAMILY=4
+fi
+
 NTP_SERVERS=$(uci get system.ntp.server)
-NTP_SERVERS_ADDRS=""
 
-for NTP_SERVER in $NTP_SERVERS; do
-	selected_ntp_ips=$(resolve_host "$NTP_SERVER")
-	NTP_SERVERS_ADDRS="$(for ip in $selected_ntp_ips; do echo -n "-p $ip "; done)${NTP_SERVERS_ADDRS}"
-done
-
-# shellcheck disable=SC2086 # otherwise ntpd cries
-if ! force_wan_connection /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug ${NTP_SERVERS_ADDRS} -q
+if ! ntp_sync "$WAN_FAMILY"
 then
 	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}... exiting."
 	exit 3
