@@ -46,7 +46,7 @@ end
 
 local uptime = get_uptime()
 local uptime_minutes = math.floor(uptime / 60)
-local monitor_duration = tonumber(uci:get('ssid-changer', 'settings', 'switch_timeframe') or 30)
+local monitor_duration = tonumber(uci:get('ssid-changer', 'settings', 'switch_timeframe')) or 30
 local is_switch_time = uptime_minutes % monitor_duration
 
 if uptime < 60 then
@@ -118,8 +118,8 @@ else
 end
 
 local function calculate_tq_limit()
-	local tq_limit_max = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_max') or 45)
-	local tq_limit_min = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_min') or 35)
+	local tq_limit_max = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_max')) or 45
+	local tq_limit_min = tonumber(uci:get('ssid-changer', 'settings', 'tq_limit_min')) or 35
 	local gateway_tq
 
 	local handle = io.popen("batctl gwl -H | grep -e '^\\*' | awk -F'[()]' '{print $2}' | tr -d ' '")

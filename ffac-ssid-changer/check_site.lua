@@ -1,5 +1,5 @@
 need_boolean({'ssid_changer', 'enabled'}, false)
-need_number({'ssid_changer', 'switch_timeframe'}, false)
+need_number_range({'ssid_changer', 'switch_timeframe'}, 1, math.huge, false)
 need_number({'ssid_changer', 'first'}, false)
 need_string({'ssid_changer', 'prefix'}, false)
 need_one_of({'ssid_changer', 'suffix'}, {'nodename', 'mac', 'none'}, false)
