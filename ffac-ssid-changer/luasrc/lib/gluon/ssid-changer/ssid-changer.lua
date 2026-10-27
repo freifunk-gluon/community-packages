@@ -176,7 +176,10 @@ if status == 'online' then
 	-- to reduce impact
 	if off_count > 0 then
 		log("reverting offline ssid back to default wireless config")
-		uci:revert('wireless')
+		wireless.foreach_radio(uci, function(radio)
+			uci:revert('wireless', 'client_' .. radio['.name'], 'ssid')
+			uci:revert('wireless', 'owe_' .. radio['.name'], 'disabled')
+		end)
 		os.execute('wifi reconf')
 	end
 elseif status == 'offline' then
