@@ -72,7 +72,9 @@ local function calculate_offline_ssid()
 	local suffix
 
 	if settings_suffix == 'nodename' then
-		suffix = io.popen('uname -n'):read("*a"):gsub("%s+", "")
+		local handle = io.popen('uname -n')
+		suffix = handle:read("*a"):gsub("%s+", "")
+		handle:close()
 		if #suffix > (30 - #prefix) then
 			local max_suffix_length = math.floor((28 - #prefix) / 2)
 			local suffix_first_chars = suffix:sub(1, max_suffix_length)
@@ -80,15 +82,15 @@ local function calculate_offline_ssid()
 			suffix = suffix_first_chars .. '...' .. suffix_last_chars
 		end
 	elseif settings_suffix == 'mac' then
-		suffix = io.popen('uci -q get network.bat0.macaddr | sed "s/://g"'):read("*a"):gsub("%s+", "")
+		local handle = io.popen('uci -q get network.bat0.macaddr | sed "s/://g"')
+		suffix = handle:read("*a"):gsub("%s+", "")
+		handle:close()
 	else
 		suffix = ''
 	end
 
 	return prefix .. suffix
 end
-
-local offline_ssid = calculate_offline_ssid()
 
 -- Count offline incidents
 local tmp = '/tmp/ssid-changer-count'
@@ -193,6 +195,7 @@ elseif status == 'offline' then
 			-- if has been offline for at least half checks in monitor duration
 			-- set the SSID to the offline SSID
 			-- and disable owe client radios
+			local offline_ssid = calculate_offline_ssid()
 			wireless.foreach_radio(uci, function(radio)
 				local radio_name = radio['.name']
 
