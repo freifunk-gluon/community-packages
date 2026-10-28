@@ -24,7 +24,6 @@ function f:write()
 			enabled = '1',
 			-- switch_timeframe = switch_timeframe.data or '30'
 			-- tq_limit_max = tq_limit_max.data or '45'
-			-- first = first.data or '5'
 			-- prefix = prefix.data or 'FF_Offline_'
 			-- suffix = suffix.data or 'nodename'
 			-- tq_limit_min = tq_limit_min.data or '35'
