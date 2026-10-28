@@ -4,7 +4,7 @@ local site = require 'gluon.site'
 
 local uci = require('simple-uci').cursor()
 
-if site.ssid_changer ~= nil then
+if site.ssid_changer() ~= nil then
 	local site_enabled = site.ssid_changer.enabled(true)
 
 	uci:section('ssid-changer', 'settings', 'settings', {

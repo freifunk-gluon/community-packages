@@ -10,7 +10,8 @@ local s = f:section(Section, nil, pkg_i18n.translate(
 ))
 
 local enabled = s:option(Flag, 'enabled', pkg_i18n.translate('Enabled'))
-enabled.default = uci:get_bool('ssid-changer', 'settings', 'enabled')
+-- the ssid-changer runs unless it is explicitly disabled
+enabled.default = uci:get('ssid-changer', 'settings', 'enabled') ~= '0'
 
 -- local prefix = s:option(Value, 'prefix', pkg_i18n.translate('First part of the Offline SSID'))
 -- prefix:depends(enabled, true)
