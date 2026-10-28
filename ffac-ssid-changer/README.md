@@ -58,6 +58,10 @@ Adapt and add this block to your `site.conf`:
       debug_log_enabled = true, -- optional: enable extra debug logs
     },
 
+While the node is offline, OWE client networks are disabled instead of
+being renamed, so only the open client network broadcasts the
+Offline-SSID. Clients can still connect to it.
+
 # Commandline options
 
 You can configure the ssid-changer on the commandline with `uci`, for
