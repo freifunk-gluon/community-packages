@@ -4,10 +4,9 @@ PKG_NAME:=ffda-node-whisperer
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL=https://github.com/freifunk-darmstadt/node-whisperer.git
-PKG_SOURCE_DATE:=2026-05-16
-PKG_SOURCE_VERSION:=c0f09545607006b8b8551a76a29d9f825f0dc128
-
+PKG_SOURCE_URL=https://github.com/fnsh/node-whisperer.git
+PKG_SOURCE_DATE:=2026-10-28
+PKG_SOURCE_VERSION:=b7a9323e6a9886d2b81b7e8d694949fb7a09a6ea
 PKG_MAINTAINER:=David Bauer <mail@david-bauer.net>
 PKG_LICENSE:=GPL-2.0-or-later
 
