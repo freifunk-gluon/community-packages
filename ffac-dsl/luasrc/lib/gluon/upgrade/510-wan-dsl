@@ -17,6 +17,15 @@ if enabled == true then
 		ipv6='auto',
 	})
 
+	uci:section('network','interface','wdsl6',{
+		proto='dhcpv6',
+		ip6table='1',
+		sourcefilter='0',
+		peerdns='0',
+		reqprefix='no',
+		ifname='wdsl',
+	})
+
 	uci:section('firewall','rule','wdsl_dhcpv6',{
 		name = 'DSL DHCPv6',
 		src = 'wdsl',
