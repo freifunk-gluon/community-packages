@@ -16,7 +16,14 @@ When `checkuplink` gets called (which happens every minute via cronjob), it chec
 If one of the checks above bails out with an error the reconnect cycle is started. This means `checkuplink` registers itself with `wireguard.broker` by sending the WireGuard public key over either HTTP or HTTPS (depending on the device support).
 The broker responds with JSON data containing the gateway peer data (pubkey, address, port, allowed IPs aka link address). `checkuplink` adds the peer to the wg interface using this data, and sets up the VXLAN interface with the peer link address as remote endpoint.
 
-This script prefers to establish connections over IPv6 and falls back to IPv4 **only if there is no IPv6 default route**.
+This script prefers to establish connections over IPv6 and falls back to IPv4 if
+
+- there is no IPv6 default route,
+- the interface of the IPv6 default route has no global IPv6 address (e.g. the upstream router sends RAs without a prefix),
+- NTP over IPv6 fails, or
+- there is no WireGuard handshake with the gateway over IPv6.
+
+Except for a missing IPv6 default route, each of these cases is logged as a warning.
 
 ### Configuration
 

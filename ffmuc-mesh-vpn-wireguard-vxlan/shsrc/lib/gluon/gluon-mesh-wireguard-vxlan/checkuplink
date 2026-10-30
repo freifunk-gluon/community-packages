@@ -67,6 +67,33 @@ combine_ip_port() {
 	echo "$ip:$port"
 }
 
+ipv6_broken() {
+	IPV6_BROKEN_REASON="$1"
+	WAN_FAMILY=4
+	logger -p warn -t checkuplink "$IPV6_BROKEN_REASON, using IPv4"
+}
+
+select_wan_family() {
+	local device
+
+	WAN_FAMILY=4
+	IPV6_BROKEN_REASON=""
+
+	# Check if we have a default route for v6 if not fallback to v4
+	device="$(ip -6 route show table 1 | awk '/^default via/ {print $5; exit}')"
+	if [ -z "$device" ]; then
+		return 0
+	fi
+
+	# Routers sending RAs without a prefix leave us with a default route but no global address
+	if ! ip -6 address show dev "$device" scope global | grep -q 'inet6'; then
+		ipv6_broken "IPv6 default route on $device, but no global IPv6 address"
+		return 0
+	fi
+
+	WAN_FAMILY=6
+}
+
 resolve_host() {
 	local host_to_resolve="$1"
 	local family="$2"
@@ -199,8 +226,24 @@ get_wgkex_data() {
 }
 
 set_peer_endpoint() {
-	PEER_ADDRESS="$(resolve_host "$PEER_HOST" "$WAN_FAMILY" | head -n 1)" # use the first resolved address of the peer
+	PEER_ADDRESS="$(resolve_host "$PEER_HOST" "$WAN_FAMILY" | head -n 1)" || return # use the first resolved address of the peer
 	PEER_ENDPOINT="$(combine_ip_port "$PEER_ADDRESS" "$PEER_PORT")"
+}
+
+retry_peer_over_ipv4() {
+	# Only retry if there was no handshake at all, otherwise IPv6 works and IPv4 won't help
+	if [ "$WAN_FAMILY" -eq 4 ] || [ "$(wg show "$MESH_VPN_IFACE" latest-handshakes | awk '{print $2}')" != "0" ]; then
+		return 1
+	fi
+
+	ipv6_broken "No WireGuard handshake with $PEER_HOST($PEER_ENDPOINT) over IPv6"
+	# set -e is not effective within conditions, so exit with the error code of resolve_host explicitly
+	set_peer_endpoint || exit
+	logger -p info -t checkuplink "Connecting to $PEER_HOST($PEER_ENDPOINT)"
+	gluon-wan-dns wg set "$MESH_VPN_IFACE" peer "$PEER_PUBLICKEY" endpoint "$PEER_ENDPOINT"
+
+	sleep 10
+	is_connected
 }
 
 use_api_v1() {
@@ -272,6 +315,9 @@ fi
 
 MESH_VPN_IFACE=$(get_site_string mesh_vpn.wireguard.iface)
 
+# Runs before the connectivity check to log a broken IPv6 uplink on every run
+select_wan_family
+
 # Check connectivity to supernode
 if is_connected; then
 	# We have a connection, we are done
@@ -280,17 +326,15 @@ fi
 
 logger -t checkuplink "Reconnecting ..."
 
-# Check if we have a default route for v6 if not fallback to v4
-if ip -6 route show table 1 | grep -q 'default via'
-then
-	WAN_FAMILY=6
-else
-	WAN_FAMILY=4
-fi
-
 NTP_SERVERS=$(uci get system.ntp.server)
 
-if ! ntp_sync "$WAN_FAMILY"
+# ipv6_broken() sets WAN_FAMILY to 4, so the next block retries NTP over IPv4
+if [ "$WAN_FAMILY" -eq 6 ] && ! ntp_sync 6
+then
+	ipv6_broken "Unable to establish NTP connection to ${NTP_SERVERS} over IPv6"
+fi
+
+if [ "$WAN_FAMILY" -eq 4 ] && ! ntp_sync 4
 then
 	logger -p err -t checkuplink "Unable to establish NTP connection to ${NTP_SERVERS}... exiting."
 	exit 3
@@ -368,9 +412,14 @@ sleep 5
 batctl hardif mesh-vpn throughput_override 1000mbit;
 
 # Check again if connected
-if ! is_connected; then
+if ! is_connected && ! retry_peer_over_ipv4; then
 	logger -p err -t checkuplink "Failed to connect to $PEER_HOST($PEER_ENDPOINT) - Please check your router firewall settings... exiting."
 	exit 4
 fi
 
 logger -p info -t checkuplink "Successfully connected to $PEER_HOST($PEER_ENDPOINT)"
+
+# Repeat the warning after the success message, so that the broken IPv6 uplink is not overlooked
+if [ -n "$IPV6_BROKEN_REASON" ]; then
+	logger -p warn -t checkuplink "$IPV6_BROKEN_REASON, connected over IPv4"
+fi
