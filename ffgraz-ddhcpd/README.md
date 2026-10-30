@@ -23,6 +23,10 @@ nodes.
 Choose a free IP-range that is not used by the DHCP-servers of your gateways
 that the DDHCPD can use to assign to clients.
 
+The range defaults to `prefix4` if unset. The netmask handed to clients is
+derived from the range, so DDHCPD can serve a different network than the mesh
+prefix.
+
 If you use B.A.T.M.A.N., continue reading the _Configuration_ section in
 [ddhcpd-batman-adv README](../ffgraz-ddhcpd-batman-adv/README.md#Configuration)
 
