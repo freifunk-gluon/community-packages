@@ -1,0 +1,9 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+if uci:get_bool('leds-off', 'settings', 'enabled') then
+	os.execute('/etc/init.d/leds-off enable')
+else
+	os.execute('/etc/init.d/leds-off disable')
+end

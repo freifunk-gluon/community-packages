@@ -44,7 +44,7 @@ strip_spaces_around_boolean_operators() {
 
 	# convert "true && false" to "true&&false"
 	sed -i 's/\s*||\s*/||/g' "${filename}"
-	sed -i 's/\s*&&\s*/&&/g' "${filename}"
+	sed -i 's/\s*&&\s*/\&\&/g' "${filename}"
 }
 
 strip_trailing_semicolon() {

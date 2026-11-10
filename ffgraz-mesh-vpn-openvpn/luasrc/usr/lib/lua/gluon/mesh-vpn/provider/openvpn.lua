@@ -37,4 +37,8 @@ function M.mtu()
 	return site.mesh_vpn.openvpn.mtu(1500)
 end
 
+function M.pubkey_privacy()
+	return true
+end
+
 return M
