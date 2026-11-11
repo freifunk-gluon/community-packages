@@ -8,11 +8,18 @@ It is currently in use at Freifunk Braunschweig.
 Other communities are interested in adopting it as well.
 
 This module extends `respondd`'s `statistics` object with the following
-info:
+info, as long as the node routes for its clients itself, that is: as long
+as it has a default route over one of its own `wg_*` tunnels.
 
-* `gateway`: IPv4 default gateway for the client net - if set.
-* `gateway6`: IPv6 default gateway for the client net - if set.
-* `gateway_nexthop`: The name of the currently selected gateway - if set.
+* `gateway6`: IPv6 gateway of the default route over the tunnel.
+* `gateway_nexthop`: The name of the tunnel that default route uses.
+* `gateway`: IPv4 gateway of the default route over the tunnel - only
+  present as long as there is one.
+
+The IPv6 default route is the one that describes how the node is connected:
+a node running 464XLAT translates the clients' IPv4 traffic to IPv6 before
+it enters the tunnel, so IPv4 does not have to be routed over the tunnel at
+all.
 
 For a node, that itself has a wireguard connection this can look like this:
 (Other information removed for readability.)
@@ -27,7 +34,10 @@ root@hostname:~# gluon-neighbour-info -r statistics
 ```
 
 For a node that does not have a WireGuard connection (and is thus using another node
-as gateway) this may look like this:
+as gateway) this module reports nothing. The same fields are filled in by
+`gluon-mesh-batman-adv` (`gateway`, `gateway_nexthop`) and the router
+advertisement filter (`gateway6`) instead, which describe the selected
+batman-adv gateway by its MAC addresses:
 
 ```shell
 root@anotherhostname:~# gluon-neighbour-info -r statistics

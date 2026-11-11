@@ -9,7 +9,11 @@ include $(TOPDIR)/../package/gluon.mk
 
 define Package/$(PKG_NAME)
   TITLE:=Filters router advertisments of any gateway but the connected gateway
-  DEPENDS:=+gluon-ebtables +libgluonutil +libbatadv
+  DEPENDS:=+gluon-ebtables +libgluonutil +libbatadv +libnl-tiny
 endef
+
+MAKE_VARS += \
+	LIBNL_NAME="libnl-tiny" \
+	LIBNL_GENL_NAME="libnl-tiny"
 
 $(eval $(call BuildPackageGluon,$(PKG_NAME)))
