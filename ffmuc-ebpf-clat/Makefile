@@ -11,7 +11,7 @@ include $(TOPDIR)/../package/gluon.mk
 define Package/$(PKG_NAME)
   TITLE:=eBPF-based CLAT binary (NAT46)
   DEPENDS:=+libbpf
-  EXTRA_DEPENDS:=kmod-sched-bpf
+  EXTRA_DEPENDS:=kmod-sched-bpf (>=6.12)  # openwrt-25.12 kernel series; $(LINUX_VERSION) is empty at packaging time
 endef
 
 MAKE_FLAGS+= \
