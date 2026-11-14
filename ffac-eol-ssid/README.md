@@ -1,6 +1,6 @@
 # ffac-eol-ssid
 
-This package changes the 2.4GHz SSID. It is used to show a deprecation warning in the SSID name for unsupported targets (end-of-life).
+This package changes the 2.4GHz SSID and optionally disables WiFi AP on a configured date. It is used to show a deprecation warning in the SSID name for unsupported targets (end-of-life).
 It was created to deprecate devices with 4MB and 32MB RAM.
 
 However it can be used for various deprecation processes of old versions.
@@ -9,15 +9,19 @@ For example the soon to come deprecation of devices with 8MB Flash.
 One should update all supported devices to the new gluon version, so that only devices without an update are left at the old version.
 Then one can add the `ffac-eol-ssid` package to the old version and leave a much noticed note in the ssid to switch to a supported device.
 
-
 ## Site Configuration
 
-```
+```lua
 eol_ssid = {
     enabled = true,
-    ssid = 'erneuern.freifunk.net',
+    ssid = 'erneuern.freifunk.net',-- EOL SSID for the SSID change
+    date_ssid = '2026-12-31',      -- Date when SSID changes (required)
+    date_wifi_off = '2027-12-31',  -- Date when WiFi AP is disabled (optional, must be >= date_ssid)
 }
 ```
+
+From `date_ssid` the SSID is changed, from `date_wifi_off` the client wifi is additionally switched off (mesh stays active).
+Dates are only evaluated once NTP is synchronized. See [DETAILS.md](DETAILS.md) for how it works and is triggered.
 
 ## Upgrading
 
