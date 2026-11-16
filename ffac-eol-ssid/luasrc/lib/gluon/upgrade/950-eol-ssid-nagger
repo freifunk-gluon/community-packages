@@ -19,7 +19,7 @@ if uci:get('eol-wifi', 'ssid') ~= nil then
 	uci:save('eol-ssid')
 	os.remove('/etc/config/eol-wifi')
 end
-1
+
 -- migrate ffmuc-eol-ssid configuration
 if uci:get('ffmuc', 'eol_ssid') then
 	local ffmuc_ssid_enabled = true
@@ -77,7 +77,8 @@ end
 if off_ts and now >= off_ts then
 	-- only client (AP) interfaces, mesh interfaces stay untouched
 	for _, section in ipairs({'client_radio0', 'client_radio1', 'owe_radio0', 'owe_radio1'}) do
-		set_if_different(section, 'disabled', true)
+		-- uci:get returns strings, so compare against '1' (not boolean true)
+		set_if_different(section, 'disabled', '1')
 	end
 end
 
