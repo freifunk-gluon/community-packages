@@ -97,6 +97,34 @@ untranslated IPv4 packet. The 28 bytes reach it because noderoute puts
 them on the IPv4 default route rather than on the interface, which
 carries the IPv6 packets that do not pay them.
 
+Multi-site operation
+--------------------
+
+A node can connect to two or more sites (PoPs) at the same time. One site
+is active. The other sites are on standby. Clients use the prefix of the
+active site for new connections.
+
+When the config service sends `sites` and `primary_site`, the
+`parker-sites` service does these steps:
+
+* It monitors the gateway (pgw) of each site with one ping each second.
+* After 3 missed pings, it moves the tunnel to the next pgw of the same
+  site. It then tells the config service, so that the old pgw removes its
+  route to the node.
+* When all pgws of a site fail, the site is down. When the primary site
+  is down, the next site that is up becomes active.
+* It sends one router advertisement (RA) for the prefixes of all sites
+  through `parker-radvd`. The prefix of the active site is preferred. The
+  other prefixes are deprecated, and existing connections can continue.
+* It routes each client source address to the tunnel of its own site.
+
+Without `sites` in the config, the service does nothing, and the node
+operates with one site as before. The status is in
+`/tmp/parker-sites/status` and in the output of `status`.
+
+Multi-site operation needs `ip-full` and a uradvd that supports
+`--state-file`.
+
 site.conf
 ---------
 

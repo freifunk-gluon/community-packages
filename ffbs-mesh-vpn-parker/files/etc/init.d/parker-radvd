@@ -1,0 +1,23 @@
+#!/bin/sh /etc/rc.common
+# SC2034,SC2154: /etc/rc.common imports this script and uses variables defined here
+# shellcheck disable=SC2034,SC2154
+# shellcheck shell="busybox sh"
+
+# The uradvd of the multi-site operation: one RA with the prefixes of all
+# sites, each with its own lifetimes. parker-sites writes the arguments and
+# the state. uradvd reads the state again on SIGHUP. Without these files
+# (one site only), gluon-radvd sends the RAs and this service does nothing.
+
+USE_PROCD=1
+
+STATE=/tmp/parker-sites
+
+start_service() {
+	[ -r "$STATE/ra-state" ] && [ -r "$STATE/ra-args" ] || return 0
+	procd_open_instance
+	# shellcheck disable=SC2046
+	procd_set_param command /usr/sbin/uradvd $(cat "$STATE/ra-args") --state-file "$STATE/ra-state"
+	procd_set_param respawn
+	procd_set_param stderr 1
+	procd_close_instance
+}
