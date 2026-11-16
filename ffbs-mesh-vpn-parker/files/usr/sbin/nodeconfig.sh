@@ -102,7 +102,19 @@ while true; do
 		exit 1
 	fi
 
-	LD_PRELOAD=libpacketmark.so wget -T "$FETCH_TIMEOUT" "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
+	# Optional site preference of the node owner. The config service uses
+	# it only when that site has capacity.
+	site_info=""
+	preferred_site=$(uci -q get parker.nodeconfig.preferred_site)
+	if [ -n "$preferred_site" ]; then
+		if echo "$preferred_site" | grep -qE '^[a-z0-9_-]{1,32}$'; then
+			site_info="&preferred_site=${preferred_site}"
+		else
+			$LOGGER "ignoring invalid parker.nodeconfig.preferred_site"
+		fi
+	fi
+
+	LD_PRELOAD=libpacketmark.so wget -T "$FETCH_TIMEOUT" "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${site_info}${tc_info}" -O "${tmpdir}response" -q
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."

@@ -122,6 +122,19 @@ Without `sites` in the config, the service does nothing, and the node
 operates with one site as before. The status is in
 `/tmp/parker-sites/status` and in the output of `status`.
 
+The config service selects the primary site of a node by load. The node
+owner can request a site:
+
+```sh
+uci set parker.nodeconfig.preferred_site='vie'
+uci commit parker
+```
+
+The value is a site name (`a-z`, `0-9`, `_`, `-`, 32 characters maximum).
+The node sends it as `preferred_site` with each config request. The config
+service uses it only when that site has capacity. To remove it, use
+`uci delete parker.nodeconfig.preferred_site`.
+
 Multi-site operation needs `ip-full` and a uradvd that supports
 `--state-file`.
 
