@@ -46,7 +46,7 @@ No cron/`micrond` and no extra packages are required.
 
 ## Testing
 
-The script writes log messages with `logger -t eol-ssid` to the syslog. Logged are the early exits during upgrade/boot (disabled, no NTP sync yet) and every actual change (`client_radio0.ssid -> ...`, `client_radio0.disabled -> true`, wifi reload). Runs without any change stay silent, so the small log buffer is not flooded.
+The script writes log messages with `logger -t eol-ssid` to the syslog. Logged are the early exits during upgrade/boot (disabled, no NTP sync yet) and every actual change (`client_radio0.ssid -> ...`, `client_radio0.disabled -> 1`, wifi reload). Runs without any change stay silent, so the small log buffer is not flooded.
 
 Show the messages on the router:
 
