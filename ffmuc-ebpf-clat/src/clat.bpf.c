@@ -28,6 +28,16 @@ char _license[] SEC("license") = "GPL";
 #define IP_OFFSET_MASK (0x1FFF)
 #define IP_MF (0x2000)
 
+/* IPv6 Fragment header (RFC 8200 section 4.5). frag_off holds the offset in
+ * 8-byte units in the upper 13 bits and the M flag in the lowest bit. */
+struct ipv6_frag_hdr {
+	__u8 nexthdr;
+	__u8 reserved;
+	__be16 frag_off;
+	__be32 identification;
+};
+#define IP6_MF (0x0001)
+
 /* Prob. requires CONFIG_BPF_EVENTS and CONFIG_TRACING kernel options to be enabled */
 #ifdef ENABLE_DEBUG_PRINT
  #define DEBUG_PRINT(x) bpf_printk(x)
@@ -289,12 +299,13 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 		return TC_ACT_SHOT;
 	}
 
-	uint16_t mf_flag = bpf_ntohs(ip->frag_off) & IP_MF; // More Fragments
-	uint16_t frag_off = bpf_ntohs(ip->frag_off) & IP_OFFSET_MASK; // Fragment Offset
-	if (mf_flag != 0 || frag_off > 0) {
-		/* TODO: We'll want to support this eventually.
-		 * Need to check since IPv6 header is bigger though. */
-		DEBUG_PRINT("Dropping fragmented IPv4 packet");
+	__u16 frag = bpf_ntohs(ip->frag_off);
+	__u16 frag_off = frag & IP_OFFSET_MASK; // Fragment Offset
+	int is_frag = (frag & IP_MF) || frag_off > 0;
+	/* RFC 7915 section 1.3: fragmented ICMP is not translated, because the ICMPv6
+	 * checksum covers a pseudo-header with the length of the full message. */
+	if (is_frag && ip->protocol == IPPROTO_ICMP) {
+		DEBUG_PRINT("Dropping fragmented ICMP packet");
 		return TC_ACT_SHOT;
 	}
 
@@ -306,6 +317,7 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 	}
 
 	/* Build IPv6 header. */
+	__be16 ip_id = ip->id;
 	struct ipv6hdr ip6_new = {
 		.version = 6,
 		.priority = ip->tos >> 4,
@@ -327,19 +339,37 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 	bpf_skb_load_bytes(skb, l3_off + offsetof(struct iphdr, daddr),
 	                    &ip6_new.daddr.in6_u.u6_addr32[3], sizeof(__u32));
 
-	/* Update L4 checksum. */
+	/* Update L4 checksum. Only the first fragment holds the L4 header. */
 	__u32 offset = sizeof(struct iphdr);
 #if HAS_ETH_HEADER
 	offset += sizeof(struct ethhdr);
 #endif
-	int ret = update_l4_4to6(skb, offset, &ip6_new);
-	if (ret != TC_ACT_OK) {
-		return ret;
+	if (frag_off == 0) {
+		int ret = update_l4_4to6(skb, offset, &ip6_new);
+		if (ret != TC_ACT_OK) {
+			return ret;
+		}
+	}
+
+	/* RFC 7915 section 4.1: an IPv4 fragment gets an IPv6 Fragment header. The kernel
+	 * fragments IPv4 at the route MTU, which leaves room for these 8 bytes. */
+	struct ipv6_frag_hdr fh = {
+		.nexthdr = ip6_new.nexthdr,
+		.frag_off = bpf_htons((frag_off << 3) | ((frag & IP_MF) ? IP6_MF : 0)),
+		.identification = bpf_htonl(bpf_ntohs(ip_id)),
+	};
+	if (is_frag) {
+		ip6_new.nexthdr = IPPROTO_FRAGMENT;
+		ip6_new.payload_len = bpf_htons(bpf_ntohs(ip6_new.payload_len) + sizeof(fh));
 	}
 
 	/* Change SKB protocol. */
 	if (bpf_skb_change_proto(skb, __bpf_constant_htons(ETH_P_IPV6), 0)) {
 		DEBUG_PRINT("Failed to convert to IPv6");
+		return TC_ACT_SHOT;
+	}
+	if (is_frag && bpf_skb_adjust_room(skb, sizeof(fh), BPF_ADJ_ROOM_NET, BPF_F_ADJ_ROOM_NO_CSUM_RESET)) {
+		DEBUG_PRINT("Failed to make room for the fragment header");
 		return TC_ACT_SHOT;
 	}
 
@@ -364,6 +394,10 @@ int clat_egress_4to6(struct __sk_buff *skb) {
 	 * but thus forcing unaligned access on non-ethernet packets. Let bpf_skb_store_bytes handle this.
 	 * See also https://docs.kernel.org/6.19/core-api/unaligned-memory-access.html#alignment-vs-networking */
 	bpf_skb_store_bytes(skb, l3_off, &ip6_new, sizeof(ip6_new), 0);
+	if (is_frag && bpf_skb_store_bytes(skb, l3_off + sizeof(ip6_new), &fh, sizeof(fh), 0)) {
+		DEBUG_PRINT("Failed to store fragment header");
+		return TC_ACT_SHOT;
+	}
 
 	DEBUG_PRINT("Translated egress packet");
 	return TC_ACT_OK;
@@ -684,23 +718,63 @@ static int __always_inline update_l3_6to4(struct __sk_buff *skb, __u32 l3_offset
 	struct ipv6hdr *ip6 = (struct ipv6hdr *)(data + (__u64)l3_offset);
 	ENSURE_MEM_VALID(ip6);
 	__u32 l4_offset = l3_offset + sizeof(struct ipv6hdr);
+	__u8 l4_proto = 0;
+	__u16 frag_off = 0;
+	__be16 frag_id = 0;
 
 	switch (ip6->nexthdr) {
-	case IPPROTO_FRAGMENT:
-		DEBUG_PRINT("Dropping due to fragmentation");
-		return TC_ACT_SHOT;
+	case IPPROTO_FRAGMENT: {
+		if (is_inner) {
+			DEBUG_PRINT("Dropping due to fragmented embedded packet");
+			return TC_ACT_SHOT;
+		}
+		struct ipv6_frag_hdr fh;
+		if (bpf_skb_load_bytes(skb, l4_offset, &fh, sizeof(fh))) {
+			return TC_ACT_SHOT;
+		}
+		l4_proto = fh.nexthdr;
+		switch (l4_proto) {
+		case IPPROTO_ICMPV6: /* RFC 7915 section 1.3, see egress. */
+		case IPPROTO_FRAGMENT:
+		case IPPROTO_HOPOPTS:
+		case IPPROTO_ROUTING:
+		case IPPROTO_DSTOPTS:
+		case IPPROTO_MH:
+			DEBUG_PRINT("Dropping fragment with untranslatable payload");
+			return TC_ACT_SHOT;
+		}
+		/* RFC 7915 section 5.1.1: copy offset, M flag and the low 16 bits of the ID. */
+		__u16 off6 = bpf_ntohs(fh.frag_off);
+		frag_off = (off6 >> 3) | ((off6 & IP6_MF) ? IP_MF : 0);
+		frag_id = bpf_htons(bpf_ntohl(fh.identification) & 0xFFFF);
+		l4_offset += sizeof(fh);
+		/* Only the first fragment holds the L4 header. */
+		if ((off6 >> 3) == 0) {
+			int ret = TC_ACT_OK;
+			if (l4_proto == IPPROTO_TCP) {
+				ret = update_tcp_6to4(skb, l4_offset, NULL);
+			} else if (l4_proto == IPPROTO_UDP) {
+				ret = update_udp_6to4(skb, l4_offset, NULL);
+			}
+			if (ret != TC_ACT_OK) {
+				return ret;
+			}
+		}
+		break;
+	}
 	case IPPROTO_HOPOPTS:
 	case IPPROTO_ROUTING:
 	case IPPROTO_DSTOPTS:
 	case IPPROTO_MH:
 		DEBUG_PRINT("Dropping due to unsupported extension");
 		return TC_ACT_SHOT;
+	default: {
+		/* Update L4 (checksums only for TCP&UDP, full header for ICMP). */
+		int ret = update_l4_6to4(skb, l4_offset, ip6, is_inner, outer_icmp_csum_diff);
+		if (ret != TC_ACT_OK) {
+			return ret;
+		}
 	}
-
-	/* Update L4 (checksums only for TCP&UDP, full header for ICMP). */
-	int ret = update_l4_6to4(skb, l4_offset, ip6, is_inner, outer_icmp_csum_diff);
-	if (ret != TC_ACT_OK) {
-		return ret;
 	}
 
 	data_end = (void *)(__u64)skb->data_end;
@@ -727,9 +801,13 @@ static int __always_inline update_l3_6to4(struct __sk_buff *skb, __u32 l3_offset
 		.version = 4,
 		.ihl = sizeof(struct iphdr) >> 2,
 		.tos = (ip6->priority << 4) | (ip6->flow_lbl[0] >> 4),
-		.tot_len = bpf_htons(bpf_ntohs(ip6->payload_len) + sizeof(struct iphdr)),
+		.tot_len = bpf_htons(bpf_ntohs(ip6->payload_len) + sizeof(struct iphdr) -
+		                     (l4_offset - l3_offset - sizeof(struct ipv6hdr))),
+		.id = frag_id,
+		.frag_off = bpf_htons(frag_off),
 		.check = 0,
-		.protocol = ip6->nexthdr,
+		/* For non-fragments, ICMP translation has already set the next header to ICMP. */
+		.protocol = l4_proto ? l4_proto : ip6->nexthdr,
 		.ttl = ip6->hop_limit,
 		.saddr = ip6_saddr.in6_u.u6_addr32[3],
 		.daddr = ip6_daddr.in6_u.u6_addr32[3],
@@ -817,6 +895,7 @@ int clat_ingress_6to4(struct __sk_buff *skb) {
 	}
 
 	struct iphdr ip_new;
+	__u8 is_frag = ip6->nexthdr == IPPROTO_FRAGMENT;
 
 	int ret = update_l3_6to4(skb, l3_off, &ip_new, set_dummy_saddr, 0, NULL);
 	if(ret != TC_ACT_OK){
@@ -828,6 +907,13 @@ int clat_ingress_6to4(struct __sk_buff *skb) {
 	data = (void *)(__u64)skb->data;
 	ip6 = (struct ipv6hdr *)(data + (__u64)l3_off);
 	ENSURE_MEM_VALID(ip6);
+
+	/* Remove the IPv6 Fragment header; the IPv4 header carries its fields. */
+	if (is_frag && bpf_skb_adjust_room(skb, -(int)sizeof(struct ipv6_frag_hdr), BPF_ADJ_ROOM_NET,
+	                                   BPF_F_ADJ_ROOM_NO_CSUM_RESET)) {
+		DEBUG_PRINT("Failed to remove fragment header");
+		return TC_ACT_SHOT;
+	}
 
 
 	/* Change SKB protocol. */

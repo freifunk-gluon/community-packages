@@ -12,7 +12,7 @@ This package implements RFC 6145-compliant IPv4-to-IPv6 translation using eBPF p
 - **TC hook integration**: Attaches to network interface ingress for packet processing
 - **RFC 6145 compliance**: Follows standard IPv4-to-IPv6 translation rules
 - **Configurable prefixes**: Supports custom local and remote IPv6 prefixes
-- **Fragment handling**: Detects and skips fragmented packets (not yet translated)
+- **Fragment handling**: Translates TCP and UDP fragments in both directions (RFC 7915 IPv6 Fragment header). Drops fragmented ICMP (RFC 7915 section 1.3)
 
 ## Configuration
 
@@ -46,7 +46,8 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe
 
 ## Limitations
 
-- Currently only handles non-fragmented IPv4 packets
+- Does not translate fragmented ICMP, or fragments with IPv6 extension headers
+- The route MTU for IPv4 must be at least 28 bytes below the interface MTU (20 for the larger header, 8 for the fragment header)
 - Downstream (IPv4-to-IPv6) translation only
 - Requires root privileges for TC operations
 - No handling of packets with local source/destination yet

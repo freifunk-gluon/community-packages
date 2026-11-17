@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ffmuc-ebpf-clat
 PKG_VERSION:=1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_LICENSE:=LGPL-2.1 OR BSD-2-Clause
 
 include $(TOPDIR)/../package/gluon.mk
