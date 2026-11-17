@@ -10,7 +10,7 @@ One should update all supported devices to the new gluon version, so that only d
 Then one can add the `ffac-eol-ssid-disable` package to the old version and leave a much noticed note in the ssid to switch to a supported device.
 
 **_Note:_**
-_This is very similar as `ffac-eol-ssid` but with the extended feature for setting a date for ssid change and switch off client wifi._
+_This is very similar as `ffac-eol-ssid` but with the extended features for setting a date for ssid change and switch off client wifi._
 
 
 ## Site Configuration
@@ -35,9 +35,11 @@ This package will migrate uci settings for previous versions of it.
 
 As this package was created to migrate older devices, it does not respect 5GHz or OWE radio.
 
+DO NOT use this package and `ffac-eol-ssid` at the same time.
+
 ## Credits
 
-This is based on ffac-eol-ssid which ich based on the hard-coded packages from FFMUC and FFKA
+This is based on `ffac-eol-ssid` which ich based on the hard-coded packages from FFMUC and FFKA
 
 - https://github.com/freifunk-gluon/community-packages/tree/main/ffac-eol-ssid
 - https://github.com/freifunkMUC/gluon-packages/tree/main/ffmuc-eol-ssid/

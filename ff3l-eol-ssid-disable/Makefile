@@ -4,7 +4,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=ffac-eol-ssid
+PKG_NAME:=ffac-eol-ssid-disable
 PKG_VERSION:=1
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-2.0-or-later
@@ -12,7 +12,7 @@ PKG_LICENSE:=GPL-2.0-or-later
 include $(TOPDIR)/../package/gluon.mk
 
 define Package/$(PKG_NAME)
-  TITLE:=Changes the SSID for devices with this package. Used to show a deprecation warning in the SSID for unsupported devices/targets
+  TITLE:=Changes and disables the SSID for devices with this package (on configured dates). Used to show a deprecation warning in the SSID for unsupported devices/targets
   DEPENDS:=+gluon-core
 endef
 
