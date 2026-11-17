@@ -84,7 +84,9 @@ while true; do
 		nonce=$(head -c16 /dev/urandom | md5sum | head -c32)
 	done
 	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
-	if ! ip route show table 1 | grep -Fq via ; then
+	# The uplink can have IPv4, IPv6 or both. prefer_ipv6() in
+	# nodeconfig.lua uses the same IPv6 check.
+	if ! ip route show table 1 | grep -Fq via && ! ip -6 route show table 1 | grep -q '^default '; then
 		$LOGGER no WAN route. Doing nothing.
 		retry
 		continue;
