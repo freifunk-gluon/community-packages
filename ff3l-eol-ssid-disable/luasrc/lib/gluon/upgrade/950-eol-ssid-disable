@@ -7,10 +7,10 @@ local from_ntp = os.getenv('EOL_SSID_NTP_SYNCED') == '1'
 
 -- read with: logread -e eol-ssid
 local function log(msg)
-	os.execute("logger -t eol-ssid '" .. msg:gsub("'", "'\\''") .. "'")
+	os.execute("logger -t eol-ssid-disable '" .. msg:gsub("'", "'\\''") .. "'")
 end
 
-log('starting EOL SSID nagger')
+log('Starting EOL SSID disable')
 
 -- migrate older ffac-eol-ssid version with manual eol-wifi.ssid.disabled=1
 if uci:get('eol-wifi', 'ssid') ~= nil then
@@ -36,7 +36,7 @@ if not site.eol_ssid.enabled(false) -- disabled for site/domain
 	or uci:get('eol-ssid', 'settings', 'enabled') == "0" -- present & disabled on router
 then
 	if not from_ntp then
-		log('disabled (site.conf or router setting), nothing to do')
+		log('Not enabled (site.conf or router setting), nothing to do.')
 	end
 	os.exit(0) -- do not change SSID
 end
@@ -44,7 +44,7 @@ end
 -- The dates are only trustworthy once ntpd reported a sync (set by the ntp hotplug script).
 -- During upgrade/boot the clock is usually wrong, so nothing is changed then.
 if not from_ntp then
-	log('no NTP sync yet (upgrade/boot run), waiting for ntpd')
+	log('No NTP sync yet (upgrade/boot run), waiting for ntpd...')
 	os.exit(0)
 end
 
@@ -83,7 +83,7 @@ if off_ts and now >= off_ts then
 end
 
 if changed then
-	log('wireless changed (date_ssid reached: ' .. tostring(ssid_ts ~= nil and now >= ssid_ts)
+	log('Wireless changed (date_ssid reached: ' .. tostring(ssid_ts ~= nil and now >= ssid_ts)
 		.. ', date_wifi_off reached: ' .. tostring(off_ts ~= nil and now >= off_ts) .. '), reloading wifi')
 	uci:save('wireless')
 	uci:commit('wireless')
