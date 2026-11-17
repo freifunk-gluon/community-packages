@@ -39,6 +39,21 @@ root@anotherhostname:~# gluon-neighbour-info -r statistics
 }
 ```
 
+Traffic
+-------
+
+The clients of a parker node use the `wg_*` tunnels, not `bat0`. When the
+node has a `wg_*` tunnel, this module sets `traffic.rx` and `traffic.tx`
+(`packets`, `bytes`, `dropped`) to the sum of the counters of all `wg_*`
+tunnels. `traffic.forward`, `traffic.mgmt_rx` and `traffic.mgmt_tx` stay
+as gluon-mesh-batman-adv sends them for the batman-adv mesh to other
+nodes.
+
+respondd merges its modules in the order of the file names. For the same
+key, the last module wins. Thus this package installs its module as
+`zz-ffbs-parker-respondd.so`, after `gluon-mesh-batman-adv.so` and
+`gluon-radv-filterd.so`.
+
 Usage with Meshviewer
 ---------------------
 
