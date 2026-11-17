@@ -1,0 +1,7 @@
+#!/bin/sh
+# busybox ntpd events; stratum 16 means "not synchronized"
+case "$ACTION" in
+	step|stratum|periodic)
+		[ "${stratum:-16}" -lt 16 ] && EOL_SSID_NTP_SYNCED=1 /lib/gluon/upgrade/950-eol-ssid-nagger
+		;;
+esac
