@@ -159,8 +159,11 @@ local function apply_network(conf, target_state, address4)
 	if target_state == true then
 		util.log("network: routing state: active")
 		local prefix_len = tonumber(util.str_split(conf.range4, "[^/]+")[2])
+		-- Offset 1 is our own address and the last one is the broadcast
+		-- address, so the pool runs from offset 2 to the one before the
+		-- broadcast address.
 		local start = 2
-		local limit = (2 ^ (32 - prefix_len) - 2)
+		local limit = (2 ^ (32 - prefix_len) - 3)
 		local prefix6_len = tonumber(util.str_split(conf.range6, "[^/]+")[2])
 
 		if address4 ~= conf.address4 then
