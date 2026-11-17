@@ -24,6 +24,10 @@
  * gluon-mesh-batman-adv reports the gateway for that case. */
 #define MESH_VPN_PREFIX "wg_"
 
+/* In multi-site operation, ffbs-mesh-vpn-parker (parker-sites) writes the
+ * gateways here: the default routes are device routes without a gateway. */
+#define PARKER_SITES_FILE "/tmp/parker-sites/respondd.json"
+
 struct gatewayinfo {
 	char interface[IF_NAMESIZE];
 	char gateway[INET6_ADDRSTRLEN];
@@ -152,9 +156,18 @@ int getgatewayandiface(struct gatewayinfo * gwinfo, sa_family_t family) {
 
 
 static struct json_object * respondd_parker_gateway(void) {
-	struct json_object *ret = json_object_new_object();
+	struct json_object *ret;
 	struct gatewayinfo gwinfo4 = {0};
 	struct gatewayinfo gwinfo6 = {0};
+
+	if (access(PARKER_SITES_FILE, R_OK) == 0) {
+		ret = json_object_from_file(PARKER_SITES_FILE);
+		if (ret && json_object_is_type(ret, json_type_object))
+			return ret;
+		json_object_put(ret);
+	}
+
+	ret = json_object_new_object();
 
 	/* The IPv6 default route is the one that tells us how this node is
 	 * connected: with 464XLAT the clients' IPv4 traffic is translated to

@@ -33,6 +33,15 @@ root@hostname:~# gluon-neighbour-info -r statistics
 }
 ```
 
+In multi-site operation (see ffbs-mesh-vpn-parker), the default routes
+have no gateway address. Then `parker-sites` writes the fields to
+`/tmp/parker-sites/respondd.json`, and this module sends that file:
+
+* `gateway6` and `gateway_nexthop`: the pgw and the tunnel of the active
+  site.
+* `gateway`: the pgw of a standby site that is up (its IPv4 address, or
+  its IPv6 address if it has no IPv4 address).
+
 For a node that does not have a WireGuard connection (and is thus using another node
 as gateway) this module reports nothing. The same fields are filled in by
 `gluon-mesh-batman-adv` (`gateway`, `gateway_nexthop`) and the router

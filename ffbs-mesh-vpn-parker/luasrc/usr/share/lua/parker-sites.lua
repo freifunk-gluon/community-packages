@@ -761,6 +761,23 @@ local function tick(db)
 			.. " ra=" .. (ra_state:find(conf.sites[name].range6 .. ",", 1, true) and "on" or "off"))
 	end
 	update_file(STATE .. "/status", table.concat(status, "\n") .. "\n")
+
+	-- For ffbs-parker-respondd: the pgw of the active site as gateway6, and
+	-- the pgw of an up standby site as gateway. The default routes are
+	-- device routes, so respondd cannot read the pgw from them.
+	local gw = {}
+	for _, name in ipairs(names) do
+		local site = conf.sites[name]
+		local pgw = find_by(site.pgws, "name", db.sites[name].pgw)
+			or find_by(conf.concentrators, "id", site.concentrator) or {}
+		if name == active and pgw.address6 then
+			gw.gateway6, gw.gateway_nexthop = pgw.address6, iface[name]
+		elseif name ~= active and up[name] and not gw.gateway then
+			gw.gateway = pgw.address4 or pgw.address6
+		end
+	end
+	-- jsonc writes an empty table as [].
+	update_file(STATE .. "/respondd.json", next(gw) and json.stringify(gw) or "{}")
 end
 
 if arg[1] == "pin" then
