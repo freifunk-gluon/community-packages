@@ -4,7 +4,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=ffac-eol-ssid-disable
+PKG_NAME:=ff3l-eol-ssid-disable
 PKG_VERSION:=1
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-2.0-or-later
