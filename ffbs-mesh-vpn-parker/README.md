@@ -122,7 +122,9 @@ When the config service sends `sites` and `primary_site`, the
 
 Without `sites` in the config, the service does nothing, and the node
 operates with one site as before. The status is in
-`/tmp/parker-sites/status` and in the output of `status`.
+`/tmp/parker-sites/status` and in the output of `status`. The active pgw
+and the state of each site go to respondd and the status page through
+`/tmp/parker-sites/respondd.json` (see ffbs-parker-respondd).
 
 The config service selects the primary site of a node by load. The node
 owner can request a site:
