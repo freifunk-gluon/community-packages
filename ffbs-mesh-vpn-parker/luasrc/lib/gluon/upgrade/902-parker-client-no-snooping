@@ -1,0 +1,21 @@
+#!/usr/bin/lua
+
+-- gluon-client-bridge (300) enables multicast snooping and the multicast
+-- querier on br-client. A site can switch off both with
+-- parker.disable_client_snooping. The querier needs snooping, so it has no
+-- function without it. Without the site option, keep the Gluon defaults.
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+if not site.parker.disable_client_snooping(false) then
+	os.exit(0)
+end
+
+if not uci:get('network', 'client') then
+	os.exit(0)
+end
+
+uci:set('network', 'client', 'igmp_snooping', false)
+uci:set('network', 'client', 'multicast_querier', false)
+uci:commit('network')
