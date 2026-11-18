@@ -643,6 +643,39 @@ local function cleanup(db, conf)
 	sh("rm -rf " .. STATE)
 end
 
+-- The statistics for ffbs-parker-respondd. The default routes are device
+-- routes, so respondd cannot read the pgw from them.
+--   * gateway, gateway6, gateway_nexthop: the pgw and tunnel of the active
+--     site.
+--   * mesh_vpn: one group per site with its pgw, in the format of
+--     gluon-mesh-vpn-fastd. "established" is the time since the site is up,
+--     "method" is "active", "standby" or "down".
+local function respondd_json(conf, names, db, iface, active, now)
+	local ret = { mesh_vpn = { groups = {} } }
+	for _, name in ipairs(names) do
+		local site, st = conf.sites[name], db.sites[name]
+		local pgw = find_by(site.pgws, "name", st.pgw)
+			or find_by(conf.concentrators, "id", site.concentrator) or {}
+		local peer = { method = "down" }
+		if st.state == "up" then
+			peer = { established = now - st.since, method = name == active and "active" or "standby" }
+		end
+		local peers = {}
+		peers[pgw.name or iface[name] or name] = peer
+		ret.mesh_vpn.groups[name] = { peers = peers }
+		if name == active then
+			ret.gateway = (pgw.name or pgw.address4 or pgw.address6 or "?") .. " (" .. name .. ")"
+			ret.gateway6 = pgw.address6
+			ret.gateway_nexthop = iface[name]
+		end
+	end
+	if not next(ret.mesh_vpn.groups) then
+		ret.mesh_vpn = nil
+	end
+	-- jsonc writes an empty table as [].
+	return next(ret) and json.stringify(ret) or "{}"
+end
+
 -- One tick. db is kept in memory by the loop (and in state.json).
 local function tick(db)
 	sh("mkdir -p " .. STATE)
@@ -761,6 +794,8 @@ local function tick(db)
 			.. " ra=" .. (ra_state:find(conf.sites[name].range6 .. ",", 1, true) and "on" or "off"))
 	end
 	update_file(STATE .. "/status", table.concat(status, "\n") .. "\n")
+
+	update_file(STATE .. "/respondd.json", respondd_json(conf, names, db, iface, active, now))
 end
 
 if arg[1] == "pin" then

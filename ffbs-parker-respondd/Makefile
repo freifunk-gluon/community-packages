@@ -17,4 +17,13 @@ define Package/ffbs-parker-respondd/description
   Respndd module for parker-based networks.
 endef
 
+# respondd merges the modules in the order of their file names. For the same
+# key, the last module wins. The "zz-" prefix puts this module after
+# gluon-mesh-batman-adv and gluon-radv-filterd, so that traffic and gateway
+# come from this module.
+define Package/ffbs-parker-respondd/install
+	$(INSTALL_DIR) $(1)/usr/lib/respondd
+	$(CP) $(PKG_BUILD_DIR)/respondd.so $(1)/usr/lib/respondd/zz-$(PKG_NAME).so
+endef
+
 $(eval $(call BuildPackageGluon,ffbs-parker-respondd))
