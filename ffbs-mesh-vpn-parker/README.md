@@ -138,6 +138,58 @@ service uses it only when that site has capacity. To remove it, use
 Multi-site operation needs `ip-full` and a uradvd that supports
 `--state-file`.
 
+Config service
+--------------
+
+`nodeconfig.sh` gets the node configuration from the config service:
+
+    GET http://<config_server>/config?pubkey=<wg pubkey>&nonce=<nonce>
+        &v6mtu=<br-wan IPv6 MTU>&version=<gluon release>
+        [&preferred_site=<name>][&tc_ingress=<kbit/s>&tc_egress=<kbit/s>]
+
+The answer is a JSON object. The last line is the usign signature with
+`config_pubkey`. The node does not use a config with a bad signature or a
+different `nonce`.
+
+Base fields. All config services send them:
+
+| Field           | Meaning                                                    |
+| :-------------- | :--------------------------------------------------------- |
+| `id`            | Config ID. Without `id`, the node applies nothing.         |
+| `nonce`         | The nonce of the request.                                  |
+| `time`          | Unix time. The node sets its clock when it is 60 s off.    |
+| `retry`         | Seconds until the next request.                            |
+| `mtu`           | Upper limit of the tunnel MTU (see MTU).                   |
+| `wg_keepalive`  | WireGuard persistent keepalive in seconds.                 |
+| `range4`        | IPv4 client network, for example `10.0.0.0/26`.            |
+| `address4`      | IPv4 address of the node in `range4` and on the tunnels.   |
+| `range6`        | IPv6 client prefix (/64).                                  |
+| `address6`      | IPv6 address of the node in `range6` and on the tunnels.   |
+| `concentrators` | List of tunnels: `id`, `pubkey`, `endpoint`, `address4`, `address6`. Tunnel `wg_c<id>` goes to `endpoint`. |
+
+Optional fields. Without them, the node operates as before:
+
+| Field          | Meaning                                                     |
+| :------------- | :---------------------------------------------------------- |
+| `xlat_range6`  | 464XLAT mode. The IPv6 range that the CLAT (`ffmuc-ebpf-clat`) translates the IPv4 clients into. The node allows only IPv6 on the tunnels, sends DHCPv4 option 108 and announces the NAT64 prefix `64:ff9b::/96` (PREF64). |
+| `primary_site` | Multi-site operation. The name of the preferred site.        |
+| `sites`        | Multi-site operation. One object for each site name (see below). |
+
+Fields of each entry in `sites`:
+
+| Field          | Meaning                                                     |
+| :------------- | :---------------------------------------------------------- |
+| `range6`       | IPv6 client prefix of the site.                             |
+| `address6`     | IPv6 address of the node in `range6`.                       |
+| `xlat_range6`  | Optional. CLAT range of the site.                           |
+| `dns64`        | Optional. DNS64 server of the site.                         |
+| `concentrator` | The `id` of the tunnel in `concentrators` that goes to this site. |
+| `pgws`         | List of the gateways of the site: `name`, `pubkey`, `endpoint`, `address6`. |
+
+When `parker-sites` moves a tunnel to another pgw, it reports the change:
+
+    GET http://<config_server>/api/v3/switch?pubkey=<wg pubkey>&site=<name>&pgw=<pgw name>
+
 site.conf
 ---------
 
