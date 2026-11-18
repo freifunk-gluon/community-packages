@@ -162,7 +162,36 @@ local function set_link_mtu(iface, mtu)
 	os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
 end
 
-local function conf_wg_iface(iface, privkey, peers, keepalive)
+local function wg_allowed_ips(conf)
+	-- Determine the allowed-ips our peers should be configured with.
+	--
+	-- With 464XLAT enabled all IPv4 traffic is translated to IPv6 before it
+	-- reaches Wireguard. Allowing IPv4 on the tunnel would only permit
+	-- traffic that cannot occur in that case.
+	--
+	-- Arguments:
+	-- * conf: The configuration received from the config service.
+
+	if conf.xlat_range6 ~= nil then
+		return { "::/0" }
+	end
+	return { "0.0.0.0/0", "::/0" }
+end
+
+local function same_allowed_ips(current_ips, target_ips)
+	-- Compare two lists of allowed-ips, ignoring their order.
+	if util.tablelength(current_ips) ~= util.tablelength(target_ips) then
+		return false
+	end
+	for _, ip in ipairs(target_ips) do
+		if not util.has_value(current_ips, ip) then
+			return false
+		end
+	end
+	return true
+end
+
+local function conf_wg_iface(iface, privkey, peers, keepalive, allowed_ips)
 	-- Configure Wireguard parameters on an existing wg-interface
 	-- Every peer needs a resolved_endpoint, see resolve_endpoint().
 	local cmd = "wg set " .. iface .. " fwmark 1 "
@@ -171,7 +200,7 @@ local function conf_wg_iface(iface, privkey, peers, keepalive)
 	end
 	for _, peer in pairs(peers) do
 		cmd = cmd .. " peer " .. peer.pubkey .. " endpoint " .. peer.resolved_endpoint
-		cmd = cmd .. " persistent-keepalive " .. keepalive .. " allowed-ips 0.0.0.0/0,::/0"
+		cmd = cmd .. " persistent-keepalive " .. keepalive .. " allowed-ips " .. table.concat(allowed_ips, ",")
 	end
 	os.execute(cmd)
 end
@@ -209,6 +238,7 @@ local function apply_wg(conf)
 
 	local current = util.get_wg_info()
 	local target_ifaces = {}
+	local allowed_ips = wg_allowed_ips(conf)
 	local ipv6_first = prefer_ipv6()
 
 	-- Create wg-interfaces defined in the configuration, if they
@@ -227,7 +257,7 @@ local function apply_wg(conf)
 				util.log("Creating wg-interface " .. iface .. " with mtu " .. mtu)
 				os.execute("ip link add " .. iface .. " type wireguard")
 				os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
-				conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive)
+				conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive, allowed_ips)
 				util.log("Setting wg-interface " .. iface .. " up")
 				os.execute("ip link set up " .. iface)
 				conf_tc_iface(iface)
@@ -268,6 +298,7 @@ local function apply_wg(conf)
 						cur_conf.pubkey = pubkey
 						cur_conf.endpoint = peer.endpoint
 						cur_conf.keepalive = peer.persistent_keepalive
+						cur_conf.allowed_ips = peer["allowed-ips"]
 					end
 					if cur_conf.pubkey ~= target.pubkey then
 						util.log(
@@ -302,12 +333,25 @@ local function apply_wg(conf)
 							)
 							do_it = true
 						end
+						if not same_allowed_ips(cur_conf.allowed_ips, allowed_ips) then
+							util.log(
+								"wg-iface "
+									.. iface
+									.. ": Reconfiguring peer "
+									.. cur_conf.pubkey
+									.. ". Allowed IPs have changed from "
+									.. table.concat(cur_conf.allowed_ips, ",")
+									.. " to "
+									.. table.concat(allowed_ips, ",")
+							)
+							do_it = true
+						end
 					end
 				end
 				if do_it then
 					-- The active configuration differs from the received configuration.
 					-- Let's update it.
-					conf_wg_iface(iface, PRIVKEY, { target }, conf.wg_keepalive)
+					conf_wg_iface(iface, PRIVKEY, { target }, conf.wg_keepalive, allowed_ips)
 				end
 			else
 				-- Our Wireguard interfaces should always only have one peer.
@@ -335,6 +379,14 @@ local function apply_wg(conf)
 			os.execute("ip -6 addr replace " .. conf.address6 .. "/128 peer " .. conc.address6 .. " dev " .. iface)
 		end
 	end
+
+	-- reload ebpf-clat, but only when it is already running.
+	-- this ensures that clat is also active for any newly added interfaces
+	if util.read_file("/etc/init.d/ebpf-clat") ~= nil then
+		util.log("Reloading ebpf-clat")
+		os.execute("/etc/init.d/ebpf-clat running && /etc/init.d/ebpf-clat reload")
+	end
+
 	return true
 end
 

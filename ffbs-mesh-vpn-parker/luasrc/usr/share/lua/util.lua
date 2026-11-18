@@ -12,6 +12,19 @@ function util.read_file(path)
 	return content
 end
 
+function util.write_file(path, content)
+	-- Replace a file in one step, so that a service reading it while we
+	-- write never gets to see half of it.
+	local tmp = path .. ".tmp"
+	local file = io.open(tmp, "w")
+	if not file then
+		return false
+	end
+	file:write(content)
+	file:close()
+	return os.rename(tmp, path) ~= nil
+end
+
 function util.str_split(str, pattern)
 	local res = {}
 	for i in string.gmatch(str, pattern) do

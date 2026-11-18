@@ -34,6 +34,69 @@ from its own MAC, and remembers that in `parker.client.address4` until the
 config service gives it a different range. Nodes that have moved keep that
 block of addresses out of the DHCP pool they hand to their clients.
 
+MTU
+---
+
+Everything our clients send leaves the node through a WireGuard tunnel,
+so how big their packets may be is decided by what is left of the WAN
+MTU once WireGuard, and with 464XLAT the CLAT as well, have taken their
+share.
+
+`nodeconfig.sh` reports the MTU `br-wan` uses for IPv6 to the config
+service, which answers with an upper bound in `mtu`. The service cannot
+know whether a tunnel ends up running over IPv6 or over IPv4, which
+differ by the 20 bytes between the two IP headers, so `nodeconfig.lua`
+finishes the calculation once it has resolved an endpoint, and
+`noderoute.lua` passes the result on to the clients:
+
+    A         the MTU br-wan uses for IPv6, 1436 behind DS-Lite
+    wg MTU  = min(conf.mtu, A - 80)   for an endpoint reached over IPv6
+            = min(conf.mtu, A - 60)   for one reached over IPv4
+    RA MTU  = the smallest wg MTU of the tunnels with a live handshake
+    DHCP 26 = RA MTU - 28             while the CLAT translates for us
+            = RA MTU                  when it does not
+    MSS     = RA MTU - 60             for TCP over IPv6
+            = DHCP 26 - 40            for TCP over IPv4
+
+With the `mtu = min(v6mtu, 1375)` the config service answers with today
+that comes out as:
+
+| WAN MTU | endpoint | wg MTU | RA option 5 | DHCP option 26 | MSS v6 | MSS v4 |
+| ------: | :------- | -----: | ----------: | -------------: | -----: | -----: |
+|    1436 | IPv6     |   1356 |        1356 |           1328 |   1296 |   1288 |
+|    1436 | IPv4     |   1375 |        1375 |           1347 |   1315 |   1307 |
+|    1500 | IPv6     |   1375 |        1375 |           1347 |   1315 |   1307 |
+|    1500 | IPv4     |   1375 |        1375 |           1347 |   1315 |   1307 |
+
+The 1375 is what keeps the last three rows from reaching the 1420, 1440
+and 1376 their WAN would allow.
+
+The 28 bytes the CLAT costs are the 20 between the IPv4 header it takes
+off and the IPv6 header it puts on, plus the 8 bytes of the fragment
+header RFC 7915 asks a translator to add to an IPv4 fragment. The kernel
+fragments IPv4 packets without DF at the 1347 of the route, and
+ebpf-clat translates each TCP or UDP fragment to an IPv6 fragment of at
+most 1375 bytes. Fragmented ICMP is dropped (RFC 7915 section 1.3), so
+a `ping -s 1400` over IPv4 gets no answer.
+
+The tunnels with a live handshake are all candidates for the default
+route, and noderoute may pick another one on any of its cycles without
+the clients noticing, so they are told the smallest of them. A tunnel is
+never sized below the 1280 bytes IPv6 needs on a link, and no MTU is
+announced in the router advertisements below that either: uradvd rejects
+one and exits, which would leave the client network without router
+advertisements at all.
+
+Nothing announces an MSS. fw4 clamps it, from `mtu_fix '1'` on the
+`vpn_parker` zone, by way of a `tcp option maxseg size set rt mtu` rule
+in `mangle_forward` and `mangle_postrouting`; the kernel subtracts 40
+bytes of IPv4 or 60 bytes of IPv6 and TCP header from the MTU of the
+route a packet takes. That clamp runs before the CLAT, which is attached
+to the tc egress hook of the wg-interface, and it therefore sees the
+untranslated IPv4 packet. The 28 bytes reach it because noderoute puts
+them on the IPv4 default route rather than on the interface, which
+carries the IPv6 packets that do not pay them.
+
 site.conf
 ---------
 
