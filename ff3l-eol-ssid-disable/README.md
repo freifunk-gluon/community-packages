@@ -27,6 +27,19 @@ eol_ssid = {
 From `date_ssid` the SSID is changed, from `date_wifi_off` the client wifi is additionally switched off (mesh stays active).
 Dates are only evaluated once NTP is synchronized. See [DETAILS.md](DETAILS.md) for how it works and is triggered.
 
+
+# Implement this package in your firmware
+
+Edit the `modules` file with the following content in your site directory:
+
+    GLUON_SITE_FEEDS="community"
+    PACKAGES_SSIDCHANGER_REPO=https://github.com/freifunk-gluon/community-packages.git
+    PACKAGES_SSIDCHANGER_COMMIT=b2910b46bb1c1a201396ff89da11ac7e5def523c # <-- set the newest commit ID here
+    PACKAGES_SSIDCHANGER_BRANCH=v2023.2.x
+
+With this done you can add the package `ff3l-eol-ssid-disable` to your `GLUON_SITE_PACKAGES` in your `site.mk`
+
+
 ## Upgrading
 
 This package will migrate uci settings for previous versions of it.
