@@ -1,0 +1,45 @@
+#!/bin/sh /etc/rc.common
+# /etc/rc.common imports this script and uses variables defined here
+# shellcheck disable=SC2034
+
+USE_PROCD=1
+START=21 # launch just after general networking
+STOP=89 # stop just before general networking
+
+
+start_instance() {
+	local iface="$1"
+
+	if [ ! -h "/sys/class/net/${iface}" ]; then
+		echo "Cannot find interface ${iface}" 1>&2
+		return 2
+	fi
+	if [ ! -r /tmp/xlat_range6 ]; then
+		echo "Cannot find config in /tmp/xlat_range6" 1>&2
+		return 3
+	fi
+
+	ifaceindex="$(cat "/sys/class/net/${iface}/ifindex")"
+	xlat_range6="$(cut -d'/' -f1 /tmp/xlat_range6)"
+
+	procd_open_instance "ebpf-clat.${iface}"
+	procd_set_param command /usr/sbin/ebpf-clat "${ifaceindex}" "${xlat_range6}" "64:ff9b::"
+	procd_set_param respawn "${respawn_threshold:-3600}" "${respawn_timeout:-5}" "${respawn_retry:-5}"
+	procd_set_param stdout 1 # TODO: remove this output
+	procd_set_param stderr 1
+	procd_close_instance
+
+}
+
+start_service() {
+	if [ ! -x /usr/sbin/ebpf-clat ]; then
+		echo "Cannot find ebpf-clat" 1>&2
+		return 1
+	fi
+
+	ifaces=$(wg show all public-key | cut -f1)
+
+	for iface in $ifaces; do
+		start_instance "$iface"
+	done
+}
