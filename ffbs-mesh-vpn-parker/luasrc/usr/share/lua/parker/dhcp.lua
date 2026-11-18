@@ -61,7 +61,12 @@ function dhcp.set_client_option(uci, name, values)
 		uci:section('dhcp', 'dhcp', CLIENT_SECTION)
 	end
 
-	uci:set('dhcp', CLIENT_SECTION, 'dhcp_option', options)
+	if #options > 0 then
+		uci:set('dhcp', CLIENT_SECTION, 'dhcp_option', options)
+	else
+		-- uci cannot hold an empty list.
+		uci:delete('dhcp', CLIENT_SECTION, 'dhcp_option')
+	end
 	uci:commit('dhcp')
 	return true
 end

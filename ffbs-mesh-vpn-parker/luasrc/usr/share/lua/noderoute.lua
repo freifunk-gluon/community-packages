@@ -147,7 +147,12 @@ local function set_client_option(name, values)
 	if options == nil then
 		return false
 	end
-	uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	if #options > 0 then
+		uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	else
+		-- uci cannot hold an empty list.
+		uci_delete("dhcp", DHCP_IFACE, "dhcp_option")
+	end
 	uci_commit("dhcp")
 	return true
 end
