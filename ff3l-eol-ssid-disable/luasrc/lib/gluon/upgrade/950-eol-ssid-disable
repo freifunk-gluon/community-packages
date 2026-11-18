@@ -89,3 +89,4 @@ if changed then
 	uci:commit('wireless')
 	os.execute('wifi reload')
 end
+
