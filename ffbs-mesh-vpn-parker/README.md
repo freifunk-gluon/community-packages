@@ -23,6 +23,22 @@ They have their corresponding services in `/etc/init.d/` and are usually quite v
 in `logread`.
 This package also takes care of generating the WireGuard Keypair for the node.
 
+Broadcasts after a restart
+--------------------------
+
+batman-adv starts the broadcast sequence number at 1.
+Gluon creates `bat0` again at each boot and at each change of the gateway mode.
+The other nodes keep the old number of the node for about 200 seconds.
+They drop all its broadcasts (also router advertisements) until the new number is higher than the old number.
+This can take a long time.
+
+To prevent this, the node sends 70 small broadcasts directly on `bat0` (UDP to `255.255.255.255`, port 9) each time `bat0` is new.
+It sends them when `bat0` has a neighbour, because batman-adv also counts broadcasts that no neighbour receives.
+When `bat0` starts, bridge loop avoidance drops all broadcasts for about 30 seconds.
+Thus the node first sends one test broadcast per second. It sends the 70 broadcasts when `tx_dropped` of `bat0` does not increase, or after 60 seconds.
+The code is in `/etc/hotplug.d/net/50-parker-bcast-burst` and `/usr/share/lua/parker/bcast.lua`.
+`lua5.1 tests/bcast-sim.lua` (in the package directory) simulates the probe and the burst with mock modules.
+
 MTU
 ---
 
