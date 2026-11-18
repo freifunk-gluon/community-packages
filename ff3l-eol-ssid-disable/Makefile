@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2023 Florian Maurer (FFAC), grische (FFMUC)
+# SPDX-FileCopyrightText: 2026 Tobias Buss (FF3L)
+# SPDX-License-Identifier: GPL-2.0-or-later
+# This package is based on https://gitlab.karlsruhe.freifunk.net/firmware/packages/-/tree/master/ffka-eol-ssid by Julian Schuh and Simon Terzenbach
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=ff3l-eol-ssid-disable
+PKG_VERSION:=1
+PKG_RELEASE:=1
+PKG_LICENSE:=GPL-2.0-or-later
+
+include $(TOPDIR)/../package/gluon.mk
+
+define Package/$(PKG_NAME)
+  TITLE:=Changes and disables the SSID for devices with this package (on configured dates). Used to show a deprecation warning in the SSID for unsupported devices/targets
+  DEPENDS:=+gluon-core
+endef
+
+define Package/$(PKG_NAME)/conffiles
+/etc/config/eol-ssid
+endef
+
+$(eval $(call BuildPackageGluon,$(PKG_NAME)))
