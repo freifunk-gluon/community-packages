@@ -1,0 +1,91 @@
+#!/usr/bin/lua
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+local from_ntp = os.getenv('EOL_SSID_NTP_SYNCED') == '1'
+
+-- read with: logread -e eol-ssid
+local function log(msg)
+	os.execute("logger -t eol-ssid-disable '" .. msg:gsub("'", "'\\''") .. "'")
+end
+
+log('Starting EOL SSID disable')
+
+-- migrate older ffac-eol-ssid version with manual eol-wifi.ssid.disabled=1
+if uci:get('eol-wifi', 'ssid') ~= nil then
+	local deprecated_ssid_enabled = not uci:get_bool('eol-wifi', 'ssid', 'disabled')
+	uci:set('eol-ssid', 'settings', 'enabled', deprecated_ssid_enabled)
+	uci:save('eol-ssid')
+	os.remove('/etc/config/eol-wifi')
+end
+
+-- migrate ffmuc-eol-ssid configuration
+if uci:get('ffmuc', 'eol_ssid') then
+	local ffmuc_ssid_enabled = true
+	if uci:get('ffmuc', 'eol_ssid', 'enabled') ~= nil then
+		ffmuc_ssid_enabled = uci:get_bool('ffmuc', 'eol_ssid', 'enabled')
+	end
+	uci:set('eol-ssid', 'settings', 'enabled', ffmuc_ssid_enabled)
+	uci:save('eol-ssid')
+	uci:delete('ffmuc', 'eol_ssid')
+	uci:save('ffmuc')
+end
+
+if not site.eol_ssid.enabled(false) -- disabled for site/domain
+	or uci:get('eol-ssid', 'settings', 'enabled') == "0" -- present & disabled on router
+then
+	if not from_ntp then
+		log('Not enabled (site.conf or router setting), nothing to do.')
+	end
+	os.exit(0) -- do not change SSID
+end
+
+-- The dates are only trustworthy once ntpd reported a sync (set by the ntp hotplug script).
+-- During upgrade/boot the clock is usually wrong, so nothing is changed then.
+if not from_ntp then
+	log('No NTP sync yet (upgrade/boot run), waiting for ntpd...')
+	os.exit(0)
+end
+
+local function parse_date(datestr)
+	local y, m, d = (datestr or ''):match('^(%d%d%d%d)%-(%d%d)%-(%d%d)$')
+	if not y then
+		return nil
+	end
+	return os.time({year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 0})
+end
+
+local now = os.time()
+local ssid_ts = parse_date(site.eol_ssid.date_ssid())
+local off_ts = parse_date(site.eol_ssid.date_wifi_off())
+
+local changed = false
+
+local function set_if_different(section, option, value)
+	if uci:get('wireless', section) ~= nil and uci:get('wireless', section, option) ~= value then
+		log(string.format('%s.%s -> %s', section, option, tostring(value)))
+		uci:set('wireless', section, option, value)
+		changed = true
+	end
+end
+
+if ssid_ts and now >= ssid_ts then
+	set_if_different('client_radio0', 'ssid', site.eol_ssid.ssid())
+end
+
+if off_ts and now >= off_ts then
+	-- only client (AP) interfaces, mesh interfaces stay untouched
+	for _, section in ipairs({'client_radio0', 'client_radio1', 'owe_radio0', 'owe_radio1'}) do
+		-- uci:get returns strings, so compare against '1' (not boolean true)
+		set_if_different(section, 'disabled', '1')
+	end
+end
+
+if changed then
+	log('Wireless changed (date_ssid reached: ' .. tostring(ssid_ts ~= nil and now >= ssid_ts)
+		.. ', date_wifi_off reached: ' .. tostring(off_ts ~= nil and now >= off_ts) .. '), reloading wifi')
+	uci:save('wireless')
+	uci:commit('wireless')
+	os.execute('wifi reload')
+end
