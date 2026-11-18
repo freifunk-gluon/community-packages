@@ -5,6 +5,15 @@
 # !!!!!!
 SIGN_PUB_KEY=/tmp/ff-Ohb0ba0u/nodeconfig-pub.key
 DEFAULT_SLEEP=20
+# Time to wait before the first retry. A node that boots with a working
+# uplink makes its first attempts while the WAN is still coming up, so
+# retrying quickly at first gets us our configuration a lot earlier. Every
+# further attempt that fails doubles the delay, up to DEFAULT_SLEEP.
+INITIAL_SLEEP=2
+# Give up on a config request that stalls. Without a timeout a connection
+# that is never answered keeps this script from making any progress at
+# all, which is exactly what we do not want while a node is starting up.
+FETCH_TIMEOUT=20
 export LIBPACKETMARK_MARK=1
 
 tmpdir=/tmp/ff-Ohb0ba0u/
@@ -14,6 +23,17 @@ version="$(cat /lib/gluon/release)"
 
 LOGGER="logger -s -t nodeconfig.sh"
 $LOGGER "Starting up. I am running ${version}"
+
+retry_sleep=$INITIAL_SLEEP
+
+retry() {
+	# Wait before the next attempt and back off for the attempt after that.
+	sleep "$retry_sleep"
+	retry_sleep=$((retry_sleep * 2))
+	if [ "$retry_sleep" -gt "$DEFAULT_SLEEP" ]; then
+		retry_sleep=$DEFAULT_SLEEP
+	fi
+}
 
 if [ ! -s /etc/parker/wg-privkey ]; then
 	$LOGGER No Wireguard private key found, generating...
@@ -65,23 +85,28 @@ while true; do
 	while [ -z "${nonce}" ]; do
 		nonce=$(head -c16 /dev/urandom | md5sum | head -c32)
 	done
-	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
-	if ! ip route show table 1 | grep -Fq via ; then
+	# The uplink can have IPv4, IPv6 or both. util.prefer_ipv6() uses the
+	# same IPv6 check.
+	if ! ip route show table 1 | grep -Fq via && ! ip -6 route show table 1 | grep -q '^default '; then
 		$LOGGER no WAN route. Doing nothing.
-		sleep $DEFAULT_SLEEP
+		retry
 		continue;
 	fi
+
+	# Only read this once there is a WAN route: right after boot br-wan
+	# may not exist yet.
+	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
 
 	if ! config_server=$(uci get parker.nodeconfig.config_server); then
 		$LOGGER unable to get config_server from uci
 		exit 1
 	fi
 
-	LD_PRELOAD=libpacketmark.so wget "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
+	LD_PRELOAD=libpacketmark.so wget -T "$FETCH_TIMEOUT" "http://${config_server}/config?pubkey=${pubkey}&nonce=${nonce}&v6mtu=${v6mtu}&version=${version}${tc_info}" -O "${tmpdir}response" -q
 	RET=$?
 	if [ $RET -gt 0 ]; then
 		$LOGGER "failed to fetch config with exit code $RET. Doing nothing."
-		sleep $DEFAULT_SLEEP
+		retry
 		continue;
 	fi
 
@@ -95,14 +120,15 @@ while true; do
 			slp=$(echo "$outp" | tail -n1)
 			$LOGGER "nodeconfig.lua successful. Sleeping ${slp}s".
 			touch ${tmpdir}/nodeconfig-successful
+			retry_sleep=$INITIAL_SLEEP
 			sleep "$slp"
 		else
 			echo "$outp"
 			$LOGGER nodeconfig.lua failed.
-			sleep "$DEFAULT_SLEEP"
+			retry
 		fi
 	else
 		$LOGGER Signature validation failed. Doing nothing.
-		sleep "$DEFAULT_SLEEP"
+		retry
 	fi
 done

@@ -44,9 +44,20 @@ function util.tablelength(T)
 	return count
 end
 
-function util.nslookup(host)
-	local ans = posix.sys.socket.getaddrinfo(host, nil, { protocol = posix.sys.socket.IPPROTO_UDP })
-	if not ans then
+function util.nslookup(host, family)
+	-- Resolve a hostname to the first address the resolver returns.
+	--
+	-- Arguments:
+	-- * host: The hostname to resolve.
+	-- * family: Optional address family (posix.sys.socket.AF_INET or
+	--   posix.sys.socket.AF_INET6) to restrict the lookup to.
+
+	local hints = { protocol = posix.sys.socket.IPPROTO_UDP }
+	if family ~= nil then
+		hints.family = family
+	end
+	local ans = posix.sys.socket.getaddrinfo(host, nil, hints)
+	if not ans or not ans[1] then
 		return nil
 	else
 		return ans[1].addr
@@ -84,6 +95,19 @@ end
 
 function util.sleep(n)
 	posix.unistd.sleep(n)
+end
+
+function util.wait_for(condition, timeout)
+	-- Wait until condition() returns true.
+	-- Gives up after timeout seconds and returns whether the condition
+	-- has been met.
+	for _ = 1, timeout do
+		if condition() then
+			return true
+		end
+		util.sleep(1)
+	end
+	return condition()
 end
 
 local random_seeded = false

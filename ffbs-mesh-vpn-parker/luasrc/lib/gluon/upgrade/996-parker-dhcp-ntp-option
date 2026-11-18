@@ -1,9 +1,28 @@
 #!/usr/bin/lua
 
 local site = require 'gluon.site'
-local ntp_server = site.ntp_servers()[1]
+local dhcp = require 'parker.dhcp'
+local uci = require('simple-uci').cursor()
 
-local uci = require('uci')
-local x = uci.cursor()
-x:set('dhcp', 'client' , 'dhcp_option', {'option:ntp-server,' .. ntp_server})
-x:commit('dhcp')
+-- dnsmasq's name for DHCPv4 option 42 (RFC 2132).
+local NTP_OPTION = 'option:ntp-server'
+
+-- Option 42 carries IPv4 addresses only.
+local function client_ntp_servers()
+	local servers = dhcp.ipv4_addresses(site.parker.client_ntp_servers4({}))
+	if #servers > 0 then
+		return servers
+	end
+
+	-- ntp_servers configures the node's own clock and may well be a
+	-- hostname, but sites that have put an IPv4 address there have been
+	-- relying on us passing it on.
+	local ntp_server = site.ntp_servers({})[1]
+	if ntp_server and dhcp.is_ipv4(ntp_server) then
+		return { ntp_server }
+	end
+
+	return {}
+end
+
+dhcp.set_client_option(uci, NTP_OPTION, client_ntp_servers())

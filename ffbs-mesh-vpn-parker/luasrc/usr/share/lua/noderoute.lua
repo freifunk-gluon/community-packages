@@ -1,3 +1,4 @@
+local clientaddr = require("clientaddr")
 local json = require("jsonc")
 local util = require("util")
 local uci = require("uci")
@@ -8,6 +9,12 @@ local tmpdir = arg[1]
 
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
+
+-- How long we are willing to wait for netifd to apply a configuration we
+-- have just committed, and for the services serving our clients to catch
+-- up with it afterwards.
+local NETWORK_TIMEOUT = 60
+local SERVICES_TIMEOUT = 20
 
 util.loggername = "noderoute.lua"
 
@@ -100,7 +107,48 @@ local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
 
-local function apply_network(conf, target_state)
+local function iface_status(iface)
+	local output = util.check_output("ubus call network.interface." .. iface .. " status 2>/dev/null")
+	if output == "" then
+		return nil
+	end
+	return json.parse(output)
+end
+
+local function network_applied(address4, target_state)
+	-- Has netifd applied the interface configuration we have committed?
+	-- netifd updates the running protocol as part of processing the
+	-- reload, so as long as we are switching protocols this cannot be
+	-- confused by the state the interface was in before.
+	local status = iface_status(DHCP_IFACE)
+	if status == nil then
+		return false
+	end
+	if not target_state then
+		return status.proto == "dhcp"
+	end
+	if status.proto ~= "static" or status.up ~= true then
+		return false
+	end
+	-- The interface may have been up with a different address before.
+	for _, addr in ipairs(status["ipv4-address"] or {}) do
+		if addr.address == address4 then
+			return true
+		end
+	end
+	return false
+end
+
+local function services_ready()
+	-- Are the services our clients need back up? These are the same
+	-- conditions noderoute.sh complains about when they are missing.
+	if os.execute("pidof uradvd >/dev/null") ~= 0 then
+		return false
+	end
+	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
+end
+
+local function apply_network(conf, target_state, address4)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
 	end
@@ -111,19 +159,31 @@ local function apply_network(conf, target_state)
 	if target_state == true then
 		util.log("network: routing state: active")
 		local prefix_len = tonumber(util.str_split(conf.range4, "[^/]+")[2])
-		local limit = (2 ^ (32 - prefix_len) - 2)
+		-- Offset 1 is our own address and the last one is the broadcast
+		-- address, so the pool runs from offset 2 to the one before the
+		-- broadcast address.
+		local start = 2
+		local limit = (2 ^ (32 - prefix_len) - 3)
 		local prefix6_len = tonumber(util.str_split(conf.range6, "[^/]+")[2])
+
+		if address4 ~= conf.address4 then
+			-- We have moved out of the way of another node, so the block of
+			-- addresses we may move to has to stay out of the pool. The end
+			-- of the pool stays where it is for everybody.
+			start = clientaddr.RESERVED + 1
+			limit = limit - (start - 2)
+		end
 
 		uci_set("dhcp", DHCP_IFACE, "interface", DHCP_IFACE)
 		uci_set("dhcp", DHCP_IFACE, "leasetime", "3m")
-		uci_set("dhcp", DHCP_IFACE, "start", "2")
+		uci_set("dhcp", DHCP_IFACE, "start", start)
 		uci_set("dhcp", DHCP_IFACE, "limit", limit)
 		uci_set("dhcp", DHCP_IFACE, "force", "1")
 		util.log("Configuring DHCPD on " .. DHCP_IFACE .. " with up to " .. limit .. " leases")
 
 		uci_set("network", DHCP_IFACE, "proto", "static")
-		uci_set("network", DHCP_IFACE, "ipaddr", conf.address4 .. "/" .. prefix_len)
-		util.log(DHCP_IFACE .. " ipaddr: " .. conf.address4 .. "/" .. prefix_len)
+		uci_set("network", DHCP_IFACE, "ipaddr", address4 .. "/" .. prefix_len)
+		util.log(DHCP_IFACE .. " ipaddr: " .. address4 .. "/" .. prefix_len)
 		uci_set("network", DHCP_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
 		util.log(DHCP_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
 		uci_set("network", "client6", "proto", "static")
@@ -158,6 +218,7 @@ local function apply_network(conf, target_state)
 	end
 
 	local changed = sections_changed()
+	local radvd_stopped = false
 
 	if changed then
 		dump(uci.changes())
@@ -166,12 +227,18 @@ local function apply_network(conf, target_state)
 		util.log("Reconfiguring network...")
 		util.log("HACK: stopping gluon-radvd")
 		os.execute("/etc/init.d/gluon-radvd stop")
+		radvd_stopped = true
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
 		os.execute("/etc/init.d/network reload")
-		util.log("Network reload finished. Wait another 60s for the config to settle...")
-		util.sleep(60)
-		util.log("...done sleeping for 60s.")
+		util.log("Network reload finished. Waiting for " .. DHCP_IFACE .. " to be reconfigured...")
+		if util.wait_for(function()
+			return network_applied(address4, target_state)
+		end, NETWORK_TIMEOUT) then
+			util.log("..." .. DHCP_IFACE .. " has been reconfigured.")
+		else
+			util.log("..." .. DHCP_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
+		end
 		changed = true
 	end
 
@@ -181,9 +248,13 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
+	-- The stop above is not conditional on anything radvd announces, so it
+	-- has to be paired with a start here even when the announced prefix
+	-- did not change: a network reconfiguration that leaves the prefix
+	-- alone must not leave the clients without router advertisements.
 	local range6 = util.read_file("/tmp/range6")
-	if (target_state and range6 ~= conf.range6) or radvd_config_deleted then
-		if conf.range6 ~= nil and target_state then
+	if (target_state and range6 ~= conf.range6) or radvd_config_deleted or radvd_stopped then
+		if target_state and conf.range6 ~= nil then
 			local f = io.open("/tmp/range6", "w")
 			f:write(conf.range6)
 			f:close()
@@ -191,15 +262,23 @@ local function apply_network(conf, target_state)
 			f = io.open("/tmp/addr6", "w")
 			f:write(conf.address6)
 			f:close()
+			os.execute("/etc/init.d/gluon-radvd restart")
+		else
+			-- Nothing to announce: without a prefix uradvd exits right
+			-- away and procd stops respawning it after a few attempts,
+			-- so an explicit stop is both quieter and equivalent.
+			os.execute("/etc/init.d/gluon-radvd stop")
 		end
-		os.execute("/etc/init.d/gluon-radvd restart")
 		changed = true
 	end
 
-	if changed then
-		util.log("Some network config has changed. Wait another 20s for everything to sette...")
-		util.sleep(20)
-		util.log("... done sleeping for 20s")
+	if changed and target_state then
+		util.log("Some network config has changed. Waiting for the client services...")
+		if util.wait_for(services_ready, SERVICES_TIMEOUT) then
+			util.log("...client services are up.")
+		else
+			util.log("...client services are not up after " .. SERVICES_TIMEOUT .. "s. Continuing anyway.")
+		end
 	end
 
 	return true
@@ -230,6 +309,7 @@ local function update(report)
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
 	-- otherwise this function will simply to nothing
+	local note = ""
 	if #active == 0 then
 		util.log("No active tunnels. Deactivating")
 		apply_network(conf, false)
@@ -239,8 +319,14 @@ local function update(report)
 			report:write("no-config")
 			return
 		end
+		-- Only a node that routes for its clients claims an address on the
+		-- client network, and only that one can be in the way of another.
+		local address4 = clientaddr.select(conf, tmpdir)
+		if address4 ~= conf.address4 then
+			note = " (client ip " .. address4 .. ")"
+		end
 		util.log(#active .. " active tunnels: Applying network state.")
-		apply_network(conf, true)
+		apply_network(conf, true, address4)
 	end
 
 	local current = get_wg_routes()
@@ -252,7 +338,7 @@ local function update(report)
 	util.log("There are " .. #active .. " active tunnels")
 	if current and util.has_value(active, current) then
 		util.log("current route still active. Doing nothing.")
-		report:write("active (idle) via " .. current)
+		report:write("active (idle) via " .. current .. note)
 		return
 	end
 	if current then
@@ -302,7 +388,7 @@ local function update(report)
 		end
 		if configured then
 			util.log("Route activated")
-			report:write("active")
+			report:write("active" .. note)
 			break
 		else
 			report:write("no-route")
