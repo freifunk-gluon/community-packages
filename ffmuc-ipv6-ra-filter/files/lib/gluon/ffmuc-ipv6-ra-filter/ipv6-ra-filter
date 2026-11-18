@@ -12,6 +12,20 @@ if ! ebtables-tiny -L IPV6_RA_FILTER > /dev/null; then
 	logger -t ipv6_ra_filter "IPV6_RA_FILTER chain initialised"
 fi
 
+# A node in batman gateway mode announces itself as gateway and never selects
+# one, so there is nothing to filter for. Return to the FORWARD chain instead
+# of dropping, so that packages which handle the router advertisements of a
+# gateway themselves (like ffbs-mesh-vpn-parker) stay in charge.
+if batctl gw_mode | grep -qw '^server'; then
+	# only touch the chain and log when the mode actually changed
+	if ! ebtables-tiny -L IPV6_RA_FILTER | grep -q '^-j RETURN'; then
+		ebtables-tiny -F IPV6_RA_FILTER
+		ebtables-tiny -A IPV6_RA_FILTER -j RETURN
+		logger -t ipv6_ra_filter "Running as batman gateway. Not filtering router advertisements."
+	fi
+	exit 0
+fi
+
 # Get current gateway
 # the "grep ." fails if the awk print returns an empty string
 if ! gwl=$(batctl gwl | awk '/[*]/{print $2}' | grep .); then

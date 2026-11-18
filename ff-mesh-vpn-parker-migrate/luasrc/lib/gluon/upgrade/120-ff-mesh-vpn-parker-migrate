@@ -1,0 +1,54 @@
+#!/usr/bin/lua
+
+-- Migrate a node from ffmuc-mesh-vpn-wireguard-vxlan to Parker.
+-- Hostname, location, contact, mesh VPN state, bandwidth limit, wired mesh
+-- and the domain already survive the sysupgrade. Only the mesh VPN key and
+-- the old shaping settings need care.
+--
+-- /etc/config/wireguard stays on the node. If the node goes back to the old
+-- firmware, it uses the same key again.
+
+local uci = require('simple-uci').cursor()
+local unistd = require('posix.unistd')
+local stat = require('posix.sys.stat')
+
+local OLD_CONFIG = '/etc/config/wireguard'
+local KEY_FILE = '/etc/parker/wg-privkey'
+local PUB_FILE = '/etc/parker/wg-pubkey'
+
+if not unistd.access(OLD_CONFIG) then
+	return
+end
+
+local function valid_key(key)
+	return key and key:match('^' .. ('[%a%d+/]'):rep(42) .. '[AEIMQUYcgkosw480]=$')
+end
+
+local function file_size(path)
+	local f = io.open(path)
+	if not f then
+		return 0
+	end
+	local size = f:seek('end')
+	f:close()
+	return size
+end
+
+-- Keep the WireGuard identity of the node: Parker uses the same key type.
+local privkey = uci:get('wireguard', 'mesh_vpn', 'privatekey')
+if valid_key(privkey) and file_size(KEY_FILE) == 0 then
+	os.execute('mkdir -p /etc/parker')
+	local old_umask = stat.umask(tonumber('077', 8))
+	local f = assert(io.open(KEY_FILE .. '.tmp', 'w'))
+	f:write(privkey, '\n')
+	f:close()
+	stat.umask(old_umask)
+	assert(os.rename(KEY_FILE .. '.tmp', KEY_FILE))
+	-- nodeconfig.sh creates the public key from the private key
+	os.remove(PUB_FILE)
+end
+
+-- The old provider shaped the 'mesh-vpn' interface. Parker sets
+-- its limits at runtime.
+uci:delete('simple-tc', 'mesh_vpn')
+uci:save('simple-tc')
