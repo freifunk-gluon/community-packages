@@ -77,6 +77,78 @@ function util.nslookup(host, family)
 	end
 end
 
+function util.prefer_ipv6()
+	-- Check whether the WAN has an IPv6 default route. If it has, we want to
+	-- reach our concentrators over IPv6, otherwise over IPv4.
+	-- This mirrors what checkuplink of ffmuc-mesh-vpn-wireguard-vxlan does.
+
+	for line in string.gmatch(util.check_output("ip -6 route show table 1"), "[^\n]+") do
+		if string.find(line, "^default") then
+			return true
+		end
+	end
+	return false
+end
+
+function util.split_endpoint(endpoint)
+	-- Split an endpoint into its host and its port part.
+	-- Understands "host:port" as well as "[v6-address]:port".
+	-- Returns nil if the endpoint is not in one of these formats.
+
+	local host, port = string.match(endpoint, "^%[(.+)%]:(%d+)$")
+	if host == nil then
+		host, port = string.match(endpoint, "^([^:]+):(%d+)$")
+	end
+	return host, port
+end
+
+function util.join_endpoint(address, port)
+	-- Build an endpoint from an address and a port.
+	-- Wireguard expects IPv6 addresses to be enclosed in brackets and
+	-- reports them the same way.
+
+	if string.find(address, ":", 1, true) ~= nil then
+		return "[" .. address .. "]:" .. port
+	end
+	return address .. ":" .. port
+end
+
+function util.resolve_endpoint(endpoint, ipv6_first)
+	-- Resolve the host part of an endpoint to an IP address.
+	--
+	-- Wireguard resolves an endpoint once, when it is configured, and from
+	-- then on only reports the resolved address. Resolving the endpoint
+	-- ourselves keeps the comparison with the running configuration a
+	-- comparison of two IP addresses.
+	--
+	-- Returns nil if the endpoint can neither be parsed nor resolved.
+	--
+	-- Arguments:
+	-- * endpoint: The endpoint as received from the config service.
+	-- * ipv6_first: Whether to prefer IPv6 over IPv4 addresses.
+
+	local host, port = util.split_endpoint(endpoint)
+	if host == nil then
+		return nil
+	end
+	if string.find(host, ":", 1, true) ~= nil or string.match(host, "^%d+%.%d+%.%d+%.%d+$") ~= nil then
+		-- The endpoint already contains an IP address. Nothing to resolve.
+		return util.join_endpoint(host, port)
+	end
+
+	local families = { posix.sys.socket.AF_INET, posix.sys.socket.AF_INET6 }
+	if ipv6_first then
+		families = { posix.sys.socket.AF_INET6, posix.sys.socket.AF_INET }
+	end
+	for _, family in ipairs(families) do
+		local address = util.nslookup(host, family)
+		if address ~= nil then
+			return util.join_endpoint(address, port)
+		end
+	end
+	return nil
+end
+
 function util.get_wg_info()
 	local output = util.check_output("wg show all dump")
 	local results = {}

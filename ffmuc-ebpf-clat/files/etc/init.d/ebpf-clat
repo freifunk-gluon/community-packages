@@ -14,13 +14,17 @@ start_instance() {
 		echo "Cannot find interface ${iface}" 1>&2
 		return 2
 	fi
-	if [ ! -r /tmp/xlat_range6 ]; then
-		echo "Cannot find config in /tmp/xlat_range6" 1>&2
+	# In multi-site operation each tunnel translates into the xlat range
+	# of its own site (written by parker-sites).
+	local conf="/tmp/xlat_range6.${iface}"
+	[ -r "$conf" ] || conf=/tmp/xlat_range6
+	if [ ! -r "$conf" ]; then
+		echo "Cannot find config in $conf" 1>&2
 		return 3
 	fi
 
 	ifaceindex="$(cat "/sys/class/net/${iface}/ifindex")"
-	xlat_range6="$(cut -d'/' -f1 /tmp/xlat_range6)"
+	xlat_range6="$(cut -d'/' -f1 "$conf")"
 
 	procd_open_instance "ebpf-clat.${iface}"
 	procd_set_param command /usr/sbin/ebpf-clat "${ifaceindex}" "${xlat_range6}" "64:ff9b::"

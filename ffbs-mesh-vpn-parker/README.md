@@ -97,6 +97,101 @@ untranslated IPv4 packet. The 28 bytes reach it because noderoute puts
 them on the IPv4 default route rather than on the interface, which
 carries the IPv6 packets that do not pay them.
 
+Multi-site operation
+--------------------
+
+A node can connect to two or more sites (PoPs) at the same time. One site
+is active. The other sites are on standby. Clients use the prefix of the
+active site for new connections.
+
+When the config service sends `sites` and `primary_site`, the
+`parker-sites` service does these steps:
+
+* It monitors the gateway (pgw) of each site with one ping each second.
+* After 3 missed pings, it moves the tunnel to the next pgw of the same
+  site. It then tells the config service, so that the old pgw removes its
+  route to the node.
+* When all pgws of a site fail, the site is down. When the primary site
+  is down, the next site that is up becomes active.
+* It sends one router advertisement (RA) for the prefixes of all sites
+  through `parker-radvd`. The prefix of the active site is preferred. The
+  other prefixes are deprecated, and existing connections can continue.
+  The active prefix is the last prefix option in the RA, because macOS
+  and iOS put the CLAT46 address on the last prefix.
+* It routes each client source address to the tunnel of its own site.
+
+Without `sites` in the config, the service does nothing, and the node
+operates with one site as before. The status is in
+`/tmp/parker-sites/status` and in the output of `status`.
+
+The config service selects the primary site of a node by load. The node
+owner can request a site:
+
+```sh
+uci set parker.nodeconfig.preferred_site='vie'
+uci commit parker
+```
+
+The value is a site name (`a-z`, `0-9`, `_`, `-`, 32 characters maximum).
+The node sends it as `preferred_site` with each config request. The config
+service uses it only when that site has capacity. To remove it, use
+`uci delete parker.nodeconfig.preferred_site`.
+
+Multi-site operation needs `ip-full` and a uradvd that supports
+`--state-file`.
+
+Config service
+--------------
+
+`nodeconfig.sh` gets the node configuration from the config service:
+
+    GET http://<config_server>/config?pubkey=<wg pubkey>&nonce=<nonce>
+        &v6mtu=<br-wan IPv6 MTU>&version=<gluon release>
+        [&preferred_site=<name>][&tc_ingress=<kbit/s>&tc_egress=<kbit/s>]
+
+The answer is a JSON object. The last line is the usign signature with
+`config_pubkey`. The node does not use a config with a bad signature or a
+different `nonce`.
+
+Base fields. All config services send them:
+
+| Field           | Meaning                                                    |
+| :-------------- | :--------------------------------------------------------- |
+| `id`            | Config ID. Without `id`, the node applies nothing.         |
+| `nonce`         | The nonce of the request.                                  |
+| `time`          | Unix time. The node sets its clock when it is 60 s off.    |
+| `retry`         | Seconds until the next request.                            |
+| `mtu`           | Upper limit of the tunnel MTU (see MTU).                   |
+| `wg_keepalive`  | WireGuard persistent keepalive in seconds.                 |
+| `range4`        | IPv4 client network, for example `10.0.0.0/26`.            |
+| `address4`      | IPv4 address of the node in `range4` and on the tunnels.   |
+| `range6`        | IPv6 client prefix (/64).                                  |
+| `address6`      | IPv6 address of the node in `range6` and on the tunnels.   |
+| `concentrators` | List of tunnels: `id`, `pubkey`, `endpoint`, `address4`, `address6`. Tunnel `wg_c<id>` goes to `endpoint`. |
+
+Optional fields. Without them, the node operates as before:
+
+| Field          | Meaning                                                     |
+| :------------- | :---------------------------------------------------------- |
+| `xlat_range6`  | 464XLAT mode. The IPv6 range that the CLAT (`ffmuc-ebpf-clat`) translates the IPv4 clients into. The node allows only IPv6 on the tunnels, sends DHCPv4 option 108 and announces the NAT64 prefix `64:ff9b::/96` (PREF64). |
+| `primary_site` | Multi-site operation. The name of the preferred site.        |
+| `sites`        | Multi-site operation. One object for each site name (see below). |
+
+Fields of each entry in `sites`:
+
+| Field          | Meaning                                                     |
+| :------------- | :---------------------------------------------------------- |
+| `range6`       | IPv6 client prefix of the site.                             |
+| `address6`     | IPv6 address of the node in `range6`.                       |
+| `xlat_range6`  | Optional. CLAT range of the site.                           |
+| `dns64`        | Optional. DNS64 server of the site.                         |
+| `concentrator` | The `id` of the tunnel in `concentrators` that goes to this site. |
+| `pgws`         | List of the gateways of the site: `name`, `pubkey`, `endpoint`, `address6`. |
+
+When `parker-sites` moves a tunnel to another pgw, it reports the change:
+
+    GET http://<config_server>/api/v3/switch?pubkey=<wg pubkey>&site=<name>&pgw=<pgw name>
+
 site.conf
 ---------
 

@@ -28,6 +28,7 @@ else
 	echo -n 'uplink status:       '; brief_interface 'br-wan'
 	echo -n 'mesh status:         '; brief_interface 'br-client'
 	echo -n 'nodeconfig:          '; cat /tmp/nodeconfig-report; echo
+	if [ -r /tmp/parker-sites/status ]; then echo 'sites:'; sed 's/^/  /' /tmp/parker-sites/status; fi
 	echo -n 'vpn status:          '; if uci show gluon.mesh_vpn.enabled | grep -q '1' ; then echo enabled; else echo disabled; fi
 	echo 'dhcp clients:'
 	awk '{ printf("  %-32s  %s  %-16s  %ds left\n", $4, $2, $3, $1-systime()) }' /tmp/dhcp.leases | sort

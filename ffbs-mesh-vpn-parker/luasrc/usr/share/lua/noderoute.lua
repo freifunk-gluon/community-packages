@@ -274,6 +274,17 @@ local function services_ready()
 	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
 end
 
+-- The service that sends the RAs, and the service that must not run. In
+-- multi-site operation parker-sites sends one RA for the prefixes of all
+-- sites through its own uradvd. Two uradvd on one link would each leave
+-- out the prefixes of the other, and clients then deprecate them.
+local function radvd_services(conf)
+	if conf ~= nil and type(conf.sites) == "table" and conf.primary_site ~= nil then
+		return "/etc/init.d/parker-radvd", "/etc/init.d/gluon-radvd"
+	end
+	return "/etc/init.d/gluon-radvd", "/etc/init.d/parker-radvd"
+end
+
 local function apply_network(conf, target_state, address4, mtu)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
@@ -355,15 +366,21 @@ local function apply_network(conf, target_state, address4, mtu)
 	end
 
 	local changed = sections_changed()
+	local radvd, other_radvd = radvd_services(conf)
 	local radvd_stopped = false
+	if os.execute(other_radvd .. " running >/dev/null 2>&1") == 0 then
+		util.log("Stopping " .. other_radvd)
+		os.execute(other_radvd .. " stop")
+		radvd_stopped = true
+	end
 
 	if changed then
 		dump(uci.changes())
 		uci_commit("dhcp")
 		uci_commit("network")
 		util.log("Reconfiguring network...")
-		util.log("HACK: stopping gluon-radvd")
-		os.execute("/etc/init.d/gluon-radvd stop")
+		util.log("HACK: stopping " .. radvd)
+		os.execute(radvd .. " stop")
 		radvd_stopped = true
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
@@ -437,12 +454,12 @@ local function apply_network(conf, target_state, address4, mtu)
 		if target_state and conf.range6 ~= nil then
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
-			os.execute("/etc/init.d/gluon-radvd restart")
+			os.execute(radvd .. " restart")
 		else
 			-- Nothing to announce: without a prefix uradvd exits right
 			-- away and procd stops respawning it after a few attempts,
 			-- so an explicit stop is both quieter and equivalent.
-			os.execute("/etc/init.d/gluon-radvd stop")
+			os.execute(radvd .. " stop")
 		end
 		changed = true
 	end
