@@ -1,4 +1,4 @@
-# ffac-eol-ssid-disable
+# ff3l-eol-ssid-disable
 
 This package changes the 2.4GHz SSID and optionally disables WiFi AP on a configured date. It is used to show a deprecation warning in the SSID name for unsupported targets (end-of-life).
 It was created to deprecate devices with 4MB and 32MB RAM.
@@ -8,6 +8,8 @@ For example the soon to come deprecation of devices with 8MB Flash.
 
 One should update all supported devices to the new gluon version, so that only devices without an update are left at the old version.
 Then one can add the `ffac-eol-ssid-disable` package to the old version and leave a much noticed note in the ssid to switch to a supported device.
+
+Optionally one can set a date where the client wifi is swichted off.
 
 **_Note:_**
 _This is very similar as `ffac-eol-ssid` but with the extended features for setting a date for ssid change and switch off client wifi._
@@ -34,7 +36,7 @@ Edit the `modules` file with the following content in your site directory:
 
     GLUON_SITE_FEEDS="community"
     PACKAGES_SSIDCHANGER_REPO=https://github.com/freifunk-gluon/community-packages.git
-    PACKAGES_SSIDCHANGER_COMMIT=b2910b46bb1c1a201396ff89da11ac7e5def523c # <-- set the newest commit ID here
+    PACKAGES_SSIDCHANGER_COMMIT=<COMMIT_HASH> # <-- set the newest commit here
     PACKAGES_SSIDCHANGER_BRANCH=v2023.2.x
 
 With this done you can add the package `ff3l-eol-ssid-disable` to your `GLUON_SITE_PACKAGES` in your `site.mk`
