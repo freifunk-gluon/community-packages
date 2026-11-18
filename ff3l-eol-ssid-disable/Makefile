@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2023 Florian Maurer (FFAC), grische (FFMUC)
+# SPDX-FileCopyrightText: 2026 Tobias Buss (FF3L)
 # SPDX-License-Identifier: GPL-2.0-or-later
 # This package is based on https://gitlab.karlsruhe.freifunk.net/firmware/packages/-/tree/master/ffka-eol-ssid by Julian Schuh and Simon Terzenbach
 
