@@ -34,7 +34,8 @@
 --     down site, or from no site of this node, gets ICMPv6 type 1 code 5,
 --   * one uradvd (/etc/init.d/parker-radvd) for all prefixes: the active
 --     prefix is preferred, the others have preferred lifetime 0. A down
---     prefix is sent for 180 s more, then it is removed,
+--     prefix is sent for 180 s more, then it is removed. The active prefix
+--     is the last prefix option (macOS puts its CLAT on the last one),
 --   * the DNS64 servers of the sites that are up, active site first.
 --
 -- Each tick also checks the client path of each site. A netifd reload
@@ -552,7 +553,7 @@ local function apply(conf, names, db, iface, tbl, up, active, now)
 		sh("/etc/init.d/ebpf-clat restart")
 	end
 
-	-- RA state: active site first.
+	-- Active site first (RDNSS, DNS64).
 	local order = {}
 	if active then
 		table.insert(order, active)
@@ -562,13 +563,18 @@ local function apply(conf, names, db, iface, tbl, up, active, now)
 			table.insert(order, name)
 		end
 	end
+	-- The prefixes go in reverse order, so the active prefix is the last
+	-- PIO. macOS and iOS put each new prefix at the head of their list and
+	-- put the CLAT46 address on the head entry, with no check of the
+	-- preferred lifetime.
 	local lines, rdnss = {}, {}
-	for _, name in ipairs(order) do
+	for i = #order, 1, -1 do
+		local name = order[i]
 		local site, st = conf.sites[name], db.sites[name]
 		if up[name] or now - st.since < T.dead_keep then
 			local preferred = (name == active) and T.preferred or 0
 			table.insert(lines, site.range6 .. "," .. preferred .. "," .. T.valid)
-			table.insert(rdnss, "rdnss " .. site.address6)
+			table.insert(rdnss, 1, "rdnss " .. site.address6)
 		end
 	end
 	for _, r in ipairs(rdnss) do

@@ -116,6 +116,8 @@ When the config service sends `sites` and `primary_site`, the
 * It sends one router advertisement (RA) for the prefixes of all sites
   through `parker-radvd`. The prefix of the active site is preferred. The
   other prefixes are deprecated, and existing connections can continue.
+  The active prefix is the last prefix option in the RA, because macOS
+  and iOS put the CLAT46 address on the last prefix.
 * It routes each client source address to the tunnel of its own site.
 
 Without `sites` in the config, the service does nothing, and the node
