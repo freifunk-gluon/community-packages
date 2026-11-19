@@ -1,0 +1,103 @@
+---
+name: Build
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: 'Packages to build, separated by spaces (empty: all packages)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  select:
+    name: Select packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read  # for dorny/paths-filter to list the files of a PR
+    outputs:
+      packages: ${{ steps.select.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d  # v4.0.3
+        id: filter
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        with:
+          list-files: json
+          filters: |
+            changed:
+              - '**'
+            ci:
+              - '.github/workflows/build.yml'
+              - '.github/scripts/**'
+      - name: Select packages
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGED_FILES: ${{ steps.filter.outputs.changed_files }}
+          CI_CHANGED: ${{ steps.filter.outputs.ci }}
+          INPUT_PACKAGES: ${{ inputs.packages }}
+        run: .github/scripts/select-packages.sh
+
+  build:
+    name: ${{ matrix.arch }} (gluon ${{ matrix.gluon.ref }})
+    needs: select
+    if: needs.select.outputs.packages != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - mips_24kc
+          - x86_64
+        gluon:
+          - ref: v2025.1.x
+            openwrt: "24.10.8"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: community-packages
+      - uses: actions/checkout@v7
+        with:
+          repository: freifunk-gluon/gluon
+          ref: ${{ matrix.gluon.ref }}
+          path: gluon
+      - name: Build
+        env:
+          PACKAGES: ${{ needs.select.outputs.packages }}
+          IMAGE: ghcr.io/openwrt/sdk:${{ matrix.arch }}-${{ matrix.gluon.openwrt }}
+        run: |
+          # The SDK runs as uid 1000, which differs from the runner's uid, so
+          # the artifacts directory must be writable for all users and git
+          # must accept the mounted checkouts as safe directories.
+          install -d -m 0777 artifacts
+          docker run --rm \
+            --env PACKAGES \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env 'GIT_CONFIG_VALUE_0=*' \
+            -v "$GITHUB_WORKSPACE/gluon:/gluon:ro" \
+            -v "$GITHUB_WORKSPACE/gluon/package:/package:ro" \
+            -v "$GITHUB_WORKSPACE/community-packages:/feed:ro" \
+            -v "$GITHUB_WORKSPACE/artifacts:/artifacts" \
+            "$IMAGE" \
+            bash /feed/.github/scripts/build-packages.sh
+      - name: Store packages
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.arch }}-gluon-${{ matrix.gluon.ref }}-packages
+          path: artifacts/
+          if-no-files-found: ignore
