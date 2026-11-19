@@ -83,7 +83,6 @@ while true; do
 	while [ -z "${nonce}" ]; do
 		nonce=$(head -c16 /dev/urandom | md5sum | head -c32)
 	done
-	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
 	# The uplink can have IPv4, IPv6 or both. prefer_ipv6() in
 	# nodeconfig.lua uses the same IPv6 check.
 	if ! ip route show table 1 | grep -Fq via && ! ip -6 route show table 1 | grep -q '^default '; then
@@ -91,6 +90,13 @@ while true; do
 		retry
 		continue;
 	fi
+
+	# Only read this once there is a WAN route. The config service rejects
+	# an empty v6mtu.
+	v6mtu="$(lua -e 'print(require("util").wan_mtu() or "")' 2>/dev/null)"
+	case "$v6mtu" in
+		''|*[!0-9]*) v6mtu=1280 ;;
+	esac
 
 	if ! config_server=$(uci get parker.nodeconfig.config_server); then
 		$LOGGER unable to get config_server from uci
