@@ -39,6 +39,22 @@ Thus the node first sends one test broadcast per second. It sends the 70 broadca
 The code is in `/etc/hotplug.d/net/50-parker-bcast-burst` and `/usr/share/lua/parker/bcast.lua`.
 `lua5.1 tests/bcast-sim.lua` (in the package directory) simulates the probe and the burst with mock modules.
 
+Cellular uplink
+---------------
+
+Parker puts the IPv4 routes of `wan` into table 1. Traffic with mark 1
+uses only table 1. This traffic includes the DNS queries of
+gluon-wan-dnsmasq, which resolve the config server name.
+
+Gluon sets `ip6table 1` on the `cellular` uplink, but not `ip4table`.
+Then the IPv4 routes of `cellular_4` go into the main table. DNS queries
+to the IPv4 servers of the provider are unreachable, and `nodeconfig.sh`
+stops with exit code 4.
+
+The upgrade script `251-parker-cellular-ip4table` sets `ip4table 1` on
+`cellular`. The proto handler copies it to `cellular_4`. Nodes without
+`cellular` do not change.
+
 MTU
 ---
 
