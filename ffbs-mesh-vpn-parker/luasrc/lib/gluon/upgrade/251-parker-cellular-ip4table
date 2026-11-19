@@ -1,0 +1,16 @@
+#!/usr/bin/lua
+
+-- Parker puts the IPv4 WAN routes into table 1 (see 111-network-parker).
+-- Traffic with mark 1 (gluon-wan-dnsmasq, the tunnel) uses table 1 only.
+-- Gluon (250-cellular) sets ip6table but not ip4table on the cellular
+-- uplink. Without this, its IPv4 routes go into the main table and marked
+-- IPv4 traffic, e.g. DNS to the provider servers, is unreachable.
+
+local uci = require('simple-uci').cursor()
+
+if uci:get('network', 'cellular') ~= 'interface' then
+	return
+end
+
+uci:set('network', 'cellular', 'ip4table', 1)
+uci:save('network')
