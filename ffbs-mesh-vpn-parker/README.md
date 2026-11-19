@@ -55,6 +55,11 @@ The upgrade script `251-parker-cellular-ip4table` sets `ip4table 1` on
 `cellular`. The proto handler copies it to `cellular_4`. Nodes without
 `cellular` do not change.
 
+A cellular node has no `br-wan`. The WAN device is the device of the
+default route in table 1 (IPv6 first), for example `wwan0`.
+`nodeconfig.sh` sends the IPv6 MTU of this device as `v6mtu`. When it
+cannot read the MTU, it sends 1280. `status` uses the same device.
+
 MTU
 ---
 
@@ -62,7 +67,7 @@ Everything our clients send leaves the node through a WireGuard tunnel,
 so how big their packets may be is decided by what is left of the WAN
 MTU once WireGuard has taken its share.
 
-`nodeconfig.sh` reports the MTU `br-wan` uses for IPv6 to the config
+`nodeconfig.sh` reports the MTU the WAN device uses for IPv6 to the config
 service, which answers with the MTU of the tunnels in `mtu`.
 `nodeconfig.lua` puts it on every tunnel, and `noderoute.lua` passes it
 on to the clients:

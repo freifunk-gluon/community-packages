@@ -93,9 +93,13 @@ while true; do
 		continue;
 	fi
 
-	# Only read this once there is a WAN route: right after boot br-wan
-	# may not exist yet.
-	v6mtu="$(cat /proc/sys/net/ipv6/conf/br-wan/mtu)"
+	# Only read this once there is a WAN route. The WAN device is br-wan
+	# or, on a cellular uplink, the modem device. Never send an empty
+	# value: the config service rejects it.
+	v6mtu="$(lua -e 'print(require("util").wan_mtu() or "")' 2>/dev/null)"
+	case "$v6mtu" in
+		''|*[!0-9]*) v6mtu=1280 ;;
+	esac
 
 	if ! config_server=$(uci get parker.nodeconfig.config_server); then
 		$LOGGER unable to get config_server from uci
