@@ -25,7 +25,8 @@ else
 
 	echo -n 'batman gateway mode: '; batctl gw_mode
 	echo -n 'batman neighbours:   '; batctl n -H | wc -l
-	echo -n 'uplink status:       '; brief_interface 'br-wan'
+	wan_dev=$(lua -e 'print(require("util").wan_device() or "")' 2>/dev/null)
+	echo -n 'uplink status:       '; brief_interface "${wan_dev:-br-wan}"
 	echo -n 'mesh status:         '; brief_interface 'br-client'
 	echo -n 'nodeconfig:          '; cat /tmp/nodeconfig-report; echo
 	echo -n 'vpn status:          '; if uci show gluon.mesh_vpn.enabled | grep -q '1' ; then echo enabled; else echo disabled; fi
