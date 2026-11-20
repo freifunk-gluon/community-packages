@@ -104,7 +104,9 @@ end
 
 util.loggername = "lua"
 function util.log(s)
-	os.execute("logger -s -t" .. util.loggername .. " " .. s)
+	-- Quote the message: a "(" or ";" in it must not reach the shell.
+	local quoted = "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+	os.execute("logger -s -t" .. util.loggername .. " " .. quoted)
 end
 
 return util
