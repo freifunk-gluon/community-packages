@@ -1,0 +1,8 @@
+#!/bin/sh
+# All uplinks serve the same client network. An authoritative dnsmasq answers
+# the rebinding request of a client with a lease of another uplink with a
+# DHCPACK for the same address, but with a new router. Some clients (Android
+# 11) then lose their IPv4 default route. See README.md, "DHCPv4 after a
+# gateway change".
+uci set dhcp.@dnsmasq[0].authoritative='0'
+uci commit dhcp
