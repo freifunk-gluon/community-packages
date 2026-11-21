@@ -488,6 +488,10 @@ local function apply_network(conf, target_state, mtu)
 		end
 	elseif xlat_range6 ~= nil or xlat_config_deleted then
 		os.execute("/etc/init.d/ebpf-clat stop")
+		-- The init script does not remove the file. With the file in place
+		-- an active node would stop ebpf-clat in every cycle and would not
+		-- start it again when the same prefix comes back.
+		os.remove("/tmp/xlat_range6")
 		util.log("Stopped ebpf-clat")
 		changed = true
 	end
