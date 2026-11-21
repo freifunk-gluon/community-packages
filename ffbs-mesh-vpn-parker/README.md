@@ -49,13 +49,26 @@ A client of a routing node can still have a lease of another node, for example f
 The renewal goes through the mesh to the other node, so the other node stays the IPv4 router of the client as long as it answers.
 When the other node does not answer (it has stopped routing, or it is off), the client sends its request as a broadcast after 87.5 % of the lease time.
 batman-adv does not send a DHCP request of a client into the mesh while the node is a gateway server, so only the node of the client receives the broadcast.
-dnsmasq is not authoritative (`/lib/gluon/upgrade/905-dhcp-not-authoritative`), so it does not answer a broadcast request (rebinding or INIT-REBOOT) for a lease that it does not know.
-It answers a unicast renewal of such a lease with a DHCPNAK.
-An authoritative dnsmasq answers a request for an address of its client network with a DHCPACK for the same address, but with the router address of this node.
+
+dnsmasq is authoritative, as OpenWrt sets it.
+`dhcp_authoritative = false` in the `parker` section of `site.conf` switches this off (`/lib/gluon/upgrade/905-dhcp-not-authoritative`).
+This option is for sites where all nodes get the same `range4`, so the address of the client is in the client network of its node.
+There, an authoritative dnsmasq answers the broadcast with a DHCPACK for the same address, but with the router address of this node.
 Some clients (Android 11) then lose their IPv4 default route until they connect again.
-At the end of the lease, the client sends a DHCPDISCOVER and gets a new lease from its own node.
-Thus the client changes to its own node at most 3 minutes after the other node stops answering.
+A non-authoritative dnsmasq does not answer a broadcast request (rebinding or INIT-REBOOT) for a lease that it does not know.
+It answers a unicast renewal of such a lease with a DHCPNAK.
+At the end of the lease, the client sends a DHCPDISCOVER and gets a new lease from its own node, at most 3 minutes after the other node stops answering.
+
+A site where each node has its own `range4` keeps the default.
+With `false`, its nodes no longer send these answers:
+
+* the DHCPNAK ("wrong network") to a rebinding request for an address of another node,
+* the DHCPNAK ("wrong network") to an INIT-REBOOT request for an address of another node,
+* the DHCPACK to an INIT-REBOOT request for an address of its own range after a reboot of the node, which loses the lease file in `/tmp`.
+
+The client then waits for a timeout before it sends a DHCPDISCOVER.
 `tests/dhcp-authoritative-test.sh` (in the package directory) tests the answers of dnsmasq with and without authoritative (see the script for the command).
+`lua5.1 tests/dhcp-authoritative-upgrade-test.lua` tests the upgrade script with mock modules.
 
 Cellular uplink
 ---------------
@@ -165,6 +178,7 @@ parker = {
         -- optional
         client_ntp_servers4 = { "198.51.100.123" },
         disable_client_snooping = false,
+        dhcp_authoritative = true,
 },
 ```
 

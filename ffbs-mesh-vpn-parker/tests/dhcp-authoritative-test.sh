@@ -1,5 +1,6 @@
 #!/bin/sh
-# Test of /lib/gluon/upgrade/905-dhcp-not-authoritative with a real dnsmasq.
+# Test of the answers of dnsmasq with and without authoritative
+# (site option parker.dhcp_authoritative, see README.md).
 # Needs root (network namespaces), dnsmasq, iproute2 and python3. Example:
 #   docker run --rm --privileged -v "$PWD":/w alpine:3.20 sh -c \
 #     'apk add -q dnsmasq iproute2 python3 && sh /w/tests/dhcp-authoritative-test.sh'
@@ -17,8 +18,7 @@ cleanup() {
 	[ -n "$PID" ] && kill "$PID" 2>/dev/null
 	ip netns del cl 2>/dev/null || true
 	ip netns del srv 2>/dev/null || true
-	rm -f /tmp/dhcp-auth.leases /tmp/uci.log
-	rm -rf /tmp/dhcp-auth-bin
+	rm -f /tmp/dhcp-auth.leases
 }
 trap cleanup EXIT
 
@@ -30,14 +30,6 @@ check() {
 		FAIL=1
 	fi
 }
-
-# The upgrade script with a uci mock
-mkdir -p /tmp/dhcp-auth-bin
-printf '#!/bin/sh\necho "$*" >> /tmp/uci.log\n' > /tmp/dhcp-auth-bin/uci
-chmod +x /tmp/dhcp-auth-bin/uci
-PATH="/tmp/dhcp-auth-bin:$PATH" sh "$DIR/files/lib/gluon/upgrade/905-dhcp-not-authoritative"
-check "the upgrade script sets authoritative 0" \
-	"$(tr '\n' ';' < /tmp/uci.log)" "set dhcp.@dnsmasq[0].authoritative=0;commit dhcp;"
 
 ip netns add cl
 ip netns add srv
@@ -82,5 +74,19 @@ check "DHCPREQUEST: DHCPACK" \
 	"$(client request 255.255.255.255 0.0.0.0 10.0.0.50 10.0.0.1)" ack
 check "renewal per unicast: DHCPACK" "$(client request 10.0.0.1 10.0.0.50)" ack
 check "rebinding: DHCPACK" "$(client request 255.255.255.255 10.0.0.50)" ack
+
+echo "4. one range per node: 10.0.1.50 is an address of another node"
+dnsmasq_start "$POOL" --dhcp-authoritative
+check "authoritative, rebinding: DHCPNAK" "$(client request 255.255.255.255 10.0.1.50)" nak
+check "authoritative, INIT-REBOOT: DHCPNAK" \
+	"$(client request 255.255.255.255 0.0.0.0 10.0.1.50)" nak
+check "authoritative, INIT-REBOOT in its own range after a reboot: DHCPACK" \
+	"$(client request 255.255.255.255 0.0.0.0 10.0.0.50)" ack
+dnsmasq_start "$POOL"
+check "not authoritative, rebinding: no answer" "$(client request 255.255.255.255 10.0.1.50)" none
+check "not authoritative, INIT-REBOOT: no answer" \
+	"$(client request 255.255.255.255 0.0.0.0 10.0.1.50)" none
+check "not authoritative, INIT-REBOOT in its own range after a reboot: no answer" \
+	"$(client request 255.255.255.255 0.0.0.0 10.0.0.50)" none
 
 exit $FAIL

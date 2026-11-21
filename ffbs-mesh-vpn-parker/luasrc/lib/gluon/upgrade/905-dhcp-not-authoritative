@@ -1,0 +1,21 @@
+#!/usr/bin/lua
+
+-- OpenWrt makes dnsmasq authoritative. A site whose nodes all get the same
+-- range4 can switch this off with parker.dhcp_authoritative = false. See
+-- README.md, "DHCPv4 after a gateway change". Without the site option, keep
+-- the OpenWrt default.
+
+local site = require 'gluon.site'
+local uci = require('simple-uci').cursor()
+
+if site.parker.dhcp_authoritative(true) then
+	os.exit(0)
+end
+
+local dnsmasq = uci:get_first('dhcp', 'dnsmasq')
+if not dnsmasq then
+	os.exit(0)
+end
+
+uci:set('dhcp', dnsmasq, 'authoritative', false)
+uci:commit('dhcp')
