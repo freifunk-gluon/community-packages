@@ -11,6 +11,14 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- What /lib/gluon/radvd/arguments.override turns into uradvd arguments. These
+-- are runtime state, so they live below /var/gluon and not in /tmp.
+local RUNTIME_DIR = "/var/gluon/parker"
+local RANGE6_FILE = RUNTIME_DIR .. "/range6"
+local ADDR6_FILE = RUNTIME_DIR .. "/addr6"
+local PREF64_FILE = RUNTIME_DIR .. "/pref64"
+os.execute("mkdir -p " .. RUNTIME_DIR)
+
 -- The IPv4 default route as set_wg_route() has last put it in place, in
 -- the notation of ip route. The busybox ip on our nodes prints no route
 -- metrics, so this is the only place the MTU on that route can be read
@@ -38,8 +46,8 @@ local CLAT_OVERHEAD = 20 + 8
 local MIN_ADV_MTU = 1280
 
 -- Where uradvd picks up the MTU we want it to advertise, see
--- /lib/gluon/radvd/arguments.
-local ADV_MTU_FILE = "/tmp/adv_mtu"
+-- /lib/gluon/radvd/arguments.override.
+local ADV_MTU_FILE = RUNTIME_DIR .. "/adv_mtu"
 
 -- The NAT64 prefix we announce to our clients, in the notation uradvd
 -- expects. Its address part has to stay in sync with the prefix
@@ -338,9 +346,8 @@ local function apply_network(conf, target_state, address4, mtu)
 
 		uci_set("network", "gluon_bat0", "gw_mode", "client")
 
-		if util.read_file("/tmp/range6") ~= nil then
-			os.execute("rm /tmp/range6 -f")
-			os.execute("rm /tmp/addr6 -f")
+		if util.read_file(RANGE6_FILE) ~= nil then
+			os.execute("rm " .. RANGE6_FILE .. " " .. ADDR6_FILE .. " -f")
 			radvd_config_deleted = true
 		end
 		if util.read_file("/tmp/xlat_range6") ~= nil then
@@ -384,19 +391,19 @@ local function apply_network(conf, target_state, address4, mtu)
 
 	-- A node that translates IPv4 for its clients announces the NAT64 prefix
 	-- in its router advertisements (RFC 8781), so clients can translate for
-	-- themselves as well. uradvd only reads /tmp/pref64 when it starts, so
+	-- themselves as well. uradvd only reads pref64 when it starts, so
 	-- the file has to be in place before the restart below; the CLAT itself
 	-- is set up further down.
 	local pref64_changed = false
-	local pref64 = util.read_file("/tmp/pref64")
+	local pref64 = util.read_file(PREF64_FILE)
 	if target_state and conf.xlat_range6 ~= nil then
 		if pref64 ~= NAT64_PREFIX then
-			util.write_file("/tmp/pref64", NAT64_PREFIX)
+			util.write_file(PREF64_FILE, NAT64_PREFIX)
 			pref64_changed = true
 			util.log("Announcing NAT64 prefix " .. NAT64_PREFIX .. " to our clients")
 		end
 	elseif pref64 ~= nil then
-		os.execute("rm /tmp/pref64 -f")
+		os.execute("rm " .. PREF64_FILE .. " -f")
 		pref64_changed = true
 		util.log("No longer announcing a NAT64 prefix to our clients")
 	end
@@ -428,17 +435,17 @@ local function apply_network(conf, target_state, address4, mtu)
 	-- values changed: a network reconfiguration that touches neither the
 	-- prefix nor the MTU (the duplicate-address move, for example) must not
 	-- leave the clients without router advertisements.
-	local range6 = util.read_file("/tmp/range6")
+	local range6 = util.read_file(RANGE6_FILE)
 	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
 			or pref64_changed or adv_mtu_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
-			util.write_file("/tmp/range6", conf.range6)
-			util.write_file("/tmp/addr6", conf.address6)
+			util.write_file(RANGE6_FILE, conf.range6)
+			util.write_file(ADDR6_FILE, conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
 		else
-			-- Nothing to announce: without a prefix uradvd exits right
-			-- away and procd stops respawning it after a few attempts,
-			-- so an explicit stop is both quieter and equivalent.
+			-- Nothing to announce: without a range6 file the arguments
+			-- override refuses to produce arguments, so no uradvd is
+			-- started; an explicit stop just makes sure none is left.
 			os.execute("/etc/init.d/gluon-radvd stop")
 		end
 		changed = true

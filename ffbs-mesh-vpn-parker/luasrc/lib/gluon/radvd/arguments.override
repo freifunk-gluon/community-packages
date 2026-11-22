@@ -1,0 +1,49 @@
+#!/usr/bin/lua
+
+-- Replaces the uradvd arguments of gluon-radvd (see the init script: this
+-- file wins if executable). Parker nodes advertise the per-node client range
+-- on br-client instead of the site prefix on local-node. noderoute writes the
+-- files below while it configures the client network and restarts gluon-radvd
+-- afterwards. Without a range6 there is nothing to announce: exit non-zero so
+-- that no uradvd instance is started.
+
+local site = require 'gluon.site'
+local util = require 'gluon.util'
+
+local DIR = '/var/gluon/parker/'
+
+local range6 = util.readfile(DIR .. 'range6')
+if not range6 then
+	os.exit(1)
+end
+
+io.write('-i br-client -p ' .. range6)
+
+local addr6 = util.readfile(DIR .. 'addr6')
+if addr6 then
+	io.write(' --rdnss ' .. addr6)
+end
+
+-- Only a node that translates IPv4 for its clients announces a NAT64
+-- prefix (RFC 8781); the file is absent on all other nodes.
+local pref64 = util.readfile(DIR .. 'pref64')
+if pref64 then
+	io.write(' --pref64 ' .. pref64)
+end
+
+-- Everything our clients send leaves through a tunnel, so they are told
+-- what fits into it (RFC 4861). noderoute writes the file while that is
+-- known, and never writes a value uradvd would refuse to advertise.
+local adv_mtu = util.readfile(DIR .. 'adv_mtu')
+if adv_mtu then
+	io.write(' --adv-link-mtu ' .. adv_mtu)
+end
+
+if site.radvd() then
+	if site.radvd.preferred_lifetime() then
+		io.write(' --preferred-lifetime ' .. site.radvd.preferred_lifetime())
+	end
+	if site.radvd.valid_lifetime() then
+		io.write(' --valid-lifetime ' .. site.radvd.valid_lifetime())
+	end
+end
