@@ -236,7 +236,7 @@ static struct json_object * respondd_parker_statistics(void) {
 	if (getgatewayandiface(&gwinfo, AF_INET6) > 0) {
 		return ret;
 	}
-	if (strncmp(gwinfo.interface, "wg_", 3) == 0) {
+	if (is_mesh_vpn(gwinfo.interface)) {
 		json_object_object_add(ret, "gateway", json_object_new_string(gwinfo.gateway4));
 		json_object_object_add(ret, "gateway6", json_object_new_string(gwinfo.gateway6));
 		json_object_object_add(ret, "gateway_nexthop", json_object_new_string(gwinfo.interface));
