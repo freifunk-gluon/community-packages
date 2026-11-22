@@ -444,7 +444,7 @@ local function apply_network(conf, target_state, address4, mtu)
 			-- announce the site prefix on local-node only (never as a
 			-- default router), so that the next-node address keeps
 			-- working on a node that only meshes.
-			util.log("Announcing the site prefix only (mesh-only mode)")
+			util.log("Announcing the site prefix only, mesh-only mode")
 			os.execute("/etc/init.d/gluon-radvd restart")
 		end
 		changed = true
