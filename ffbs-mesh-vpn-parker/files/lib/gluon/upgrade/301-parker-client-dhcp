@@ -1,0 +1,12 @@
+#!/usr/bin/lua
+
+local uci = require('simple-uci').cursor()
+
+-- gluon-client-bridge (300-gluon-client-bridge-network) creates
+-- dhcp.local_client with ignore=1, which OpenWrt turns into
+-- --no-dhcp-interface for br-client and which would override the DHCP range
+-- noderoute adds for the client network. Remove it again right after
+-- creation; this has to sort after 300 and before anything that reads dhcp.
+uci:delete('dhcp', 'local_client')
+
+uci:save('dhcp')
