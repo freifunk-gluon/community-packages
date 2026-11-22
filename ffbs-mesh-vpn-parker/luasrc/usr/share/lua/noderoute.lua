@@ -443,10 +443,12 @@ local function apply_network(conf, target_state, address4, mtu)
 			util.write_file(ADDR6_FILE, conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
 		else
-			-- Nothing to announce: without a range6 file the arguments
-			-- override refuses to produce arguments, so no uradvd is
-			-- started; an explicit stop just makes sure none is left.
-			os.execute("/etc/init.d/gluon-radvd stop")
+			-- Without a range6 the arguments override makes uradvd
+			-- announce the site prefix on local-node only (never as a
+			-- default router), so that the next-node address keeps
+			-- working on a node that only meshes.
+			util.log("Announcing the site prefix only (mesh-only mode)")
+			os.execute("/etc/init.d/gluon-radvd restart")
 		end
 		changed = true
 	end

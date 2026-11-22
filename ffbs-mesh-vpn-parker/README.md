@@ -34,6 +34,24 @@ from its own MAC, and remembers that in `parker.client.address4` until the
 config service gives it a different range. Nodes that have moved keep that
 block of addresses out of the DHCP pool they hand to their clients.
 
+Router advertisements
+---------------------
+
+`gluon-radvd` runs `uradvd` with the arguments from
+`/lib/gluon/radvd/arguments.override`, which depends on whether the node
+has a client range:
+
+* With a range (it routes for its clients): `uradvd` on `br-client`
+  announces the range of the node, with the node as the default router and
+  the RDNSS, MTU and PREF64 options.
+* Without a range (no tunnel, the node only meshes): `uradvd` on
+  `local-node` announces the site's `prefix6` as in a classic Gluon mesh,
+  and never as a default router (lifetime 0), whatever `radvd.default_lifetime`
+  says. Clients on such a node reach the next-node address and get their
+  default route from the router advertisements of other nodes, which
+  `gluon-radv-filterd` passes on. The ebtables rules of `gluon-mesh-batman-adv`
+  keep these advertisements off the mesh.
+
 MTU
 ---
 
