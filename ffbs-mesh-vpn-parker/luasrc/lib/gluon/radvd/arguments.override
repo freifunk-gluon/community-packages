@@ -39,11 +39,11 @@ if adv_mtu then
 	io.write(' --adv-link-mtu ' .. adv_mtu)
 end
 
-if site.radvd() then
-	if site.radvd.preferred_lifetime() then
-		io.write(' --preferred-lifetime ' .. site.radvd.preferred_lifetime())
-	end
-	if site.radvd.valid_lifetime() then
-		io.write(' --valid-lifetime ' .. site.radvd.valid_lifetime())
-	end
-end
+-- The node is the default router of its clients, unlike in a classic Gluon
+-- mesh where uradvd only announces the prefix (default lifetime 0). Every node
+-- announces its own prefix, so a client that roams to another node has to drop
+-- the old prefix and router quickly: keep lifetimes short and RAs frequent.
+io.write(' --default-lifetime 180')
+io.write(' --min-router-adv-interval 20 --max-router-adv-interval 50')
+io.write(' --preferred-lifetime ' .. site.radvd.preferred_lifetime(120))
+io.write(' --valid-lifetime ' .. site.radvd.valid_lifetime(180))
