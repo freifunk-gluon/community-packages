@@ -43,7 +43,9 @@ has a client range:
 
 * With a range (it routes for its clients): `uradvd` on `br-client`
   announces the range of the node, with the node as the default router and
-  the RDNSS, MTU and PREF64 options.
+  the RDNSS, MTU and PREF64 options, followed by the site's `prefix6` as an
+  on-link prefix: the next-node address lives in it, and clients resolve it
+  on their own segment instead of through their router.
 * Without a range (no tunnel, the node only meshes): `uradvd` on
   `local-node` announces the site's `prefix6` as in a classic Gluon mesh,
   and never as a default router (lifetime 0), whatever `radvd.default_lifetime`

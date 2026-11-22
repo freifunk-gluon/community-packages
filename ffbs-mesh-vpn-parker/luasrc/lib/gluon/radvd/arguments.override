@@ -5,7 +5,8 @@
 -- configures the client network and restarts gluon-radvd afterwards.
 --
 -- With a range6 the node is a router: it advertises the per-node client range
--- on br-client, as the default router of its clients.
+-- on br-client, as the default router of its clients, and additionally the
+-- site prefix as an on-link prefix (see below).
 --
 -- Without a range6 (no tunnel, the node only meshes) it does what a classic
 -- Gluon node does: uradvd on local-node announces the site prefix, never as a
@@ -47,6 +48,15 @@ end
 -- range6 comes first: radv-filterd's redirect takes the first /64 of an RA
 -- as the prefix of the router.
 io.write('-i br-client -p ' .. range6)
+
+-- The clients also need the site prefix as an on-link prefix: the next-node
+-- address lives in it, and without it a client resolves that address through
+-- its router instead of on the local link (upstream Gluon relies on the
+-- prefix being on-link for this). The prefix is advertised for SLAAC as well,
+-- as in upstream Gluon, so clients get a second, unique-local address.
+if site.prefix6() then
+	io.write(' -p ' .. site.prefix6())
+end
 
 local addr6 = util.readfile(DIR .. 'addr6')
 if addr6 then
