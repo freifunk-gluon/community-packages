@@ -1,0 +1,9 @@
+-- Parker router nodes run uradvd on br-client and must answer router
+-- solicitations that arrive via bat0, and their router advertisements must
+-- leave through bat0, so nodes meshed behind them get an IPv6 default route.
+-- Upstream drops both in 300-radv-input-output (every node would announce the
+-- same identity). ebtables files are loaded in name order, rules are appended
+-- and the first matching rule wins, so accepting here makes those DROPs
+-- unreachable for exactly these two packet types.
+rule 'INPUT -p IPv6 --ip6-protocol ipv6-icmp --ip6-icmp-type router-solicitation -i bat0 -j ACCEPT'
+rule 'OUTPUT -p IPv6 --ip6-protocol ipv6-icmp --ip6-icmp-type router-advertisement -o bat0 -j ACCEPT'
