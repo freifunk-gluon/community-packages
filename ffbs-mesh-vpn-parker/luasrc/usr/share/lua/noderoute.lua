@@ -1,3 +1,4 @@
+local dhcp = require("parker.dhcp")
 local json = require("jsonc")
 local util = require("util")
 local uci = require("uci")
@@ -8,6 +9,22 @@ local tmpdir = arg[1]
 
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
+
+-- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the interface MTU.
+local MTU_OPTION = "option:mtu"
+
+-- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
+-- and exits.
+local MIN_ADV_MTU = 1280
+
+-- Where uradvd picks up the MTU we want it to advertise, see
+-- /lib/gluon/radvd/arguments.
+local ADV_MTU_FILE = "/tmp/adv_mtu"
+
+-- How long we are willing to wait for netifd to apply a configuration we
+-- have just committed, and for the client services afterwards.
+local NETWORK_TIMEOUT = 60
+local SERVICES_TIMEOUT = 20
 
 util.loggername = "noderoute.lua"
 
@@ -60,6 +77,25 @@ local function set_wg_route(iface, conc)
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
 end
 
+local function link_mtu(iface)
+	-- The MTU an interface currently has, or nil if there is no such
+	-- interface.
+	return tonumber(util.read_file("/sys/class/net/" .. iface .. "/mtu") or "")
+end
+
+local function tunnel_mtu(ifaces)
+	-- The smallest MTU of the given tunnels, or nil if none is known. Any
+	-- of them may carry the default route after the next cycle.
+	local result = nil
+	for _, iface in ipairs(ifaces) do
+		local mtu = link_mtu(iface)
+		if mtu ~= nil and (result == nil or mtu < result) then
+			result = mtu
+		end
+	end
+	return result
+end
+
 local function uci_delete(config, section, option)
 	if not uci.delete(config, section, option) then
 		util.log(
@@ -96,22 +132,85 @@ local function uci_commit(config)
 	end
 end
 
+local function set_client_option(name, values)
+	-- Announce one DHCPv4 option to our clients, or stop announcing it
+	-- when there are no values. Returns whether uci has changed, i.e.
+	-- whether dnsmasq has to be reloaded.
+
+	local options = dhcp.merge_option(uci.get("dhcp", DHCP_IFACE, "dhcp_option"), name, values)
+	if options == nil then
+		return false
+	end
+	if #options > 0 then
+		uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+	else
+		-- uci cannot hold an empty list.
+		uci_delete("dhcp", DHCP_IFACE, "dhcp_option")
+	end
+	uci_commit("dhcp")
+	return true
+end
+
 local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
 
-local function apply_network(conf, target_state)
+local function iface_status(iface)
+	local output = util.check_output("ubus call network.interface." .. iface .. " status 2>/dev/null")
+	if output == "" then
+		return nil
+	end
+	return json.parse(output)
+end
+
+local function network_applied(conf, target_state)
+	-- Has netifd applied the interface configuration we have committed?
+	-- On a mode switch the protocol changes, so the state from before the
+	-- reload cannot match.
+	local status = iface_status(DHCP_IFACE)
+	if status == nil then
+		return false
+	end
+	if not target_state then
+		return status.proto == "dhcp"
+	end
+	if status.proto ~= "static" or status.up ~= true then
+		return false
+	end
+	-- The interface may have been up with a different address before.
+	for _, addr in ipairs(status["ipv4-address"] or {}) do
+		if addr.address == conf.address4 then
+			return true
+		end
+	end
+	return false
+end
+
+local function services_ready()
+	-- Are the services our clients need back up? These are the same
+	-- conditions noderoute.sh complains about when they are missing.
+	if os.execute("pidof uradvd >/dev/null") ~= 0 then
+		return false
+	end
+	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
+end
+
+local function apply_network(conf, target_state, mtu)
 	if uci.get("dhcp", DHCP_IFACE) == nil then
 		uci_set("dhcp", DHCP_IFACE, "dhcp")
 	end
 
 	local radvd_config_deleted = false
 	local first_time_active_since_boot = false
+	local dhcp_options_changed = false
 
 	if target_state == true then
 		util.log("network: routing state: active")
 		local prefix_len = tonumber(util.str_split(conf.range4, "[^/]+")[2])
-		local limit = (2 ^ (32 - prefix_len) - 2)
+		-- Offset 1 is our own address and the last one is the broadcast
+		-- address, so the pool runs from offset 2 to the one before the
+		-- broadcast address.
+		local limit = (2 ^ (32 - prefix_len) - 3)
 		local prefix6_len = tonumber(util.str_split(conf.range6, "[^/]+")[2])
 
 		uci_set("dhcp", DHCP_IFACE, "interface", DHCP_IFACE)
@@ -158,6 +257,7 @@ local function apply_network(conf, target_state)
 	end
 
 	local changed = sections_changed()
+	local radvd_stopped = false
 
 	if changed then
 		dump(uci.changes())
@@ -166,12 +266,18 @@ local function apply_network(conf, target_state)
 		util.log("Reconfiguring network...")
 		util.log("HACK: stopping gluon-radvd")
 		os.execute("/etc/init.d/gluon-radvd stop")
+		radvd_stopped = true
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
 		os.execute("/etc/init.d/network reload")
-		util.log("Network reload finished. Wait another 60s for the config to settle...")
-		util.sleep(60)
-		util.log("...done sleeping for 60s.")
+		util.log("Network reload finished. Waiting for " .. DHCP_IFACE .. " to be reconfigured...")
+		if util.wait_for(function()
+			return network_applied(conf, target_state)
+		end, NETWORK_TIMEOUT) then
+			util.log("..." .. DHCP_IFACE .. " has been reconfigured.")
+		else
+			util.log("..." .. DHCP_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
+		end
 		changed = true
 	end
 
@@ -181,25 +287,71 @@ local function apply_network(conf, target_state)
 		changed = true
 	end
 
-	local range6 = util.read_file("/tmp/range6")
-	if (target_state and range6 ~= conf.range6) or radvd_config_deleted then
-		if conf.range6 ~= nil and target_state then
-			local f = io.open("/tmp/range6", "w")
-			f:write(conf.range6)
-			f:close()
-
-			f = io.open("/tmp/addr6", "w")
-			f:write(conf.address6)
-			f:close()
+	-- Our clients reach everything through a tunnel, so announce the
+	-- tunnel MTU, for IPv6 in the router advertisements (RFC 4861).
+	local adv_mtu_changed = false
+	local adv_mtu = util.read_file(ADV_MTU_FILE)
+	local want_adv_mtu = nil
+	if target_state and mtu ~= nil and mtu >= MIN_ADV_MTU then
+		want_adv_mtu = tostring(mtu)
+	end
+	if want_adv_mtu ~= nil then
+		if want_adv_mtu ~= adv_mtu then
+			util.write_file(ADV_MTU_FILE, want_adv_mtu)
+			adv_mtu_changed = true
+			util.log("Announcing an MTU of " .. want_adv_mtu .. " to our clients")
 		end
-		os.execute("/etc/init.d/gluon-radvd restart")
+	elseif adv_mtu ~= nil then
+		os.execute("rm " .. ADV_MTU_FILE .. " -f")
+		adv_mtu_changed = true
+		util.log("No longer announcing an MTU to our clients")
+	end
+
+	-- Start radvd again after the stop above, also when neither the prefix
+	-- nor the MTU has changed.
+	local range6 = util.read_file("/tmp/range6")
+	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
+			or adv_mtu_changed or radvd_stopped then
+		if target_state and conf.range6 ~= nil then
+			util.write_file("/tmp/range6", conf.range6)
+			util.write_file("/tmp/addr6", conf.address6)
+			os.execute("/etc/init.d/gluon-radvd restart")
+		else
+			-- Without a prefix uradvd exits at once, and procd stops
+			-- respawning it after a few attempts.
+			os.execute("/etc/init.d/gluon-radvd stop")
+		end
 		changed = true
 	end
 
-	if changed then
-		util.log("Some network config has changed. Wait another 20s for everything to sette...")
-		util.sleep(20)
-		util.log("... done sleeping for 20s")
+	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132).
+	local client_mtu4 = nil
+	if target_state and mtu ~= nil then
+		client_mtu4 = mtu
+	end
+	-- { nil } is the empty list, i.e. no such option.
+	if set_client_option(MTU_OPTION, { client_mtu4 }) then
+		dhcp_options_changed = true
+		if client_mtu4 ~= nil then
+			util.log("Announcing an IPv4 MTU of " .. client_mtu4 .. " to our clients")
+		else
+			util.log("No longer announcing an IPv4 MTU to our clients")
+		end
+	end
+
+	if dhcp_options_changed then
+		util.log("Reloading dnsmasq to serve our clients the options they now get")
+		os.execute("/etc/init.d/dnsmasq reload")
+		changed = true
+	end
+
+	if changed and target_state then
+		util.log("Some network config has changed. Waiting for the client services...")
+		if util.wait_for(services_ready, SERVICES_TIMEOUT) then
+			util.log("...client services are up.")
+		else
+			util.log("...client services are not up after " .. SERVICES_TIMEOUT .. "s. Continuing anyway.")
+		end
 	end
 
 	return true
@@ -227,6 +379,8 @@ local function update(report)
 		conf = json.parse(conf_json)
 	end
 
+	local mtu = tunnel_mtu(active)
+
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
 	-- otherwise this function will simply to nothing
@@ -240,7 +394,7 @@ local function update(report)
 			return
 		end
 		util.log(#active .. " active tunnels: Applying network state.")
-		apply_network(conf, true)
+		apply_network(conf, true, mtu)
 	end
 
 	local current = get_wg_routes()

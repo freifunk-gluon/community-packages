@@ -6,6 +6,8 @@
 
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +19,11 @@
 #include <errno.h>
 
 #define BUFFER_SIZE 4096
+
+/* Name prefix of the mesh VPN tunnels ffbs-mesh-vpn-parker sets up. */
+#define MESH_VPN_PREFIX "wg_"
+
+#define SYSFS_NET "/sys/class/net/"
 
 struct gatewayinfo {
 	char interface[IF_NAMESIZE];
@@ -153,9 +160,76 @@ int getgatewayandiface(struct gatewayinfo * gwinfo, sa_family_t family) {
 }
 
 
-static struct json_object * respondd_parker_gateway(void) {
+static bool is_mesh_vpn(const char * interface) {
+	return strncmp(interface, MESH_VPN_PREFIX, strlen(MESH_VPN_PREFIX)) == 0;
+}
+
+static bool read_counter(const char *interface, const char *name, uint64_t *value) {
+	char path[sizeof(SYSFS_NET) + IF_NAMESIZE + 32];
+	unsigned long long v;
+	FILE *f;
+	bool ok;
+
+	snprintf(path, sizeof(path), SYSFS_NET "%s/statistics/%s", interface, name);
+	f = fopen(path, "r");
+	if (!f)
+		return false;
+	ok = fscanf(f, "%llu", &v) == 1;
+	fclose(f);
+	if (ok)
+		*value += v;
+	return ok;
+}
+
+static struct json_object * new_counter(uint64_t packets, uint64_t bytes) {
+	struct json_object *ret = json_object_new_object();
+
+	json_object_object_add(ret, "packets", json_object_new_int64(packets));
+	json_object_object_add(ret, "bytes", json_object_new_int64(bytes));
+	return ret;
+}
+
+/* The client traffic of a parker node goes through its mesh VPN tunnels,
+ * not through bat0. Thus "rx" and "tx" are the sums of all wg_* tunnels.
+ * "forward", "mgmt_rx" and "mgmt_tx" stay as gluon-mesh-batman-adv reports
+ * them for the batman-adv mesh to other nodes. */
+static void add_traffic(struct json_object *obj) {
+	struct if_nameindex *ifs = if_nameindex(), *i;
+	uint64_t rx_packets = 0, rx_bytes = 0, tx_packets = 0, tx_bytes = 0, tx_dropped = 0;
+	bool found = false;
+	struct json_object *traffic, *tx;
+
+	if (!ifs)
+		return;
+
+	for (i = ifs; i->if_index; i++) {
+		if (!is_mesh_vpn(i->if_name))
+			continue;
+		found |= read_counter(i->if_name, "rx_packets", &rx_packets);
+		read_counter(i->if_name, "rx_bytes", &rx_bytes);
+		read_counter(i->if_name, "tx_packets", &tx_packets);
+		read_counter(i->if_name, "tx_bytes", &tx_bytes);
+		read_counter(i->if_name, "tx_dropped", &tx_dropped);
+	}
+	if_freenameindex(ifs);
+
+	if (!found)
+		return;
+
+	traffic = json_object_new_object();
+	tx = new_counter(tx_packets, tx_bytes);
+	json_object_object_add(tx, "dropped", json_object_new_int64(tx_dropped));
+	json_object_object_add(traffic, "rx", new_counter(rx_packets, rx_bytes));
+	json_object_object_add(traffic, "tx", tx);
+	json_object_object_add(obj, "traffic", traffic);
+}
+
+static struct json_object * respondd_parker_statistics(void) {
 	struct json_object *ret = json_object_new_object();
 	struct gatewayinfo gwinfo = {0};
+
+	add_traffic(ret);
+
 	if (getgatewayandiface(&gwinfo, AF_INET) > 0) {
 		return ret;
 	}
@@ -172,6 +246,6 @@ static struct json_object * respondd_parker_gateway(void) {
 
 
 const struct respondd_provider_info respondd_providers[] = {
-	{"statistics", respondd_parker_gateway},
+	{"statistics", respondd_parker_statistics},
 	{}
 };

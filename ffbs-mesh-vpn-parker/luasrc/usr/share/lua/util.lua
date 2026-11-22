@@ -12,6 +12,19 @@ function util.read_file(path)
 	return content
 end
 
+function util.write_file(path, content)
+	-- Replace a file in one step, so that a service reading it while we
+	-- write never gets to see half of it.
+	local tmp = path .. ".tmp"
+	local file = io.open(tmp, "w")
+	if not file then
+		return false
+	end
+	file:write(content)
+	file:close()
+	return os.rename(tmp, path) ~= nil
+end
+
 function util.str_split(str, pattern)
 	local res = {}
 	for i in string.gmatch(str, pattern) do
@@ -44,13 +57,54 @@ function util.tablelength(T)
 	return count
 end
 
-function util.nslookup(host)
-	local ans = posix.sys.socket.getaddrinfo(host, nil, { protocol = posix.sys.socket.IPPROTO_UDP })
-	if not ans then
+function util.nslookup(host, family)
+	-- Resolve a hostname to the first address the resolver returns.
+	--
+	-- Arguments:
+	-- * host: The hostname to resolve.
+	-- * family: Optional address family (posix.sys.socket.AF_INET or
+	--   posix.sys.socket.AF_INET6) to restrict the lookup to.
+
+	local hints = { protocol = posix.sys.socket.IPPROTO_UDP }
+	if family ~= nil then
+		hints.family = family
+	end
+	local ans = posix.sys.socket.getaddrinfo(host, nil, hints)
+	if not ans or not ans[1] then
 		return nil
 	else
 		return ans[1].addr
 	end
+end
+
+function util.wan_device()
+	-- The device of the WAN default route in table 1, or nil while there
+	-- is no WAN route. IPv6 first, like prefer_ipv6() in nodeconfig.lua.
+	-- This is br-wan for a wired uplink and the modem device (e.g. wwan0)
+	-- for a cellular uplink.
+
+	for _, cmd in ipairs({ "ip -6 route show table 1", "ip -4 route show table 1" }) do
+		for line in string.gmatch(util.check_output(cmd), "[^\n]+") do
+			if string.find(line, "^default") then
+				local dev = string.match(line, " dev ([%w%._-]+)")
+				if dev ~= nil then
+					return dev
+				end
+			end
+		end
+	end
+	return nil
+end
+
+function util.wan_mtu()
+	-- The MTU the kernel uses for IPv6 on the WAN device, or nil while
+	-- there is no WAN route.
+
+	local dev = util.wan_device()
+	if dev == nil then
+		return nil
+	end
+	return tonumber(util.read_file("/proc/sys/net/ipv6/conf/" .. dev .. "/mtu") or "")
 end
 
 function util.get_wg_info()
@@ -86,6 +140,19 @@ function util.sleep(n)
 	posix.unistd.sleep(n)
 end
 
+function util.wait_for(condition, timeout)
+	-- Wait until condition() returns true.
+	-- Gives up after timeout seconds and returns whether the condition
+	-- has been met.
+	for _ = 1, timeout do
+		if condition() then
+			return true
+		end
+		util.sleep(1)
+	end
+	return condition()
+end
+
 local random_seeded = false
 function util.shuffle(tbl)
 	if not random_seeded then
@@ -104,7 +171,9 @@ end
 
 util.loggername = "lua"
 function util.log(s)
-	os.execute("logger -s -t" .. util.loggername .. " " .. s)
+	-- Quote the message: a "(" or ";" in it must not reach the shell.
+	local quoted = "'" .. tostring(s):gsub("'", "'\\''") .. "'"
+	os.execute("logger -s -t" .. util.loggername .. " " .. quoted)
 end
 
 return util
