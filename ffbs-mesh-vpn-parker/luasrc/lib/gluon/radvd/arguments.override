@@ -43,7 +43,13 @@ end
 -- mesh where uradvd only announces the prefix (default lifetime 0). Every node
 -- announces its own prefix, so a client that roams to another node has to drop
 -- the old prefix and router quickly: keep lifetimes short and RAs frequent.
-io.write(' --default-lifetime 180')
-io.write(' --min-router-adv-interval 20 --max-router-adv-interval 50')
+-- The values belong together: the router lifetime equals the prefix valid
+-- lifetime, and RAs come every 20-50 s so that at least three RAs fall into
+-- one lifetime (as in ffbs uradvd commits 19e29408, c7cf08a7, ef50e787). The
+-- site may override them via radvd.*; the fallbacks keep the node a default
+-- router even if a site forgets to set them.
+io.write(' --default-lifetime ' .. site.radvd.default_lifetime(180))
+io.write(' --min-router-adv-interval ' .. site.radvd.min_interval(20))
+io.write(' --max-router-adv-interval ' .. site.radvd.max_interval(50))
 io.write(' --preferred-lifetime ' .. site.radvd.preferred_lifetime(120))
 io.write(' --valid-lifetime ' .. site.radvd.valid_lifetime(180))
