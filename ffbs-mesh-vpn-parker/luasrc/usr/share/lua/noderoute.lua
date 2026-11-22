@@ -10,8 +10,23 @@ local tmpdir = arg[1]
 local DHCP_IFACE = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
+-- The IPv4 default route that set_wg_route() has set last, in the notation
+-- of ip route. The busybox ip on our nodes prints no route metrics, so
+-- this record is the only source of the MTU of that route.
+local ROUTE4_FILE = tmpdir .. "/noderoute-route4"
+
+-- dnsmasq's name for the DHCPv4 option of RFC 8925, which tells a client
+-- that it may do without IPv4 altogether.
+local IPV6_ONLY_OPTION = "option:ipv6-only"
+
 -- dnsmasq's name for DHCPv4 option 26 (RFC 2132), the interface MTU.
 local MTU_OPTION = "option:mtu"
+
+-- The bytes the CLAT adds to an IPv4 packet of a client: 20 because the
+-- IPv6 header is larger than the IPv4 header, and 8 for the fragment
+-- header that a translator inserts into a fragment (RFC 7915). ebpf-clat
+-- inserts it into TCP and UDP fragments and drops ICMP fragments.
+local CLAT_OVERHEAD = 20 + 8
 
 -- uradvd refuses to advertise a link MTU below the 1280 bytes IPv6 needs
 -- and exits.
@@ -20,6 +35,11 @@ local MIN_ADV_MTU = 1280
 -- Where uradvd picks up the MTU we want it to advertise, see
 -- /lib/gluon/radvd/arguments.
 local ADV_MTU_FILE = "/tmp/adv_mtu"
+
+-- The NAT64 prefix we announce to our clients, in the notation uradvd
+-- expects. Its address part has to stay in sync with the prefix
+-- /etc/init.d/ebpf-clat starts ebpf-clat with.
+local NAT64_PREFIX = "64:ff9b::/96"
 
 -- How long we are willing to wait for netifd to apply a configuration we
 -- have just committed, and for the client services afterwards.
@@ -52,7 +72,22 @@ local function get_handshake_ages()
 	return result
 end
 
+local function recorded_mtu4(line)
+	-- The MTU that set_wg_route() has recorded for an IPv4 default route
+	-- that ip has printed without an MTU. Returns nil if set_wg_route() has
+	-- put no MTU on the route, or false if there is no record of the route.
+	local route = string.match(line, "default via %S+ dev %S+")
+	local recorded = util.read_file(ROUTE4_FILE) or ""
+	if route == nil or string.match(recorded, "default via %S+ dev %S+") ~= route then
+		return false
+	end
+	return tonumber(string.match(recorded, "mtu (%d+)"))
+end
+
 local function get_wg_routes()
+	-- The IPv4 default routes we have installed, as { iface, mtu } pairs.
+	-- busybox ip prints no route metrics, so the MTU of a route printed
+	-- without one comes from recorded_mtu4().
 	local result = {}
 	local output = util.check_output("ip r show proto " .. RT_PROTO)
 	util.log("Checking for wg routes")
@@ -62,7 +97,11 @@ local function get_wg_routes()
 			if not string.find(line, "broadcast") then
 				for iface in string.gmatch(line, "dev [a-z0-9-_]+") do
 					util.log("Route found")
-					table.insert(result, iface:sub(5))
+					local mtu = tonumber(string.match(line, "mtu (%d+)"))
+					if mtu == nil then
+						mtu = recorded_mtu4(line)
+					end
+					table.insert(result, { iface = iface:sub(5), mtu = mtu })
 				end
 			end
 		end
@@ -70,11 +109,36 @@ local function get_wg_routes()
 	return result
 end
 
-local function set_wg_route(iface, conc)
-	local res =
-		os.execute("ip -4 r replace default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+local function set_wg_route(iface, conc, mtu4)
+	-- Route our clients through a tunnel. mtu4 is set on the IPv4 route
+	-- rather than on the interface, because the interface carries IPv6 as
+	-- well and only IPv4 packets grow in the CLAT.
+	local route4 = "default via " .. conc["address4"] .. " dev " .. iface .. " proto " .. RT_PROTO
+	if mtu4 ~= nil then
+		route4 = route4 .. " mtu " .. mtu4
+	end
+	-- Remove the record before changing the route and write it only after
+	-- ip has succeeded, so that it never describes a route the kernel does
+	-- not have.
+	os.remove(ROUTE4_FILE)
+	local res = os.execute("ip -4 r replace " .. route4)
+	if res == 0 then
+		util.write_file(ROUTE4_FILE, route4)
+	end
 	return res
 		+ os.execute("ip -6 r replace default via " .. conc["address6"] .. " dev " .. iface .. " proto " .. RT_PROTO)
+end
+
+local function find_concentrator(conf, iface)
+	-- The concentrator of a wg-interface, or nil if the config service no
+	-- longer lists it.
+	local id = tonumber(iface:match("[0-9]+"))
+	for _, conc in ipairs(conf.concentrators or {}) do
+		if conc.id == id then
+			return conc
+		end
+	end
+	return nil
 end
 
 local function link_mtu(iface)
@@ -94,6 +158,16 @@ local function tunnel_mtu(ifaces)
 		end
 	end
 	return result
+end
+
+local function clat_mtu(conf, mtu)
+	-- The largest IPv4 packet of a client that still fits into a tunnel with
+	-- the given MTU after the CLAT has translated it, or nil if the MTU is
+	-- unknown or no CLAT translates IPv4.
+	if mtu == nil or conf == nil or conf.xlat_range6 == nil then
+		return nil
+	end
+	return mtu - CLAT_OVERHEAD
 end
 
 local function uci_delete(config, section, option)
@@ -151,6 +225,18 @@ local function set_client_option(name, values)
 	return true
 end
 
+-- The dnsmasq default for dhcp-lease-max.
+local DNSMASQ_LEASE_MAX = 1000
+
+local function dnsmasq_section()
+	local name = nil
+	uci.foreach("dhcp", "dnsmasq", function(s)
+		name = s[".name"]
+		return false
+	end)
+	return name
+end
+
 local function sections_changed()
 	return not empty(uci.changes("dhcp")) or not empty(uci.changes("network"))
 end
@@ -201,6 +287,7 @@ local function apply_network(conf, target_state, mtu)
 	end
 
 	local radvd_config_deleted = false
+	local xlat_config_deleted = false
 	local first_time_active_since_boot = false
 	local dhcp_options_changed = false
 
@@ -220,11 +307,22 @@ local function apply_network(conf, target_state, mtu)
 		uci_set("dhcp", DHCP_IFACE, "force", "1")
 		util.log("Configuring DHCPD on " .. DHCP_IFACE .. " with up to " .. limit .. " leases")
 
+		-- Gluon leaves dhcp-lease-max at the dnsmasq default, so dnsmasq
+		-- would hand out fewer leases than a larger pool has.
+		local dnsmasq = dnsmasq_section()
+		if dnsmasq ~= nil then
+			uci_set("dhcp", dnsmasq, "dhcpleasemax", math.max(limit, DNSMASQ_LEASE_MAX))
+		end
+
 		uci_set("network", DHCP_IFACE, "proto", "static")
 		uci_set("network", DHCP_IFACE, "ipaddr", conf.address4 .. "/" .. prefix_len)
 		util.log(DHCP_IFACE .. " ipaddr: " .. conf.address4 .. "/" .. prefix_len)
 		uci_set("network", DHCP_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
 		util.log(DHCP_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
+		if conf.xlat_range6 then
+			uci_set("network", DHCP_IFACE, "xlat_range6", conf.xlat_range6)
+			util.log(DHCP_IFACE .. " xlat_range6: " .. conf.xlat_range6)
+		end
 		uci_set("network", "client6", "proto", "static")
 		uci_set("network", "gluon_bat0", "gw_mode", "server")
 		if not util.check_output("ebtables-tiny -L PARKER_RADV"):find("DROP") then
@@ -243,7 +341,13 @@ local function apply_network(conf, target_state, mtu)
 
 		uci_delete("network", DHCP_IFACE, "ipaddr")
 		uci_delete("network", DHCP_IFACE, "ip6addr")
+		uci_delete("network", DHCP_IFACE, "xlat_range6")
 		uci_set("network", "client6", "proto", "dhcpv6")
+
+		local dnsmasq = dnsmasq_section()
+		if dnsmasq ~= nil and uci.get("dhcp", dnsmasq, "dhcpleasemax") ~= nil then
+			uci_delete("dhcp", dnsmasq, "dhcpleasemax")
+		end
 
 		uci_set("network", "gluon_bat0", "gw_mode", "client")
 
@@ -251,6 +355,10 @@ local function apply_network(conf, target_state, mtu)
 			os.execute("rm /tmp/range6 -f")
 			os.execute("rm /tmp/addr6 -f")
 			radvd_config_deleted = true
+		end
+		if util.read_file("/tmp/xlat_range6") ~= nil then
+			os.execute("rm /tmp/xlat_range6 -f")
+			xlat_config_deleted = true
 		end
 
 		os.execute("ebtables-tiny -F PARKER_RADV")
@@ -287,6 +395,24 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
+	-- A node that translates IPv4 for its clients announces the NAT64 prefix
+	-- in its router advertisements (RFC 8781), so clients can translate for
+	-- themselves as well. uradvd only reads /tmp/pref64 when it starts, so
+	-- the file has to be in place before the restart below.
+	local pref64_changed = false
+	local pref64 = util.read_file("/tmp/pref64")
+	if target_state and conf.xlat_range6 ~= nil then
+		if pref64 ~= NAT64_PREFIX then
+			util.write_file("/tmp/pref64", NAT64_PREFIX)
+			pref64_changed = true
+			util.log("Announcing NAT64 prefix " .. NAT64_PREFIX .. " to our clients")
+		end
+	elseif pref64 ~= nil then
+		os.execute("rm /tmp/pref64 -f")
+		pref64_changed = true
+		util.log("No longer announcing a NAT64 prefix to our clients")
+	end
+
 	-- Our clients reach everything through a tunnel, so announce the
 	-- tunnel MTU, for IPv6 in the router advertisements (RFC 4861).
 	local adv_mtu_changed = false
@@ -311,7 +437,7 @@ local function apply_network(conf, target_state, mtu)
 	-- nor the MTU has changed.
 	local range6 = util.read_file("/tmp/range6")
 	if (target_state and range6 ~= conf.range6) or radvd_config_deleted
-			or adv_mtu_changed or radvd_stopped then
+			or pref64_changed or adv_mtu_changed or radvd_stopped then
 		if target_state and conf.range6 ~= nil then
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
@@ -324,10 +450,11 @@ local function apply_network(conf, target_state, mtu)
 		changed = true
 	end
 
-	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132).
+	-- For IPv4, announce the tunnel MTU in DHCP option 26 (RFC 2132), minus
+	-- the CLAT overhead while the CLAT translates.
 	local client_mtu4 = nil
 	if target_state and mtu ~= nil then
-		client_mtu4 = mtu
+		client_mtu4 = clat_mtu(conf, mtu) or mtu
 	end
 	-- { nil } is the empty list, i.e. no such option.
 	if set_client_option(MTU_OPTION, { client_mtu4 }) then
@@ -337,6 +464,41 @@ local function apply_network(conf, target_state, mtu)
 		else
 			util.log("No longer announcing an IPv4 MTU to our clients")
 		end
+	end
+
+	-- Tell our clients that they can do without IPv4 while we translate it
+	-- for them (RFC 8925). Like the MTU above, the option follows the
+	-- target state and not /tmp/xlat_range6, because a reboot removes the
+	-- file but not the option, which would then stay announced.
+	local xlat = target_state and conf ~= nil and conf.xlat_range6 or nil
+	if set_client_option(IPV6_ONLY_OPTION, { xlat and "0" }) then
+		dhcp_options_changed = true
+		if xlat ~= nil then
+			util.log("Announcing IPv6-only Preferred to our clients")
+		else
+			util.log("No longer announcing IPv6-only Preferred to our clients")
+		end
+	end
+
+	-- Start or stop ebpf-clat. Unlike the DHCPv4 option above, this follows
+	-- /tmp/xlat_range6, because the service, like the file, does not
+	-- survive a reboot.
+	local xlat_range6 = util.read_file("/tmp/xlat_range6")
+	if xlat ~= nil then
+		if xlat_range6 ~= xlat then
+			util.write_file("/tmp/xlat_range6", xlat)
+			os.execute("/etc/init.d/ebpf-clat start")
+			util.log("Started ebpf-clat")
+			changed = true
+		end
+	elseif xlat_range6 ~= nil or xlat_config_deleted then
+		os.execute("/etc/init.d/ebpf-clat stop")
+		-- The init script does not remove the file. With the file in place
+		-- an active node would stop ebpf-clat in every cycle and would not
+		-- start it again when the same prefix comes back.
+		os.remove("/tmp/xlat_range6")
+		util.log("Stopped ebpf-clat")
+		changed = true
 	end
 
 	if dhcp_options_changed then
@@ -380,6 +542,7 @@ local function update(report)
 	end
 
 	local mtu = tunnel_mtu(active)
+	local route_mtu4 = clat_mtu(conf, mtu)
 
 	-- update network config
 	-- the uci commit will only be executed if there is an actual change.
@@ -401,12 +564,21 @@ local function update(report)
 	assert(#current <= 1, "too many current routes")
 	current = current[1]
 	if current then
-		util.log("Currently " .. current .. " is the selected tunnel")
+		util.log("Currently " .. current.iface .. " is the selected tunnel")
 	end
 	util.log("There are " .. #active .. " active tunnels")
-	if current and util.has_value(active, current) then
+	if current and util.has_value(active, current.iface) then
+		if current.mtu ~= route_mtu4 then
+			-- The tunnel MTU has changed, or the MTU of the route is
+			-- unknown (false, see recorded_mtu4()), so set the route again.
+			local conc = find_concentrator(conf, current.iface)
+			if conc ~= nil then
+				util.log("Setting the IPv4 MTU of the route via " .. current.iface .. " to " .. tostring(route_mtu4))
+				set_wg_route(current.iface, conc, route_mtu4)
+			end
+		end
 		util.log("current route still active. Doing nothing.")
-		report:write("active (idle) via " .. current)
+		report:write("active (idle) via " .. current.iface)
 		return
 	end
 	if current then
@@ -415,6 +587,7 @@ local function update(report)
 
 	if #active == 0 then
 		util.log("No active tunnels. Removing default routes via wg_x.")
+		os.remove(ROUTE4_FILE)
 		local ip4route = util.check_output("ip -4 r show")
 		for line in string.gmatch(ip4route, "[^\n]+") do
 			if string.find(line, "default via") then
@@ -443,15 +616,12 @@ local function update(report)
 	local configured = false
 	for _, act in pairs(util.shuffle(active)) do
 		util.log("activating route for " .. act)
-		local id = tonumber(act:match("[0-9]+"))
-		for _, conc in ipairs(conf["concentrators"]) do
-			if conc["id"] == id then
-				if set_wg_route(act, conc) == 0 then
-					configured = true
-					break
-				else
-					util.log("Failed to activate route. Trying next...")
-				end
+		local conc = find_concentrator(conf, act)
+		if conc ~= nil then
+			if set_wg_route(act, conc, route_mtu4) == 0 then
+				configured = true
+			else
+				util.log("Failed to activate route. Trying next...")
 			end
 		end
 		if configured then
