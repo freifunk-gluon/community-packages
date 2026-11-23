@@ -9,6 +9,32 @@ local dhcp = {}
 -- creates, which noderoute.lua switches on while the node routes.
 local CLIENT_SECTION = 'local_client'
 
+function dhcp.is_ipv4(addr)
+	local octets = { addr:match('^(%d+)%.(%d+)%.(%d+)%.(%d+)$') }
+	if #octets ~= 4 then
+		return false
+	end
+	for _, octet in ipairs(octets) do
+		if tonumber(octet) > 255 then
+			return false
+		end
+	end
+	return true
+end
+
+-- The addresses of a site key dnsmasq will accept, in the given order.
+-- dnsmasq refuses to start on an option it cannot parse, so handing it
+-- anything else would take down DHCP and DNS for our clients.
+function dhcp.ipv4_addresses(addrs)
+	local result = {}
+	for _, addr in ipairs(addrs) do
+		if dhcp.is_ipv4(addr) then
+			table.insert(result, addr)
+		end
+	end
+	return result
+end
+
 -- Returns options with the entry of option name set to the given values,
 -- or removed when there are none. Other entries keep their place.
 -- Returns nil when the list does not change, so that a caller can skip
