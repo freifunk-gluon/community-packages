@@ -9,6 +9,15 @@ local tmpdir = arg[3]
 
 local PRIVKEY = "/etc/parker/wg-privkey"
 
+-- What Wireguard puts in front of every packet it sends: 16 bytes of its
+-- own header, a 16 byte authentication tag, the UDP header and the IP
+-- header of the family the endpoint lives in.
+local WG_OVERHEAD = { [4] = 20 + 8 + 32, [6] = 40 + 8 + 32 }
+
+-- IPv6 needs 1280 bytes on every link. Sizing a tunnel below that makes
+-- the kernel drop IPv6 from the interface.
+local MIN_MTU = 1280
+
 util.loggername = "nodeconfig.lua"
 
 local function prefer_ipv6()
@@ -109,6 +118,55 @@ local function same_allowed_ips(current_ips, target_ips)
 	return true
 end
 
+local function endpoint_family(endpoint)
+	-- The address family a resolved endpoint lives in. join_endpoint()
+	-- puts IPv6 addresses in brackets, the same way wg reports them.
+
+	if string.sub(endpoint, 1, 1) == "[" then
+		return 6
+	end
+	return 4
+end
+
+local function tunnel_mtu(conf, endpoint)
+	-- The MTU a tunnel to this endpoint may use: what is left of the WAN
+	-- MTU once Wireguard has added its headers, but never more than the
+	-- config service allows.
+	--
+	-- The config service is only told our WAN MTU, so it cannot know
+	-- whether we end up talking to a concentrator over IPv6 or over IPv4,
+	-- which differ by the 20 bytes between the two IP headers. Sizing the
+	-- interface is therefore ours to finish.
+	--
+	-- Arguments:
+	-- * conf: The configuration received from the config service.
+	-- * endpoint: The resolved endpoint of the concentrator.
+
+	local wan = util.wan_mtu()
+	if wan == nil then
+		-- Nothing to improve on without a WAN MTU.
+		return conf.mtu
+	end
+
+	local mtu = math.min(conf.mtu, wan - WG_OVERHEAD[endpoint_family(endpoint)])
+	if mtu < MIN_MTU then
+		util.log("A tunnel MTU of " .. mtu .. " would not carry IPv6. Using " .. MIN_MTU .. " instead")
+		return MIN_MTU
+	end
+	return mtu
+end
+
+local function set_link_mtu(iface, mtu)
+	-- Resize an interface, unless it already has the MTU we want. Every
+	-- run of this script would otherwise resize every tunnel it finds.
+
+	if tonumber(util.read_file("/sys/class/net/" .. iface .. "/mtu") or "") == mtu then
+		return
+	end
+	util.log("Updating MTU on wg-interface " .. iface .. " to " .. mtu)
+	os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
+end
+
 local function conf_wg_iface(iface, privkey, peers, keepalive, allowed_ips)
 	-- Configure Wireguard parameters on an existing wg-interface
 	-- Every peer needs a resolved_endpoint, see resolve_endpoint().
@@ -199,16 +257,19 @@ local function apply_wg(conf)
 		else
 			target_ifaces[iface] = conc
 			if current[iface] == nil then
-				util.log("Creating wg-interface " .. iface .. " with mtu " .. conf.mtu)
+				local mtu = tunnel_mtu(conf, conc.resolved_endpoint)
+				util.log("Creating wg-interface " .. iface .. " with mtu " .. mtu)
 				os.execute("ip link add " .. iface .. " type wireguard")
-				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+				os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
 				conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive, allowed_ips)
 				util.log("Setting wg-interface " .. iface .. " up")
 				os.execute("ip link set up " .. iface)
 				conf_tc_iface(iface)
-			else
-				util.log("Updating MTU on wg-interface " .. iface .. " to " .. conf.mtu)
-				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+			elseif conc.resolved_endpoint ~= nil then
+				-- An interface is sized for the endpoint it is about to be
+				-- configured with. While that endpoint is unresolvable we
+				-- keep the peer as it is, so its MTU stays as well.
+				set_link_mtu(iface, tunnel_mtu(conf, conc.resolved_endpoint))
 			end
 		end
 	end
