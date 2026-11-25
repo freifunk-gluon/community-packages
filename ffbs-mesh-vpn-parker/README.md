@@ -44,6 +44,10 @@ mesh_vpn = {
 },
 ```
 
+* `dns.servers` (required, list of IPv6 addresses):
+  Every routing node is the DNS server of its clients (DHCPv4 and RDNSS
+  point to the node), and its dnsmasq forwards their queries to these
+  servers through the tunnel.
 * `ntp_servers` (required, list of strings):
   The node sends the first entry of this list to its clients in DHCP
   option 42.
