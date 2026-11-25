@@ -222,6 +222,8 @@ local function set_peer_addr(iface, family, addr, peer, prefixlen)
 	-- * addr: The local address.
 	-- * peer: The peer address.
 	-- * prefixlen: The prefix length of the address.
+	--
+	-- Returns true if the local address was missing.
 
 	local spec = addr .. "/" .. prefixlen .. " peer " .. peer .. " dev " .. iface
 	if os.execute("ip " .. family .. " addr add " .. spec .. " 2>/dev/null") == 0 then
@@ -229,9 +231,11 @@ local function set_peer_addr(iface, family, addr, peer, prefixlen)
 		util.log("Updating " .. (family == "-4" and "IPv4" or "IPv6") .. " addr on wg-iface " .. iface)
 		os.execute("ip " .. family .. " addr flush dev " .. iface .. " scope global")
 		os.execute("ip " .. family .. " addr add " .. spec)
+		return true
 	elseif family == "-6" then
 		os.execute("ip -6 addr replace " .. spec)
 	end
+	return false
 end
 
 local function apply_wg(conf)
@@ -243,6 +247,7 @@ local function apply_wg(conf)
 
 	local current = util.get_wg_info()
 	local target_ifaces = {}
+	local changed = false
 	local allowed_ips = wg_allowed_ips(conf)
 	local ipv6_first = prefer_ipv6()
 
@@ -265,6 +270,7 @@ local function apply_wg(conf)
 				util.log("Setting wg-interface " .. iface .. " up")
 				os.execute("ip link set up " .. iface)
 				conf_tc_iface(iface)
+				changed = true
 			elseif conc.resolved_endpoint ~= nil then
 				-- An interface is sized for the endpoint it is about to be
 				-- configured with. While that endpoint is unresolvable we
@@ -281,6 +287,7 @@ local function apply_wg(conf)
 			-- connect to other concentrators from now on.
 			util.log("Removing wg-interface " .. iface)
 			os.execute("ip link del " .. iface)
+			changed = true
 		else
 			-- Update configuration on existing interfaces to what the config
 			-- service has told us to use.
@@ -355,6 +362,7 @@ local function apply_wg(conf)
 					-- The active configuration differs from the received configuration.
 					-- Let's update it.
 					conf_wg_iface(iface, PRIVKEY, { target }, conf.wg_keepalive, allowed_ips)
+					changed = true
 				end
 			else
 				-- Our Wireguard interfaces should always only have one peer.
@@ -368,18 +376,53 @@ local function apply_wg(conf)
 
 	-- set ip addresses
 	for iface, conc in pairs(target_ifaces) do
-		set_peer_addr(iface, "-4", conf.address4, conc.address4, 32)
-		set_peer_addr(iface, "-6", conf.address6, conc.address6, 128)
+		if set_peer_addr(iface, "-4", conf.address4, conc.address4, 32) then
+			changed = true
+		end
+		if set_peer_addr(iface, "-6", conf.address6, conc.address6, 128) then
+			changed = true
+		end
 	end
 
 	-- ebpf-clat runs one instance per wg-interface, so reload a running
-	-- ebpf-clat to translate on newly added interfaces as well.
-	if util.read_file("/etc/init.d/ebpf-clat") ~= nil then
+	-- ebpf-clat when a tunnel or its address changed, to translate on newly
+	-- added interfaces as well.
+	if changed and util.read_file("/etc/init.d/ebpf-clat") ~= nil then
 		util.log("Reloading ebpf-clat")
 		os.execute("/etc/init.d/ebpf-clat running && /etc/init.d/ebpf-clat reload")
 	end
 
 	return true
+end
+
+-- Keys that change in the answer of the config service without a change
+-- for the node: nonce and time change with each request.
+local VOLATILE = { nonce = true, time = true }
+
+-- Is b equal to a? Tables are compared by value, without the VOLATILE keys.
+local function same_value(a, b)
+	if type(a) ~= "table" or type(b) ~= "table" then
+		return a == b
+	end
+	for k, v in pairs(a) do
+		if not VOLATILE[k] and not same_value(v, b[k]) then
+			return false
+		end
+	end
+	for k in pairs(b) do
+		if not VOLATILE[k] and a[k] == nil then
+			return false
+		end
+	end
+	return true
+end
+
+-- Is the configuration in new_path equal to the one in old_path?
+-- Compare the files, not conf: apply_wg() adds keys to conf.
+local function same_config(old_path, new_path)
+	local old = json.parse(util.read_file(old_path) or "")
+	local new = json.parse(util.read_file(new_path) or "")
+	return type(old) == "table" and type(new) == "table" and same_value(new, old)
 end
 
 local function apply_time(conf)
@@ -410,11 +453,15 @@ if conf.id ~= nil then
 	apply_time(conf)
 	local res_wg = apply_wg(conf)
 
-	-- the config has been validated.
-	-- do an atomic replace in $tmpdir where noderoute.lua will
-	-- fetch it from.
-	os.execute("cp " .. config_file .. " " .. config_file .. ".copy")
-	os.execute("mv " .. config_file .. ".copy " .. tmpdir .. "/noderoute.json")
+	-- The config has been validated. Do an atomic replace in $tmpdir, where
+	-- noderoute.sh reads it. noderoute.sh starts a new cycle when the file
+	-- is newer than its last cycle. Thus replace the file only when the
+	-- content changed.
+	local noderoute_json = tmpdir .. "/noderoute.json"
+	if not same_config(noderoute_json, config_file) then
+		os.execute("cp " .. config_file .. " " .. config_file .. ".copy")
+		os.execute("mv " .. config_file .. ".copy " .. noderoute_json)
+	end
 	if not res_wg then
 		os.exit(1)
 	end
