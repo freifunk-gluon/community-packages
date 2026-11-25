@@ -147,6 +147,35 @@ local function conf_tc_iface(iface)
 	end
 end
 
+local function set_peer_addr(iface, family, addr, peer, prefixlen)
+	-- Makes addr with peer the global address of the given family on an
+	-- interface. An address that is already set stays untouched: removing
+	-- the last IPv4 address of an interface also removes its routes.
+	--
+	-- "ip addr add" fails if the address exists. For IPv4 the peer is part
+	-- of the address, for IPv6 only the local address is compared, so a
+	-- changed IPv6 peer is applied with "replace", which keeps the address.
+	-- This needs no parsing of "ip addr show", whose output differs between
+	-- busybox and iproute2.
+	--
+	-- Arguments:
+	-- * iface: The name of the interface.
+	-- * family: "-4" or "-6".
+	-- * addr: The local address.
+	-- * peer: The peer address.
+	-- * prefixlen: The prefix length of the address.
+
+	local spec = addr .. "/" .. prefixlen .. " peer " .. peer .. " dev " .. iface
+	if os.execute("ip " .. family .. " addr add " .. spec .. " 2>/dev/null") == 0 then
+		-- The address was missing: drop any old one.
+		util.log("Updating " .. (family == "-4" and "IPv4" or "IPv6") .. " addr on wg-iface " .. iface)
+		os.execute("ip " .. family .. " addr flush dev " .. iface .. " scope global")
+		os.execute("ip " .. family .. " addr add " .. spec)
+	elseif family == "-6" then
+		os.execute("ip -6 addr replace " .. spec)
+	end
+end
+
 local function apply_wg(conf)
 	-- Make sure the Wireguard interfaces on this system match
 	-- the configuration we've got from the config service.
@@ -276,21 +305,10 @@ local function apply_wg(conf)
 		end
 	end
 
-	-- check ip addresses
+	-- set ip addresses
 	for iface, conc in pairs(target_ifaces) do
-		local state = util.check_output("ip addr show dev " .. iface)
-		-- check ipv4
-		if string.find(state, "inet " .. conf.address4 .. " peer " .. conc.address4) == nil then
-			util.log("Updating IPv4 addr on wg-iface " .. iface)
-			os.execute("ip -4 addr flush dev " .. iface .. " scope global")
-			os.execute("ip -4 addr add " .. conf.address4 .. "/32 peer " .. conc.address4 .. " dev " .. iface)
-		end
-		-- check ipv6
-		if string.find(state, "inet6 " .. conf.address6 .. " peer " .. conc.address6) == nil then
-			util.log("Updating IPv6 addr on wg-iface " .. iface)
-			os.execute("ip -6 addr flush dev " .. iface .. " scope global")
-			os.execute("ip -6 addr replace " .. conf.address6 .. "/128 peer " .. conc.address6 .. " dev " .. iface)
-		end
+		set_peer_addr(iface, "-4", conf.address4, conc.address4, 32)
+		set_peer_addr(iface, "-6", conf.address6, conc.address6, 128)
 	end
 
 	-- ebpf-clat runs one instance per wg-interface, so reload a running
