@@ -258,6 +258,23 @@ local function iface_status(iface)
 	return json.parse(output)
 end
 
+local function client_ula_address()
+	-- The address a classic Gluon node gets by SLAAC from its own router
+	-- advertisement: prefix6 plus the EUI-64 of the MAC of br-client.
+	-- gluon-status-page redirects the next-node address only to a node
+	-- address inside prefix6. A routing node does not receive its own
+	-- advertisement, so client6 carries the address statically there.
+	-- Without a prefix6 there is nothing to carry.
+	local prefix6 = require("gluon.site").prefix6()
+	local mac = uci.get("network", NETWORK_IFACE, "macaddr")
+	if prefix6 == nil or mac == nil then
+		return nil
+	end
+	-- mac_to_ip returns a /128 built from the first 64 bits of the prefix
+	local address = require("gluon.iputil").mac_to_ip(prefix6, mac):gsub("/128$", "/64")
+	return address
+end
+
 local function network_applied(conf, target_state)
 	-- Has netifd applied the interface configuration we have committed?
 	-- On a mode switch the protocol changes, so the state from before the
@@ -341,6 +358,15 @@ local function apply_network(conf, target_state, mtu)
 			util.log(NETWORK_IFACE .. " xlat_range6: " .. conf.xlat_range6)
 		end
 		uci_set("network", "client6", "proto", "static")
+		-- The prefix6 address belongs to client6 in both states: by SLAAC
+		-- when inactive, static here. On a switch netifd then takes it
+		-- down and up again with the one interface, instead of client
+		-- adding it while client6 is still removing its SLAAC address.
+		local ula_address = client_ula_address()
+		if ula_address ~= nil then
+			uci_set("network", "client6", "ip6addr", ula_address)
+			util.log("client6 ip6addr: " .. ula_address)
+		end
 		uci_set("network", "gluon_bat0", "gw_mode", "server")
 		if not util.check_output("ebtables-tiny -L PARKER_RADV"):find("DROP") then
 			os.execute("ebtables-tiny -A PARKER_RADV -j DROP")
@@ -364,6 +390,9 @@ local function apply_network(conf, target_state, mtu)
 		uci_delete("network", NETWORK_IFACE, "ipaddr")
 		uci_delete("network", NETWORK_IFACE, "ip6addr")
 		uci_delete("network", NETWORK_IFACE, "xlat_range6")
+		if uci.get("network", "client6", "ip6addr") ~= nil then
+			uci_delete("network", "client6", "ip6addr")
+		end
 		uci_set("network", "client6", "proto", "dhcpv6")
 
 		local dnsmasq = dnsmasq_section()

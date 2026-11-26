@@ -21,6 +21,14 @@ advertisements of other nodes, which `gluon-radv-filterd` passes on. A
 site without `prefix6` gets no `uradvd` in this mode: the script exits with
 an error.
 
+A routing node does not receive its own advertisement, so `noderoute.lua`
+also gives `br-client` the address that SLAAC would derive from `prefix6`
+and the MAC of `br-client` (as a `/64`, next to the address of its range).
+`gluon-status-page` redirects a visit of the next-node address only to a
+node address inside `prefix6`, and the node has such an address in both
+modes: a mesh-only node takes it by SLAAC from the advertisements it
+receives.
+
 Both modes rely on the next-node address lying inside `prefix6`, which the
 clients then resolve on their own segment. A site whose next-node address is
 outside of it, or which sets `next_node.ip4`, adds `ffbs-parker-nextnode` to
