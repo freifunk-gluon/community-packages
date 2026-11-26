@@ -1,0 +1,74 @@
+#!/usr/bin/lua
+
+-- With a range6 (written by noderoute) the node is the default router of its
+-- clients on br-client; without one it announces prefix6 on local-node like a
+-- classic Gluon node.
+
+local site = require 'gluon.site'
+local util = require 'gluon.util'
+
+-- The node is the default router of its clients, unlike in a classic Gluon
+-- mesh where uradvd only announces the prefix (default lifetime 0). Every
+-- node announces its own prefix, so a client that roams to another node has
+-- to drop the old prefix and router quickly: keep the lifetimes short and
+-- the RAs frequent. The router lifetime equals the valid lifetime, and RAs
+-- come often enough for at least three of them to fall into one lifetime.
+-- The site may override all of this via radvd.*; the fallbacks keep the
+-- node usable if it does not.
+local function lifetimes(default_lifetime)
+	io.write(' --default-lifetime ' .. default_lifetime)
+	io.write(' --min-router-adv-interval ' .. site.radvd.min_interval(20))
+	io.write(' --max-router-adv-interval ' .. site.radvd.max_interval(50))
+	io.write(' --preferred-lifetime ' .. site.radvd.preferred_lifetime(120))
+	io.write(' --valid-lifetime ' .. site.radvd.valid_lifetime(180))
+end
+
+local range6 = util.readfile('/tmp/range6')
+if not range6 then
+	if not site.prefix6() then
+		os.exit(1)
+	end
+	-- A node without a tunnel must never announce itself as a default
+	-- router, whatever radvd.default_lifetime says: lifetime 0 is forced.
+	io.write('-i local-node -p ' .. site.prefix6())
+	if site.dns.servers() and site.next_node.ip6() then
+		io.write(' --rdnss ' .. site.next_node.ip6())
+	end
+	lifetimes(0)
+	os.exit(0)
+end
+
+-- range6 comes first: radv-filterd's redirect takes the first /64 of an RA
+-- as the prefix of the router.
+io.write('-i br-client -p ' .. range6)
+
+-- The clients also need the site prefix as an on-link prefix: the next-node
+-- address lives in it, and without it a client resolves that address through
+-- its router instead of on the local link (upstream Gluon relies on the
+-- prefix being on-link for this). The prefix is advertised for SLAAC as well,
+-- as in upstream Gluon, so clients get a second, unique-local address.
+if site.prefix6() then
+	io.write(' -p ' .. site.prefix6())
+end
+
+local addr6 = util.readfile('/tmp/addr6')
+if addr6 then
+	io.write(' --rdnss ' .. addr6)
+end
+
+-- Only a node that translates IPv4 for its clients announces a NAT64
+-- prefix (RFC 8781); the file is absent on all other nodes.
+local pref64 = util.readfile('/tmp/pref64')
+if pref64 then
+	io.write(' --pref64 ' .. pref64)
+end
+
+-- Everything our clients send leaves through a tunnel, so they are told
+-- what fits into it (RFC 4861). noderoute writes the file while that is
+-- known, and never writes a value uradvd would refuse to advertise.
+local adv_mtu = util.readfile('/tmp/adv_mtu')
+if adv_mtu then
+	io.write(' --adv-link-mtu ' .. adv_mtu)
+end
+
+lifetimes(site.radvd.default_lifetime(180))
