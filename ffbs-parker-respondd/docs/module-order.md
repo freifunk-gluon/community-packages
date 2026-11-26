@@ -4,6 +4,7 @@ Module order
 respondd merges the output of its modules in the order of their file names.
 For the same key, the last module wins. This package installs its module as
 `zz-ffbs-parker-respondd.so`, so it comes after `gluon-mesh-batman-adv.so`
+(`gluon-mesh-batman-adv-common.so` in a Gluon that ships the common package)
 and `gluon-radv-filterd.so`. Thus its values replace theirs for these keys
 of `statistics`:
 

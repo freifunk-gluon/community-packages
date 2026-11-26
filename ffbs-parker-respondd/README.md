@@ -69,8 +69,8 @@ Meshviewer (yanic) shows `total - wifi` as other (LAN) clients.
 
 respondd merges its modules in the order of the file names. For the same
 key, the last module wins. Thus this package installs its module as
-`zz-ffbs-parker-respondd.so`, after `gluon-mesh-batman-adv.so` and
-`gluon-radv-filterd.so`.
+`zz-ffbs-parker-respondd.so`, after `gluon-mesh-batman-adv.so` (or
+`gluon-mesh-batman-adv-common.so`) and `gluon-radv-filterd.so`.
 
 Usage with Meshviewer
 ---------------------
