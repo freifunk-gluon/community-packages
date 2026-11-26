@@ -41,7 +41,8 @@ local CLAT_OVERHEAD = 20 + 8
 local MIN_ADV_MTU = 1280
 
 -- Where uradvd picks up the MTU we want it to advertise, see
--- /lib/gluon/radvd/arguments.
+-- /lib/gluon/radvd/arguments of ffbs-mesh-batman-adv-parker. Gluon forks
+-- that carry the parker arguments in core read the same files.
 local ADV_MTU_FILE = "/tmp/adv_mtu"
 
 -- The NAT64 prefix we announce to our clients, in the notation uradvd

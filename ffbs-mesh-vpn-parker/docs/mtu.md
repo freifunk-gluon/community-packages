@@ -17,11 +17,11 @@ Router advertisements
 ---------------------
 
 `noderoute.lua` writes the MTU to `/tmp/adv_mtu`, and
-`/lib/gluon/radvd/arguments` has to pass it to uradvd with
-`--adv-link-mtu`. Upstream Gluon does not pass it, and the main branch of
+`/lib/gluon/radvd/arguments` of `ffbs-mesh-batman-adv-parker` passes it to
+uradvd with `--adv-link-mtu`. Upstream Gluon does not pass it, and the main branch of
 uradvd has no `--adv-link-mtu`. Thus the router advertisements only carry
-the MTU with the radvd arguments of the FreifunkMUC Gluon fork (branch
-`v2025.1.x-parker`) and a uradvd that has `--adv-link-mtu`.
+the MTU with a uradvd that has `--adv-link-mtu`. The same holds for the
+Gluon forks, which pass it from their own `radvd/arguments`.
 
 uradvd exits when it gets an MTU below 1280, so `noderoute.lua` does not
 write such a value.
