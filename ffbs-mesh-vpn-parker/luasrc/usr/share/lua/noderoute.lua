@@ -464,6 +464,19 @@ local function apply_network(conf, target_state, mtu)
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
+		elseif require("gluon.site").prefix6() then
+			-- Without a range6 the radvd arguments make uradvd
+			-- announce the site prefix on local-node only (never as a
+			-- default router), so that the next-node address keeps
+			-- working on a node that only meshes.
+			util.log("Announcing the site prefix only, mesh-only mode")
+			os.execute("/etc/init.d/gluon-radvd restart")
+			-- radv-filterd still holds the node itself as the best
+			-- router until its last router lifetime has run out, so
+			-- its clients would be left without a default route for
+			-- up to three minutes. Starting it afresh makes it pick
+			-- one of the other nodes from their next advertisements.
+			os.execute("/etc/init.d/gluon-radv-filterd restart")
 		else
 			-- Without a prefix uradvd exits at once, and procd stops
 			-- respawning it after a few attempts.
