@@ -1,0 +1,30 @@
+#!/usr/bin/lua
+
+-- Runs before 010-primary-mac, which detects the primary MAC again when
+-- none is stored.
+
+local platform = require 'gluon.platform'
+local sysconfig = require 'gluon.sysconfig'
+local util = require 'gluon.util'
+
+if not platform.match('mediatek', 'filogic', {
+	'dlink,aquila-pro-ai-m30-a1',
+	'dlink,aquila-pro-ai-m60-a1',
+}) then
+	os.exit(0)
+end
+
+local mac = sysconfig.primary_mac
+if not mac then
+	os.exit(0)
+end
+
+-- A factory address is globally administered. The broken one starts with
+-- 06:00, which has the locally administered bit set.
+local first = tonumber(mac:sub(1, 2), 16)
+if not first or math.floor(first / 2) % 2 == 0 then
+	os.exit(0)
+end
+
+sysconfig.primary_mac = nil
+util.log('dlink-aquila-mac-fix: dropped the broken primary MAC ' .. mac, true)
