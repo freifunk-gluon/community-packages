@@ -9,6 +9,15 @@ local tmpdir = arg[3]
 
 local PRIVKEY = "/etc/parker/wg-privkey"
 
+-- What Wireguard puts in front of every packet it sends: 16 bytes of its
+-- own header, a 16 byte authentication tag, the UDP header and the IP
+-- header of the family the endpoint lives in.
+local WG_OVERHEAD = { [4] = 20 + 8 + 32, [6] = 40 + 8 + 32 }
+
+-- IPv6 needs 1280 bytes on every link. Sizing a tunnel below that makes
+-- the kernel drop IPv6 from the interface.
+local MIN_MTU = 1280
+
 util.loggername = "nodeconfig.lua"
 
 local function prefer_ipv6()
@@ -109,6 +118,55 @@ local function same_allowed_ips(current_ips, target_ips)
 	return true
 end
 
+local function endpoint_family(endpoint)
+	-- The address family a resolved endpoint lives in. join_endpoint()
+	-- puts IPv6 addresses in brackets, the same way wg reports them.
+
+	if string.sub(endpoint, 1, 1) == "[" then
+		return 6
+	end
+	return 4
+end
+
+local function tunnel_mtu(conf, endpoint)
+	-- The MTU a tunnel to this endpoint may use: what is left of the WAN
+	-- MTU once Wireguard has added its headers, but never more than the
+	-- config service allows.
+	--
+	-- The config service is only told our WAN MTU, so it cannot know
+	-- whether we end up talking to a concentrator over IPv6 or over IPv4,
+	-- which differ by the 20 bytes between the two IP headers. Sizing the
+	-- interface is therefore ours to finish.
+	--
+	-- Arguments:
+	-- * conf: The configuration received from the config service.
+	-- * endpoint: The resolved endpoint of the concentrator.
+
+	local wan = util.wan_mtu()
+	if wan == nil then
+		-- Nothing to improve on without a WAN MTU.
+		return conf.mtu
+	end
+
+	local mtu = math.min(conf.mtu, wan - WG_OVERHEAD[endpoint_family(endpoint)])
+	if mtu < MIN_MTU then
+		util.log("A tunnel MTU of " .. mtu .. " would not carry IPv6. Using " .. MIN_MTU .. " instead")
+		return MIN_MTU
+	end
+	return mtu
+end
+
+local function set_link_mtu(iface, mtu)
+	-- Resize an interface, unless it already has the MTU we want. Every
+	-- run of this script would otherwise resize every tunnel it finds.
+
+	if tonumber(util.read_file("/sys/class/net/" .. iface .. "/mtu") or "") == mtu then
+		return
+	end
+	util.log("Updating MTU on wg-interface " .. iface .. " to " .. mtu)
+	os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
+end
+
 local function conf_wg_iface(iface, privkey, peers, keepalive, allowed_ips)
 	-- Configure Wireguard parameters on an existing wg-interface
 	-- Every peer needs a resolved_endpoint, see resolve_endpoint().
@@ -147,6 +205,39 @@ local function conf_tc_iface(iface)
 	end
 end
 
+local function set_peer_addr(iface, family, addr, peer, prefixlen)
+	-- Makes addr with peer the global address of the given family on an
+	-- interface. An address that is already set stays untouched: removing
+	-- the last IPv4 address of an interface also removes its routes.
+	--
+	-- "ip addr add" fails if the address exists. For IPv4 the peer is part
+	-- of the address, for IPv6 only the local address is compared, so a
+	-- changed IPv6 peer is applied with "replace", which keeps the address.
+	-- This needs no parsing of "ip addr show", whose output differs between
+	-- busybox and iproute2.
+	--
+	-- Arguments:
+	-- * iface: The name of the interface.
+	-- * family: "-4" or "-6".
+	-- * addr: The local address.
+	-- * peer: The peer address.
+	-- * prefixlen: The prefix length of the address.
+	--
+	-- Returns true if the local address was missing.
+
+	local spec = addr .. "/" .. prefixlen .. " peer " .. peer .. " dev " .. iface
+	if os.execute("ip " .. family .. " addr add " .. spec .. " 2>/dev/null") == 0 then
+		-- The address was missing: drop any old one.
+		util.log("Updating " .. (family == "-4" and "IPv4" or "IPv6") .. " addr on wg-iface " .. iface)
+		os.execute("ip " .. family .. " addr flush dev " .. iface .. " scope global")
+		os.execute("ip " .. family .. " addr add " .. spec)
+		return true
+	elseif family == "-6" then
+		os.execute("ip -6 addr replace " .. spec)
+	end
+	return false
+end
+
 local function apply_wg(conf)
 	-- Make sure the Wireguard interfaces on this system match
 	-- the configuration we've got from the config service.
@@ -156,6 +247,7 @@ local function apply_wg(conf)
 
 	local current = util.get_wg_info()
 	local target_ifaces = {}
+	local changed = false
 	local allowed_ips = wg_allowed_ips(conf)
 	local ipv6_first = prefer_ipv6()
 
@@ -170,16 +262,20 @@ local function apply_wg(conf)
 		else
 			target_ifaces[iface] = conc
 			if current[iface] == nil then
-				util.log("Creating wg-interface " .. iface .. " with mtu " .. conf.mtu)
+				local mtu = tunnel_mtu(conf, conc.resolved_endpoint)
+				util.log("Creating wg-interface " .. iface .. " with mtu " .. mtu)
 				os.execute("ip link add " .. iface .. " type wireguard")
-				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+				os.execute("ip link set dev " .. iface .. " mtu " .. mtu)
 				conf_wg_iface(iface, PRIVKEY, { conc }, conf.wg_keepalive, allowed_ips)
 				util.log("Setting wg-interface " .. iface .. " up")
 				os.execute("ip link set up " .. iface)
 				conf_tc_iface(iface)
-			else
-				util.log("Updating MTU on wg-interface " .. iface .. " to " .. conf.mtu)
-				os.execute("ip link set dev " .. iface .. " mtu " .. conf.mtu)
+				changed = true
+			elseif conc.resolved_endpoint ~= nil then
+				-- An interface is sized for the endpoint it is about to be
+				-- configured with. While that endpoint is unresolvable we
+				-- keep the peer as it is, so its MTU stays as well.
+				set_link_mtu(iface, tunnel_mtu(conf, conc.resolved_endpoint))
 			end
 		end
 	end
@@ -191,6 +287,7 @@ local function apply_wg(conf)
 			-- connect to other concentrators from now on.
 			util.log("Removing wg-interface " .. iface)
 			os.execute("ip link del " .. iface)
+			changed = true
 		else
 			-- Update configuration on existing interfaces to what the config
 			-- service has told us to use.
@@ -265,6 +362,7 @@ local function apply_wg(conf)
 					-- The active configuration differs from the received configuration.
 					-- Let's update it.
 					conf_wg_iface(iface, PRIVKEY, { target }, conf.wg_keepalive, allowed_ips)
+					changed = true
 				end
 			else
 				-- Our Wireguard interfaces should always only have one peer.
@@ -276,31 +374,55 @@ local function apply_wg(conf)
 		end
 	end
 
-	-- check ip addresses
+	-- set ip addresses
 	for iface, conc in pairs(target_ifaces) do
-		local state = util.check_output("ip addr show dev " .. iface)
-		-- check ipv4
-		if string.find(state, "inet " .. conf.address4 .. " peer " .. conc.address4) == nil then
-			util.log("Updating IPv4 addr on wg-iface " .. iface)
-			os.execute("ip -4 addr flush dev " .. iface .. " scope global")
-			os.execute("ip -4 addr add " .. conf.address4 .. "/32 peer " .. conc.address4 .. " dev " .. iface)
+		if set_peer_addr(iface, "-4", conf.address4, conc.address4, 32) then
+			changed = true
 		end
-		-- check ipv6
-		if string.find(state, "inet6 " .. conf.address6 .. " peer " .. conc.address6) == nil then
-			util.log("Updating IPv6 addr on wg-iface " .. iface)
-			os.execute("ip -6 addr flush dev " .. iface .. " scope global")
-			os.execute("ip -6 addr replace " .. conf.address6 .. "/128 peer " .. conc.address6 .. " dev " .. iface)
+		if set_peer_addr(iface, "-6", conf.address6, conc.address6, 128) then
+			changed = true
 		end
 	end
 
 	-- ebpf-clat runs one instance per wg-interface, so reload a running
-	-- ebpf-clat to translate on newly added interfaces as well.
-	if util.read_file("/etc/init.d/ebpf-clat") ~= nil then
+	-- ebpf-clat when a tunnel or its address changed, to translate on newly
+	-- added interfaces as well.
+	if changed and util.read_file("/etc/init.d/ebpf-clat") ~= nil then
 		util.log("Reloading ebpf-clat")
 		os.execute("/etc/init.d/ebpf-clat running && /etc/init.d/ebpf-clat reload")
 	end
 
 	return true
+end
+
+-- Keys that change in the answer of the config service without a change
+-- for the node: nonce and time change with each request.
+local VOLATILE = { nonce = true, time = true }
+
+-- Is b equal to a? Tables are compared by value, without the VOLATILE keys.
+local function same_value(a, b)
+	if type(a) ~= "table" or type(b) ~= "table" then
+		return a == b
+	end
+	for k, v in pairs(a) do
+		if not VOLATILE[k] and not same_value(v, b[k]) then
+			return false
+		end
+	end
+	for k in pairs(b) do
+		if not VOLATILE[k] and a[k] == nil then
+			return false
+		end
+	end
+	return true
+end
+
+-- Is the configuration in new_path equal to the one in old_path?
+-- Compare the files, not conf: apply_wg() adds keys to conf.
+local function same_config(old_path, new_path)
+	local old = json.parse(util.read_file(old_path) or "")
+	local new = json.parse(util.read_file(new_path) or "")
+	return type(old) == "table" and type(new) == "table" and same_value(new, old)
 end
 
 local function apply_time(conf)
@@ -331,11 +453,15 @@ if conf.id ~= nil then
 	apply_time(conf)
 	local res_wg = apply_wg(conf)
 
-	-- the config has been validated.
-	-- do an atomic replace in $tmpdir where noderoute.lua will
-	-- fetch it from.
-	os.execute("cp " .. config_file .. " " .. config_file .. ".copy")
-	os.execute("mv " .. config_file .. ".copy " .. tmpdir .. "/noderoute.json")
+	-- The config has been validated. Do an atomic replace in $tmpdir, where
+	-- noderoute.sh reads it. noderoute.sh starts a new cycle when the file
+	-- is newer than its last cycle. Thus replace the file only when the
+	-- content changed.
+	local noderoute_json = tmpdir .. "/noderoute.json"
+	if not same_config(noderoute_json, config_file) then
+		os.execute("cp " .. config_file .. " " .. config_file .. ".copy")
+		os.execute("mv " .. config_file .. ".copy " .. noderoute_json)
+	end
 	if not res_wg then
 		os.exit(1)
 	end

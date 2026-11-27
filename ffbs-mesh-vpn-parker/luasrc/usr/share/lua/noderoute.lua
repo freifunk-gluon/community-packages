@@ -7,7 +7,15 @@ local RT_PROTO = "23"
 
 local tmpdir = arg[1]
 
-local DHCP_IFACE = "client"
+-- The network interface of the client bridge. dnsmasq tags the range and the
+-- options of a dhcp section with the name of its interface, not of the section.
+local NETWORK_IFACE = "client"
+-- The dhcp section for it that gluon-client-bridge creates (ignore=1). Routing
+-- switches ignore off and brings the pool, the inactive state restores what
+-- Gluon made. A Gluon that deletes the section in core gets it from here.
+local DHCP_SECTION = "local_client"
+-- Section of older firmware, which served the clients next to Gluon's own.
+local LEGACY_DHCP_SECTION = "client"
 local CONFIG_FILE = tmpdir .. "/noderoute.json"
 
 -- The IPv4 default route that set_wg_route() has set last, in the notation
@@ -33,7 +41,8 @@ local CLAT_OVERHEAD = 20 + 8
 local MIN_ADV_MTU = 1280
 
 -- Where uradvd picks up the MTU we want it to advertise, see
--- /lib/gluon/radvd/arguments.
+-- /lib/gluon/radvd/arguments of ffbs-mesh-batman-adv-parker. Gluon forks
+-- that carry the parker arguments in core read the same files.
 local ADV_MTU_FILE = "/tmp/adv_mtu"
 
 -- The NAT64 prefix we announce to our clients, in the notation uradvd
@@ -211,15 +220,15 @@ local function set_client_option(name, values)
 	-- when there are no values. Returns whether uci has changed, i.e.
 	-- whether dnsmasq has to be reloaded.
 
-	local options = dhcp.merge_option(uci.get("dhcp", DHCP_IFACE, "dhcp_option"), name, values)
+	local options = dhcp.merge_option(uci.get("dhcp", DHCP_SECTION, "dhcp_option"), name, values)
 	if options == nil then
 		return false
 	end
 	if #options > 0 then
-		uci_set("dhcp", DHCP_IFACE, "dhcp_option", options)
+		uci_set("dhcp", DHCP_SECTION, "dhcp_option", options)
 	else
 		-- uci cannot hold an empty list.
-		uci_delete("dhcp", DHCP_IFACE, "dhcp_option")
+		uci_delete("dhcp", DHCP_SECTION, "dhcp_option")
 	end
 	uci_commit("dhcp")
 	return true
@@ -249,11 +258,28 @@ local function iface_status(iface)
 	return json.parse(output)
 end
 
+local function client_ula_address()
+	-- The address a classic Gluon node gets by SLAAC from its own router
+	-- advertisement: prefix6 plus the EUI-64 of the MAC of br-client.
+	-- gluon-status-page redirects the next-node address only to a node
+	-- address inside prefix6. A routing node does not receive its own
+	-- advertisement, so client6 carries the address statically there.
+	-- Without a prefix6 there is nothing to carry.
+	local prefix6 = require("gluon.site").prefix6()
+	local mac = uci.get("network", NETWORK_IFACE, "macaddr")
+	if prefix6 == nil or mac == nil then
+		return nil
+	end
+	-- mac_to_ip returns a /128 built from the first 64 bits of the prefix
+	local address = require("gluon.iputil").mac_to_ip(prefix6, mac):gsub("/128$", "/64")
+	return address
+end
+
 local function network_applied(conf, target_state)
 	-- Has netifd applied the interface configuration we have committed?
 	-- On a mode switch the protocol changes, so the state from before the
 	-- reload cannot match.
-	local status = iface_status(DHCP_IFACE)
+	local status = iface_status(NETWORK_IFACE)
 	if status == nil then
 		return false
 	end
@@ -278,12 +304,19 @@ local function services_ready()
 	if os.execute("pidof uradvd >/dev/null") ~= 0 then
 		return false
 	end
-	return os.execute("grep -qsF 'dhcp-range=set:" .. DHCP_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
+	return os.execute("grep -qsF 'dhcp-range=set:" .. NETWORK_IFACE .. "' /var/etc/dnsmasq.conf.cfg*") == 0
 end
 
 local function apply_network(conf, target_state, mtu)
-	if uci.get("dhcp", DHCP_IFACE) == nil then
-		uci_set("dhcp", DHCP_IFACE, "dhcp")
+	if uci.get("dhcp", LEGACY_DHCP_SECTION) ~= nil then
+		-- Two sections for one interface would both feed dnsmasq.
+		util.log("Removing the legacy dhcp." .. LEGACY_DHCP_SECTION .. " section")
+		uci.delete("dhcp", LEGACY_DHCP_SECTION)
+	end
+	if uci.get("dhcp", DHCP_SECTION) == nil then
+		uci_set("dhcp", DHCP_SECTION, "dhcp")
+		uci_set("dhcp", DHCP_SECTION, "interface", NETWORK_IFACE)
+		uci_set("dhcp", DHCP_SECTION, "ignore", "1")
 	end
 
 	local radvd_config_deleted = false
@@ -300,12 +333,13 @@ local function apply_network(conf, target_state, mtu)
 		local limit = (2 ^ (32 - prefix_len) - 3)
 		local prefix6_len = tonumber(util.str_split(conf.range6, "[^/]+")[2])
 
-		uci_set("dhcp", DHCP_IFACE, "interface", DHCP_IFACE)
-		uci_set("dhcp", DHCP_IFACE, "leasetime", "3m")
-		uci_set("dhcp", DHCP_IFACE, "start", "2")
-		uci_set("dhcp", DHCP_IFACE, "limit", limit)
-		uci_set("dhcp", DHCP_IFACE, "force", "1")
-		util.log("Configuring DHCPD on " .. DHCP_IFACE .. " with up to " .. limit .. " leases")
+		uci_set("dhcp", DHCP_SECTION, "interface", NETWORK_IFACE)
+		uci_set("dhcp", DHCP_SECTION, "ignore", "0")
+		uci_set("dhcp", DHCP_SECTION, "leasetime", "3m")
+		uci_set("dhcp", DHCP_SECTION, "start", "2")
+		uci_set("dhcp", DHCP_SECTION, "limit", limit)
+		uci_set("dhcp", DHCP_SECTION, "force", "1")
+		util.log("Configuring DHCPD on " .. NETWORK_IFACE .. " with up to " .. limit .. " leases")
 
 		-- Gluon leaves dhcp-lease-max at the dnsmasq default, so dnsmasq
 		-- would hand out fewer leases than a larger pool has.
@@ -314,16 +348,25 @@ local function apply_network(conf, target_state, mtu)
 			uci_set("dhcp", dnsmasq, "dhcpleasemax", math.max(limit, DNSMASQ_LEASE_MAX))
 		end
 
-		uci_set("network", DHCP_IFACE, "proto", "static")
-		uci_set("network", DHCP_IFACE, "ipaddr", conf.address4 .. "/" .. prefix_len)
-		util.log(DHCP_IFACE .. " ipaddr: " .. conf.address4 .. "/" .. prefix_len)
-		uci_set("network", DHCP_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
-		util.log(DHCP_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
+		uci_set("network", NETWORK_IFACE, "proto", "static")
+		uci_set("network", NETWORK_IFACE, "ipaddr", conf.address4 .. "/" .. prefix_len)
+		util.log(NETWORK_IFACE .. " ipaddr: " .. conf.address4 .. "/" .. prefix_len)
+		uci_set("network", NETWORK_IFACE, "ip6addr", conf.address6 .. "/" .. prefix6_len)
+		util.log(NETWORK_IFACE .. " ip6addr: " .. conf.address6 .. "/" .. prefix6_len)
 		if conf.xlat_range6 then
-			uci_set("network", DHCP_IFACE, "xlat_range6", conf.xlat_range6)
-			util.log(DHCP_IFACE .. " xlat_range6: " .. conf.xlat_range6)
+			uci_set("network", NETWORK_IFACE, "xlat_range6", conf.xlat_range6)
+			util.log(NETWORK_IFACE .. " xlat_range6: " .. conf.xlat_range6)
 		end
 		uci_set("network", "client6", "proto", "static")
+		-- The prefix6 address belongs to client6 in both states: by SLAAC
+		-- when inactive, static here. On a switch netifd then takes it
+		-- down and up again with the one interface, instead of client
+		-- adding it while client6 is still removing its SLAAC address.
+		local ula_address = client_ula_address()
+		if ula_address ~= nil then
+			uci_set("network", "client6", "ip6addr", ula_address)
+			util.log("client6 ip6addr: " .. ula_address)
+		end
 		uci_set("network", "gluon_bat0", "gw_mode", "server")
 		if not util.check_output("ebtables-tiny -L PARKER_RADV"):find("DROP") then
 			os.execute("ebtables-tiny -A PARKER_RADV -j DROP")
@@ -336,12 +379,20 @@ local function apply_network(conf, target_state, mtu)
 		-- target_state == false
 		util.log("network: routing state: inactive")
 
-		uci_set("network", DHCP_IFACE, "proto", "dhcp")
-		-- dnsmasq stops its DHCPD-job when the interface is not 'proto static'
+		uci_set("network", NETWORK_IFACE, "proto", "dhcp")
+		-- dnsmasq stops its DHCPD-job when the interface is not 'proto static',
+		-- and no longer serves a pool: back to the section Gluon created.
+		uci_set("dhcp", DHCP_SECTION, "ignore", "1")
+		for _, option in ipairs({ "leasetime", "start", "limit", "force" }) do
+			uci_delete("dhcp", DHCP_SECTION, option)
+		end
 
-		uci_delete("network", DHCP_IFACE, "ipaddr")
-		uci_delete("network", DHCP_IFACE, "ip6addr")
-		uci_delete("network", DHCP_IFACE, "xlat_range6")
+		uci_delete("network", NETWORK_IFACE, "ipaddr")
+		uci_delete("network", NETWORK_IFACE, "ip6addr")
+		uci_delete("network", NETWORK_IFACE, "xlat_range6")
+		if uci.get("network", "client6", "ip6addr") ~= nil then
+			uci_delete("network", "client6", "ip6addr")
+		end
 		uci_set("network", "client6", "proto", "dhcpv6")
 
 		local dnsmasq = dnsmasq_section()
@@ -378,13 +429,13 @@ local function apply_network(conf, target_state, mtu)
 		util.sleep(1)
 		util.log("HACK: continuing with network reload")
 		os.execute("/etc/init.d/network reload")
-		util.log("Network reload finished. Waiting for " .. DHCP_IFACE .. " to be reconfigured...")
+		util.log("Network reload finished. Waiting for " .. NETWORK_IFACE .. " to be reconfigured...")
 		if util.wait_for(function()
 			return network_applied(conf, target_state)
 		end, NETWORK_TIMEOUT) then
-			util.log("..." .. DHCP_IFACE .. " has been reconfigured.")
+			util.log("..." .. NETWORK_IFACE .. " has been reconfigured.")
 		else
-			util.log("..." .. DHCP_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
+			util.log("..." .. NETWORK_IFACE .. " did not settle within " .. NETWORK_TIMEOUT .. "s. Continuing anyway.")
 		end
 		changed = true
 	end
@@ -442,6 +493,19 @@ local function apply_network(conf, target_state, mtu)
 			util.write_file("/tmp/range6", conf.range6)
 			util.write_file("/tmp/addr6", conf.address6)
 			os.execute("/etc/init.d/gluon-radvd restart")
+		elseif require("gluon.site").prefix6() then
+			-- Without a range6 the radvd arguments make uradvd
+			-- announce the site prefix on local-node only (never as a
+			-- default router), so that the next-node address keeps
+			-- working on a node that only meshes.
+			util.log("Announcing the site prefix only, mesh-only mode")
+			os.execute("/etc/init.d/gluon-radvd restart")
+			-- radv-filterd still holds the node itself as the best
+			-- router until its last router lifetime has run out, so
+			-- its clients would be left without a default route for
+			-- up to three minutes. Starting it afresh makes it pick
+			-- one of the other nodes from their next advertisements.
+			os.execute("/etc/init.d/gluon-radv-filterd restart")
 		else
 			-- Without a prefix uradvd exits at once, and procd stops
 			-- respawning it after a few attempts.

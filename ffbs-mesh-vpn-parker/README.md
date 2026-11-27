@@ -44,6 +44,10 @@ mesh_vpn = {
 },
 ```
 
+* `dns.servers` (required, list of IPv6 addresses):
+  Every routing node is the DNS server of its clients (DHCPv4 and RDNSS
+  point to the node), and its dnsmasq forwards their queries to these
+  servers through the tunnel.
 * `ntp_servers` (required, list of strings):
   The node sends the first entry of this list to its clients in DHCP
   option 42.
@@ -64,3 +68,15 @@ mesh_vpn = {
   [docs/mtu.md](docs/mtu.md).
   Gluon selects parker as the mesh VPN provider if the `mesh_vpn.parker`
   table exists.
+
+Gluon
+-----
+
+On a Gluon with `gluon-mesh-batman-adv-common`, the package is used together
+with the mesh package
+[`ffbs-mesh-batman-adv-parker`](../ffbs-mesh-batman-adv-parker/README.md),
+which provides the router advertisements of a parker node. The Gluon forks
+that carry the parker changes in core use it with `mesh-batman-adv-15`.
+The mesh package documents `prefix6` and the `radvd` options for your
+`site.conf`; see [docs/client-dhcp.md](docs/client-dhcp.md) for the DHCP
+setup.

@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#include "clients.h"
+
 #include <respondd.h>
 
+#include <iwinfo.h>
 #include <json-c/json.h>
+#include <uci.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -24,6 +28,8 @@
 #define MESH_VPN_PREFIX "wg_"
 
 #define SYSFS_NET "/sys/class/net/"
+
+#define CLIENT_BRIDGE "br-client"
 
 struct gatewayinfo {
 	char interface[IF_NAMESIZE];
@@ -224,11 +230,105 @@ static void add_traffic(struct json_object *obj) {
 	json_object_object_add(obj, "traffic", traffic);
 }
 
+/* noderoute sets the client interface to "static" while the node routes
+ * for its clients, and to "dhcp" while it is a mesh-only node. */
+static bool is_routing(struct uci_context *ctx) {
+	struct uci_package *p;
+	struct uci_section *s;
+	const char *proto;
+
+	if (uci_load(ctx, "network", &p))
+		return false;
+	s = uci_lookup_section(ctx, p, "client");
+	proto = s ? uci_lookup_option_string(ctx, s, "proto") : NULL;
+	return proto && strcmp(proto, "static") == 0;
+}
+
+static void add_iface_stations(struct macset *set, const char *ifname) {
+	const struct iwinfo_ops *iw = iwinfo_backend(ifname);
+	struct iwinfo_assoclist_entry *entry;
+	char buf[IWINFO_BUFSIZE];
+	int len;
+
+	if (!iw || iw->assoclist(ifname, buf, &len) < 0)
+		return;
+
+	for (entry = (struct iwinfo_assoclist_entry *)buf; (char *)(entry + 1) <= buf + len; entry++) {
+		if (entry->inactive > CLIENT_MAX_INACTIVITY_MS)
+			continue;
+		macset_add(set, entry->mac);
+	}
+}
+
+/* The same access points as gluon-respondd counts for "wifi". */
+static void add_stations(struct uci_context *ctx, struct macset *set) {
+	struct uci_package *p;
+	struct uci_element *e;
+
+	if (uci_load(ctx, "wireless", &p))
+		return;
+
+	uci_foreach_element(&p->sections, e) {
+		struct uci_section *s = uci_to_section(e);
+		const char *network, *mode, *ifname;
+
+		if (strcmp(s->type, "wifi-iface"))
+			continue;
+		network = uci_lookup_option_string(ctx, s, "network");
+		mode = uci_lookup_option_string(ctx, s, "mode");
+		ifname = uci_lookup_option_string(ctx, s, "ifname");
+		if (!network || strcmp(network, "client") || !mode || strcmp(mode, "ap") || !ifname)
+			continue;
+		add_iface_stations(set, ifname);
+	}
+}
+
+/* gluon-mesh-batman-adv counts the clients in the local translation table
+ * of bat0. A routing node is the router of its clients: their frames stay
+ * in br-client and do not go into bat0. Thus count the MACs that the bridge
+ * learned on its client ports, and the stations of the access points (a
+ * sleeping station sends no frames to the bridge). The clients of other
+ * nodes come in through bat0 and do not count. */
+static void add_clients(struct json_object *obj) {
+	struct fdb_filter filter = {
+		.bridge = if_nametoindex(CLIENT_BRIDGE),
+		.skip = { if_nametoindex("bat0"), if_nametoindex("local-port") },
+		.skip_len = 2,
+	};
+	struct macset set = {};
+	struct uci_context *ctx;
+	struct json_object *clients;
+
+	if (!filter.bridge)
+		return;
+
+	ctx = uci_alloc_context();
+	if (!ctx)
+		return;
+	ctx->flags &= ~UCI_FLAG_STRICT;
+
+	if (!is_routing(ctx))
+		goto out;
+
+	if (fdb_clients(&filter, &set))
+		goto out;
+	add_stations(ctx, &set);
+
+	clients = json_object_new_object();
+	json_object_object_add(clients, "total", json_object_new_int(set.len));
+	json_object_object_add(obj, "clients", clients);
+
+out:
+	macset_free(&set);
+	uci_free_context(ctx);
+}
+
 static struct json_object * respondd_parker_statistics(void) {
 	struct json_object *ret = json_object_new_object();
 	struct gatewayinfo gwinfo = {0};
 
 	add_traffic(ret);
+	add_clients(ret);
 
 	if (getgatewayandiface(&gwinfo, AF_INET) > 0) {
 		return ret;

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Older firmware served the clients from its own dhcp.client section. Both
+# that and dhcp.local_client would feed dnsmasq for the same interface now,
+# so drop the old one (noderoute configures local_client).
+uci -q delete dhcp.client
+uci commit dhcp

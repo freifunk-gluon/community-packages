@@ -1,0 +1,9 @@
+-- Same additional packages as mesh-batman-adv-15
+feature('mesh-batman-adv-parker', {
+	'ffbs-mesh-batman-adv-parker',
+	'gluon-ebtables-limit-arp',
+})
+
+when(_'status-page' and _'mesh-batman-adv-parker', {
+	'gluon-status-page-mesh-batman-adv',
+})
