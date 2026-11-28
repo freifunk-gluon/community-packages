@@ -1,0 +1,21 @@
+#!/bin/sh
+# APBoot (Aruba AP-32x) wipes both images plus the environment if the reset
+# button is held during boot. execute_config_clear() honours
+# disable_reset_button=yes from the U-Boot environment, so make sure it is
+# there. Runs on every gluon-reconfigure, which also covers "env was purged"
+# (only writes when the value is actually missing).
+
+. /lib/functions.sh
+
+[ "$(board_name)" = "aruba,ap-32x" ] || exit 0
+
+command -v fw_printenv >/dev/null || exit 0
+[ -e /etc/fw_env.config ] || exit 0
+
+[ "$(fw_printenv -n disable_reset_button 2>/dev/null)" = "yes" ] && exit 0
+
+if fw_setenv disable_reset_button yes; then
+    logger -t ap325-no-reset-wipe "set disable_reset_button=yes"
+else
+    logger -t ap325-no-reset-wipe "FAILED to set disable_reset_button"
+fi
